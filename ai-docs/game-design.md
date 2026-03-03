@@ -13,25 +13,70 @@ A single-HTML, pass-and-play, turn-based board game for 2–4 players. Players p
 | Grid    | 7 × 7       | 13 × 13     |
 | Jump tiles per player | 3 | 4 |
 
-- Each cell on the grid is either **blank**, **occupied by a tile**, a **start position**, or a **dead zone (X)**.
-- The four corner cells are **start positions** (one per player).
-- Certain cells are pre-marked as **dead zones (X)**. The exact layout of dead zones (other than unused corners) is an open question — see §9.
+- Each cell on the grid is either **blank**, **occupied by a tile**, a **start base**, or a **dead zone (X)**.
+- Each of the four corners has a **start base** (one per player). Base size depends on board size:
+  - **13×13:** 2×2 base (4 cells per player)
+  - **7×7:** 1×1 base (1 cell per player)
+- Base cells are permanently occupied and cannot have tiles placed on them.
+- Certain cells are pre-marked as **dead zones (X)** as part of the board layout. See §3.8 and §3.9 for dead zone maps.
+- **Tiles may NOT be placed on start bases or dead zones.**
 
 ### 1.1 Coordinate System
 
 - Origin `(0, 0)` at top-left corner.
 - `row` increases downward, `col` increases rightward.
-- Corner positions:
-  - Top-left `(0, 0)` — Player 1 (e.g., Red)
-  - Top-right `(0, W-1)` — Player 2 (e.g., Blue)
-  - Bottom-right `(H-1, W-1)` — Player 3 (e.g., Green)
-  - Bottom-left `(H-1, 0)` — Player 4 (e.g., Yellow)
 
-### 1.2 Two-Player Setup
+### 1.2 Start Bases
 
-When only 2 players are present, they start on **diagonal** corners:
-- Player 1 → `(0, 0)`, Player 2 → `(H-1, W-1)` (or the other diagonal)
-- The two unused corner cells become **dead zones (X)**.
+Base size differs by board:
+
+**13×13 — 2×2 bases:**
+
+| Player | Corner       | Cells                              |
+|--------|--------------|-------------------------------------|
+| P1     | Top-left     | (0,0), (0,1), (1,0), (1,1)         |
+| P2     | Top-right    | (0,11), (0,12), (1,11), (1,12)     |
+| P3     | Bottom-right | (11,11), (11,12), (12,11), (12,12) |
+| P4     | Bottom-left  | (11,0), (11,1), (12,0), (12,1)     |
+
+Adjacent cells for first-move placement (13×13):
+
+| Player | Adjacent cells (4 options)              |
+|--------|-----------------------------------------|
+| P1     | (0,2), (1,2), (2,0), (2,1)             |
+| P2     | (0,10), (1,10), (2,11), (2,12)         |
+| P3     | (10,11), (10,12), (11,10), (12,10)     |
+| P4     | (10,0), (10,1), (11,2), (12,2)         |
+
+**7×7 — 1×1 bases:**
+
+| Player | Corner       | Cell   |
+|--------|--------------|--------|
+| P1     | Top-left     | (0,0)  |
+| P2     | Top-right    | (0,6)  |
+| P3     | Bottom-right | (6,6)  |
+| P4     | Bottom-left  | (6,0)  |
+
+Adjacent cells for first-move placement (7×7):
+
+| Player | Adjacent cells (2 options)  |
+|--------|-----------------------------|
+| P1     | (0,1), (1,0)               |
+| P2     | (0,5), (1,6)               |
+| P3     | (5,6), (6,5)               |
+| P4     | (5,0), (6,1)               |
+
+### 1.3 Player Count Setups
+
+**4 players:** All 4 corner bases are active start positions.
+
+**3 players:** Players choose which 3 corners to use. The unused corner's base becomes a **dead zone**.
+
+**2 players:** Players start on **diagonal** corners (e.g., P1 top-left, P2 bottom-right). The two unused diagonal corners become **dead zones**.
+
+### 1.4 Own-Start-Is-Deadly Rule
+
+A player's **own** start base is a **dead zone to that player**. If a player's movement chains them back into their own base, they are **eliminated**. However, an opponent reaching your base means the **opponent wins** (see §6).
 
 ---
 
@@ -79,7 +124,7 @@ Every tile can be placed in one of **4 rotations** (0°, 90°, 180°, 270° cloc
 
 ## 3. Six Tile Types
 
-Each tile type defines **4 internal paths** connecting pairs of entrances. Below are the assumed path connections (at 0° rotation). **These need verification against the reference images — see §9 Open Questions.**
+Each tile type defines **4 internal paths** connecting pairs of entrances. Below are the path connections at 0° rotation. **(Confirmed correct by designer.)**
 
 ### 3.1 Straightaway
 
@@ -147,7 +192,9 @@ The N-S and E-W paths visually cross/weave over each other.
 
 A special tile that contains a **jump pad**. The jump pad causes the player to skip over the next cell in the direction of travel and land on the cell beyond it (see §5.3).
 
-**Jump tile path layout is an open question** — see §9. Assumed to function like a straightaway but with the jump mechanic on each of its 4 paths.
+The jump tile uses the same path layout as the **straightaway** (N0↔S1, N1↔S0, E0↔W1, E1↔W0), but with the jump mechanic on each path.
+
+**Jump entrance preservation rule:** When a player enters a jump tile via entrance X, they land on the **same entrance index X** on the destination cell (two cells away). For example, entering via S1 means landing on S1 of the cell beyond the skipped cell.
 
 ### 3.7 Tile Supply
 
@@ -159,6 +206,66 @@ A special tile that contains a **jump pad**. The jump pad causes the player to s
 | Diagonal Straightaway | —                      | —                        | Yes        |
 | Weave                 | —                      | —                        | Yes        |
 | Jump                  | 3                      | 4                        | No         |
+
+### 3.8 Dead Zone Layout — 13×13 Board (Confirmed)
+
+**13 fixed interior dead zones** form a 4-fold rotationally symmetric diamond pattern centered on (6,6):
+
+| Dead Zone | Symmetry Group |
+|-----------|---------------|
+| (6, 6)    | Center        |
+| (3, 6), (6, 9), (9, 6), (6, 3) | Outer cross (3 cells from center) |
+| (4, 4), (4, 8), (8, 8), (8, 4) | Outer diamond |
+| (5, 5), (5, 7), (7, 7), (7, 5) | Inner diamond |
+
+**Complete 13×13 board map (4-player mode):**
+
+```
+     0  1  2  3  4  5  6  7  8  9 10 11 12
+ 0:  B  B  .  .  .  .  .  .  .  .  .  B  B
+ 1:  B  B  .  .  .  .  .  .  .  .  .  B  B
+ 2:  .  .  .  .  .  .  .  .  .  .  .  .  .
+ 3:  .  .  .  .  .  .  X  .  .  .  .  .  .
+ 4:  .  .  .  .  X  .  .  .  X  .  .  .  .
+ 5:  .  .  .  .  .  X  .  X  .  .  .  .  .
+ 6:  .  .  .  X  .  .  X  .  .  X  .  .  .
+ 7:  .  .  .  .  .  X  .  X  .  .  .  .  .
+ 8:  .  .  .  .  X  .  .  .  X  .  .  .  .
+ 9:  .  .  .  .  .  .  X  .  .  .  .  .  .
+10:  .  .  .  .  .  .  .  .  .  .  .  .  .
+11:  B  B  .  .  .  .  .  .  .  .  .  B  B
+12:  B  B  .  .  .  .  .  .  .  .  .  B  B
+
+B = Start base (2×2)    X = Dead zone    . = Blank
+```
+
+These 13 interior dead zones are **fixed** and present in all games regardless of player count. In 2- or 3-player mode, the unused corner 2×2 bases also become dead zones (adding 4 or 8 more dead-zone cells).
+
+### 3.9 Dead Zone Layout — 7×7 Board (Confirmed)
+
+**5 fixed interior dead zones** form a 4-fold rotationally symmetric diamond pattern centered on (3,3):
+
+| Dead Zone | Symmetry Group |
+|-----------|---------------|
+| (3, 3)    | Center        |
+| (2, 2), (2, 4), (4, 4), (4, 2) | Diamond |
+
+**Complete 7×7 board map (4-player mode):**
+
+```
+     0  1  2  3  4  5  6
+ 0:  B  .  .  .  .  .  B
+ 1:  .  .  .  .  .  .  .
+ 2:  .  .  X  .  X  .  .
+ 3:  .  .  .  X  .  .  .
+ 4:  .  .  X  .  X  .  .
+ 5:  .  .  .  .  .  .  .
+ 6:  B  .  .  .  .  .  B
+
+B = Start base (1×1)    X = Dead zone    . = Blank
+```
+
+These 5 interior dead zones are **fixed** and present in all games regardless of player count.
 
 ---
 
@@ -172,8 +279,9 @@ Each player tracks:
 | `color`             | Red / Blue / Green / Yellow                         |
 | `position`          | `{row, col, entranceIndex}` — current cell + which entrance the player is sitting on |
 | `alive`             | Boolean — eliminated players are out                |
+| `hasPlacedFirstTile`| Boolean — false until their first tile is placed    |
 | `jumpTilesRemaining`| Count of jump tiles left to place                   |
-| `startCorner`       | Which corner is this player's start                 |
+| `base`              | Start base: `{cells: [[r,c],...]}` — 2×2 on 13×13, 1×1 on 7×7 |
 
 ---
 
@@ -181,30 +289,35 @@ Each player tracks:
 
 ### 5.1 Placement Phase
 
-1. The current player selects a **tile type** and a **rotation** (0°/90°/180°/270°).
-2. The player places the tile on **any blank cell adjacent to a cell that already has a tile or a start position** (standard adjacency — N/S/E/W, not diagonal). This means tiles expand outward from the starting area.
-3. Placing a tile is **mandatory** — you must place exactly one tile per turn.
+**First turn (special):** The player places a tile on **any blank cell adjacent to their base** (see §1.2 for adjacent cell counts per board size). They then choose one of the entrances on that tile that faces their base, and their token is placed on that entrance. The player **ends on a blank cell** — there is no path to chain onto from the first tile. **(Confirmed.)**
 
-> **Open question:** Can a tile be placed on *any* blank cell, or only on the cell directly "in front of" the current player's entrance? The rules say "in front of them" which suggests it must be the cell the player's current entrance faces. See §9.
+**Subsequent turns:** The player selects a tile type and rotation, then places the tile on the **single blank cell directly in front of the entrance they are currently on**. The entrance determines which adjacent cell is "in front" (e.g., if on entrance N0 or N1 of a cell, the cell to the North is "in front"). **(Confirmed: most restrictive option — strategic planning is essential.)**
+
+**Placement restrictions:**
+- Placing a tile is **mandatory** — you must place exactly one tile per turn.
+- Tiles may **NOT** be placed on start bases or dead zones. **(Confirmed.)**
 
 ### 5.2 Movement Phase (Automatic)
 
-After a tile is placed, **all players whose current entrance now connects to a newly available path** must move immediately:
+After a tile is placed, **all players whose current entrance now connects to a newly available path** must move immediately. **(Confirmed: all affected players move, not just the current player.)** Movement is resolved **sequentially in player order** (P1 first, then P2, etc.), like chess. **(Confirmed.)**
 
 1. The player follows the path inside the tile they are on, exiting through the connected entrance.
 2. The exit entrance leads into the **adjacent cell** on the neighboring tile's corresponding entrance.
 3. If that adjacent cell **has a tile**, the player immediately follows that tile's path (chaining continues in the same turn).
 4. If the adjacent cell is **blank**, the player stops there, sitting on the entrance of the blank cell.
-5. If the adjacent cell is **off the board** or a **dead zone (X)** — the player is **eliminated**.
-6. If the player reaches **an opponent's start position** — the moving player **wins**.
+5. If the next cell is **off the board**, a **dead zone (X)**, or the player's **own start base** — the player is **eliminated at the boundary** (they do not enter the cell). **(Confirmed.)**
+6. If the player reaches **an opponent's start base** — the moving player **wins**.
 7. If two players end up on the **exact same position** (same cell + same entrance) — it is a **draw** between those two players.
+8. **Loop detection:** If during chaining the player visits the same `(row, col, entrance)` position twice, they are stuck in a loop and are **eliminated**. **(Confirmed.)**
 
 ### 5.3 Jump Pad Movement
 
 When a player is on a tile that is a **jump tile**:
 - Instead of moving to the adjacent cell, the player **skips over** the immediately adjacent cell and lands on the cell **two steps away** in the direction of travel.
-- If the landing cell is blank, the player sits on the entrance of that blank cell matching the orientation of the entrance used to enter the jump tile.
-- If the landing cell has a tile, the player enters via the corresponding entrance and continues following paths (chaining).
+- The player **flies over** the skipped cell, ignoring any tile on it. **(Confirmed.)**
+- The player lands on the **same entrance index** they used to enter the jump tile (e.g., S1 → S1). **(Confirmed.)**
+- If the landing cell is blank, the player stops there on that entrance.
+- If the landing cell has a tile, the player enters via that entrance and continues following paths (chaining).
 - If the skipped cell or landing cell is off the board / dead zone — the player is **eliminated**.
 
 ### 5.4 Turn Order
@@ -217,10 +330,12 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 
 | Condition | Result |
 |-----------|--------|
-| Player moves off the board | That player is **eliminated** |
-| Player moves onto a dead zone (X) | That player is **eliminated** |
-| Player reaches an opponent's start corner | Moving player **wins the game** |
-| Two players land on same position | **Draw** between those two |
+| Player's path leads off the board | Player is **eliminated at the boundary** (does not leave the board) |
+| Player's path leads into a dead zone (X) | Player is **eliminated at the boundary** (does not enter the dead zone cell) |
+| Player's path leads into their **own** start base | Player is **eliminated at the boundary** (own base is deadly) |
+| Player gets stuck in a **loop** (revisits same position during chaining) | Player is **eliminated** (stuck in loop) |
+| Player reaches any cell of an **opponent's** start base | Moving player **wins the game** |
+| Two players land on the exact same position | **Draw** between those two |
 | Only one player remains alive | That player **wins** |
 
 ---
@@ -314,16 +429,14 @@ Everything ships in **one `index.html`** file containing:
 ### 8.3 Data Structures
 
 ```javascript
-// Cell on the board
 Cell = {
   row: number,
   col: number,
   type: 'blank' | 'tile' | 'start' | 'deadzone',
   tile: null | { tileType: string, rotation: 0|1|2|3 },
-  owner: null | playerId   // for start cells
+  owner: null | playerId   // for start base cells
 }
 
-// Player
 Player = {
   id: number,
   name: string,
@@ -332,150 +445,110 @@ Player = {
   col: number,
   entrance: number,         // 0–7, which entrance they sit on
   alive: boolean,
+  hasPlacedFirstTile: boolean,
   jumpTilesLeft: number,
-  startRow: number,
-  startCol: number
+  base: {                   // 2×2 (13×13) or 1×1 (7×7)
+    cells: [[r,c], ...]     // all cells in base
+  }
 }
 
-// Tile definition (base rotation)
 TileDef = {
   name: string,
   paths: [[from, to], ...]  // 4 pairs of entrance indices
 }
+
+DEAD_ZONES_13x13 = [
+  [3,6], [4,4], [4,8], [5,5], [5,7],
+  [6,3], [6,6], [6,9],
+  [7,5], [7,7], [8,4], [8,8], [9,6]
+]
+
+DEAD_ZONES_7x7 = [
+  [2,2], [2,4], [3,3], [4,2], [4,4]
+]
 ```
 
 ### 8.4 Movement Algorithm (Pseudocode)
 
 ```
+function resolveTurn(placingPlayer):
+    for player in allAlivePlayers sorted by id:
+        if playerIsAffected(player, placedTile):
+            resolveMovement(player)
+
 function resolveMovement(player):
+    visited = Set()   // track (row, col, entrance) for loop detection
+
     while true:
         tile = board[player.row][player.col].tile
         if tile is null:
             break  // on blank cell, stop
 
+        state = (player.row, player.col, player.entrance)
+        if state in visited:
+            eliminate(player)   // stuck in a loop
+            return
+        visited.add(state)
+
         exitEntrance = tile.getConnectedExit(player.entrance)
-        (nextRow, nextCol, nextEntrance) = getAdjacentCell(player.row, player.col, exitEntrance)
 
         if tile.type == 'jump':
-            // skip one cell, land on the cell beyond
-            (skipRow, skipCol) = getAdjacentCell(player.row, player.col, exitEntrance)
-            (nextRow, nextCol, nextEntrance) = getAdjacentCell(skipRow, skipCol, exitEntrance)
-            // preserve entrance orientation from the jump entrance
+            direction = getDirection(exitEntrance)
+            (skipRow, skipCol) = step(player.row, player.col, direction)
+            (nextRow, nextCol) = step(skipRow, skipCol, direction)
+            nextEntrance = player.entrance  // S1→S1
+        else:
+            (nextRow, nextCol, nextEntrance) = getAdjacentCell(
+                player.row, player.col, exitEntrance)
 
-        if outOfBounds(nextRow, nextCol) or isDeadZone(nextRow, nextCol):
-            eliminate(player)
+        if outOfBounds(nextRow, nextCol):
+            eliminate(player)       // eliminated at boundary
             return
-
-        if isOpponentStart(nextRow, nextCol, player):
-            declareWinner(player)
+        if isDeadZone(nextRow, nextCol):
+            eliminate(player)       // eliminated at boundary
+            return
+        if isOwnBase(nextRow, nextCol, player):
+            eliminate(player)       // own base is deadly
+            return
+        if isOpponentBase(nextRow, nextCol, player):
+            declareWinner(player)   // reached opponent's base
             return
 
         player.row = nextRow
         player.col = nextCol
         player.entrance = nextEntrance
-
-        // check for collision with other players
         checkDrawCondition(player)
 ```
 
 ---
 
-## 9. Open Questions
+## 9. Resolved & Open Questions
 
-These need clarification before implementation can proceed:
+### Resolved
 
-### Q1: Exact Tile Path Connections (CRITICAL)
+| # | Question | Answer |
+|---|----------|--------|
+| Q1 | Tile path connections | **Confirmed correct** as documented in §3. |
+| Q2 | Tile placement — "in front of" | The single blank cell the player's entrance directly faces. |
+| Q3 | Dead zone layout (13×13) | **13 interior dead zones confirmed** — see §3.8 for exact coordinates. |
+| Q4 | First move | Player places on **any blank cell adjacent to their base** (4 options on 13×13, 2 options on 7×7), then picks an entrance facing the base. |
+| Q5 | Who moves after placement | **All affected players** move immediately, not just the current player. |
+| Q6 | Movement order | **Sequential by player order** (P1, P2, P3, P4), like chess. |
+| Q7 | Jump direction | Follows the exit direction of the tile's path. |
+| Q8 | Jump — skipped cell with tile | **Player flies over it**, ignoring the tile's paths. |
+| Q9 | Reaching own start | **Player is eliminated.** Own start base is a dead zone to its owner. |
+| Q10 | Three-player setup | **Players choose** which corner becomes the dead zone. |
+| Q11 | Tiles on start/dead zones | **No.** Tiles may not be placed on start bases or dead zones. |
+| Q12 | Jump — landing entrance | Player lands on the **same entrance index** they used to enter the jump tile (S1 → S1). |
+| Q13 | Elimination at dead zone | Player is **eliminated at the boundary** — they do not enter the dead zone cell. |
+| Q14 | Dead zone layout (7×7) | **5 interior dead zones confirmed** — (2,2), (2,4), (3,3), (4,2), (4,4). See §3.9. |
+| Q15 | First move chaining | **No chaining.** Player ends on a blank cell on their first turn. |
+| Q16 | Loop detection | Player stuck in a **loop is eliminated**. Detected by revisiting the same (row, col, entrance). |
+| Q17 | 7×7 base size | **1×1** (single corner cell), unlike the 13×13 board's 2×2 bases. |
 
-The PDF contained 6 reference images (one per tile type) showing the actual path layouts, but the images could not be extracted. The path connections in §3 are **best guesses** based on the tile names. Please verify or provide the exact entrance-pair connections for:
-- Straightaway
-- Centrifugal
-- U-Turn
-- Diagonal Straightaway
-- Weave
-- Jump Tile
+### All Questions Resolved
 
-### Q2: Tile Placement Rules — "In Front Of"
-
-> Rule 4: "the player must choose a tile to place **in front of them**."
-
-Does "in front of" mean:
-- **(A)** The single blank cell that the player's current entrance directly faces? (Most restrictive — player must plan carefully)
-- **(B)** Any blank cell adjacent (N/S/E/W) to the player's current cell?
-- **(C)** Any blank cell on the board?
-
-**Current assumption:** Option (A) — the cell the entrance faces.
-
-### Q3: Dead Zone Layout
-
-Are there dead zones on the board **besides** the unused corners in 2-player mode? If yes:
-- Are they fixed or randomly generated?
-- Are they symmetric?
-- How many on 7×7 vs. 13×13?
-
-**Current assumption:** Only unused corners in 2-player mode are dead zones. No other dead zones on the board.
-
-### Q4: Initial Placement / First Move
-
-> Rule 9: "When you start you place a tile next to your start position, and choose one of the entrances that touches your start tile."
-
-- Does "next to" mean any of the (up to 2) non-corner-edge-adjacent blank cells next to the corner?
-- After placing, the player's token moves from the start position to the chosen entrance on the newly placed tile. Does the token then immediately follow the tile's path?
-
-**Current assumption:** Player places a tile on a cell adjacent to their start corner, picks an entrance on that tile that faces the start corner, and the token moves to that entrance. No further movement occurs on the first turn (since the tile is the first placed, there is nothing beyond it to chain into).
-
-### Q5: "All Players Touching Entrances Move Immediately"
-
-> Rule 6: "all players touching the entrances are forced to move immediately"
-
-When a tile is placed, does this mean:
-- **(A)** Only the current player moves?
-- **(B)** ALL players whose current position now has a newly completed path (because the placed tile connects to their cell) must also move immediately?
-
-**Current assumption:** Option (B) — all affected players move. This is a key strategic element.
-
-### Q6: Movement Order When Multiple Players Move
-
-If multiple players are forced to move simultaneously after a tile placement:
-- Do they move in player order (P1 first, then P2, etc.)?
-- Or truly simultaneously (resolve all movements, then check collisions)?
-
-**Current assumption:** Simultaneous resolution — all compute their final positions, then check for collisions/draws.
-
-### Q7: Jump Tile — Direction of Jump
-
-Does the jump pad skip in the **direction the player is already traveling** (based on which entrance they used), or does the jump tile have a fixed jump direction regardless of entry?
-
-**Current assumption:** The jump is in the direction of the exit entrance (i.e., the path through the tile determines exit direction, then the player skips one cell in that direction).
-
-### Q8: Jump Tile — What if the Skipped Cell Has a Tile?
-
-If the cell being skipped over (during a jump) already has a tile on it, does:
-- **(A)** The player simply flies over it, ignoring its paths?
-- **(B)** The jump is blocked?
-
-**Current assumption:** Option (A) — the player flies over, ignoring the skipped cell's tile.
-
-### Q9: Reaching Your Own Start Position
-
-What happens if a player's movement chains them back to **their own** start position?
-- Is it a safe stop?
-- Does the player pass through?
-
-**Current assumption:** The player stops there; it is safe.
-
-### Q10: Three-Player Setup
-
-With 3 players, which 3 corners are used and which 1 becomes a dead zone?
-- Is it player's choice?
-- Fixed arrangement?
-
-**Current assumption:** Players choose, or the 4th corner (bottom-left) is the default dead zone.
-
-### Q11: Can You Place a Tile on a Start Position?
-
-Start positions occupy corner cells. Can tiles be placed directly on a start cell?
-
-**Current assumption:** No — start positions are permanent and cannot be overwritten.
+No remaining open questions. The design is fully specified and ready for implementation.
 
 ---
 
