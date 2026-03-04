@@ -726,9 +726,9 @@
         nextRow = lr; nextCol = lc; nextEntrance = entry;
       } else if (tileType === "diagonalJump") {
         const dir = getDiagonalDirection(entry, exit, rot);
-        const [sr, sc] = stepDiag(row, col, dir);
-        const [lr, lc] = stepDiag(sr, sc, dir);
-        if (isFatal(sr, sc, player) || isFatal(lr, lc, player)) { result.eliminated = true; return result; }
+        // Diagonal jump lands on the corner-touching diagonal tile.
+        const [lr, lc] = stepDiag(row, col, dir);
+        if (isFatal(lr, lc, player)) { result.eliminated = true; return result; }
         if (isOpponentBaseCell(player, lr, lc)) { result.win = true; return result; }
         nextRow = lr; nextCol = lc; nextEntrance = entry;
       } else {
