@@ -211,11 +211,11 @@
     .elimination-overlay {
       position: fixed;
       inset: 0;
-      z-index: 100;
+      z-index: 10000;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: rgba(0, 0, 0, .72);
+      background: rgba(80, 10, 10, .55);
       backdrop-filter: blur(6px);
     }
     .elimination-box {
@@ -304,13 +304,14 @@
       </div>
     </div>
 
-    <div id="gameView" class="hidden">
-      <div id="eliminationOverlay" class="elimination-overlay hidden">
-        <div class="elimination-box">
-          <h2 id="elimText"></h2>
-          <button id="elimOkBtn">OK</button>
-        </div>
+    <div id="eliminationOverlay" class="elimination-overlay hidden">
+      <div class="elimination-box">
+        <h2 id="elimText"></h2>
+        <button id="elimOkBtn">OK</button>
       </div>
+    </div>
+
+    <div id="gameView" class="hidden">
       <div class="chip-row" id="headerChips"></div>
       <div class="game">
         <div class="board-wrap card">
