@@ -1,3 +1,12 @@
+# Tile Path Game - Design Docs
+
+This document was split into two focused markdown files:
+
+- `ai-docs/game-rules.md` - gameplay rules, tile behavior, turn flow, and win/lose conditions.
+- `ai-docs/game-graphics.md` - tile visuals, board rendering, UI layout, and style guidance.
+
+Use these two docs as the current source of truth.
+
 # Tile Path Game — Design Document
 
 ## Overview
