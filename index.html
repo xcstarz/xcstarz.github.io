@@ -876,7 +876,6 @@
             ev.dataTransfer.effectAllowed = "copy";
             ev.dataTransfer.setData("text/plain", type);
           }
-          renderAll();
         };
         b.ondragend = () => { app.dragTileType = null; };
         b.innerHTML = `${tileSvg({type, rot:0}, 36)}<div>${TILE_LABELS[type]}</div>`;
@@ -938,7 +937,11 @@
           };
           btn.ondrop = (ev) => {
             ev.preventDefault();
-            const draggedType = (ev.dataTransfer && ev.dataTransfer.getData("text/plain")) || app.dragTileType;
+            let draggedType = "";
+            if (ev.dataTransfer) {
+              draggedType = ev.dataTransfer.getData("text/plain") || "";
+            }
+            if (!draggedType) draggedType = app.dragTileType || "";
             if (!draggedType) return;
             app.selectedTile = draggedType;
             app.dragTileType = null;
