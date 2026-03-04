@@ -330,6 +330,7 @@
       winner: null,
       pendingFirstPlacement: null,
       logs: [],
+      dragTileType: null,
     };
 
     const el = {
@@ -602,11 +603,11 @@
       return result;
     }
 
-    function onCellClick(r, c) {
+    function attemptPlaceAtCell(r, c, tileType) {
       if (app.gameOver) return;
       const p = currentPlayer();
       if (!p || !p.alive) return;
-      if (!canUseTile(p, app.selectedTile)) return;
+      if (!canUseTile(p, tileType)) return;
 
       if (!p.hasPlacedFirstTile) {
         const valid = validFirstTurnCells(p).some(([vr, vc]) => vr === r && vc === c);
@@ -614,8 +615,8 @@
         app.pendingFirstPlacement = { r, c };
         const entries = getFirstTurnEntryChoices(p, r, c);
         renderEntryChoices(entries, (entry) => {
-          placeTile(r, c, app.selectedTile, app.selectedRot);
-          consumeTile(p, app.selectedTile);
+          placeTile(r, c, tileType, app.selectedRot);
+          consumeTile(p, tileType);
           executeFirstTurnMovement(p, r, c, entry);
           p.hasPlacedFirstTile = true;
           app.pendingFirstPlacement = null;
@@ -628,10 +629,14 @@
       const valid = validSubsequentCell(p);
       if (!valid || valid[0] !== r || valid[1] !== c) return;
 
-      placeTile(r, c, app.selectedTile, app.selectedRot);
-      consumeTile(p, app.selectedTile);
+      placeTile(r, c, tileType, app.selectedRot);
+      consumeTile(p, tileType);
       resolveAfterPlacement(r, c);
       postTurnAdvance();
+    }
+
+    function onCellClick(r, c) {
+      attemptPlaceAtCell(r, c, app.selectedTile);
     }
 
     function placeTile(r, c, type, rot) {
@@ -863,6 +868,17 @@
         const enabledByPool = p && canUseTile(p, type);
         b.disabled = app.gameOver || !enabledByMode || !enabledByPool;
         b.onclick = () => { app.selectedTile = type; renderAll(); };
+        b.draggable = !b.disabled;
+        b.ondragstart = (ev) => {
+          app.dragTileType = type;
+          app.selectedTile = type;
+          if (ev.dataTransfer) {
+            ev.dataTransfer.effectAllowed = "copy";
+            ev.dataTransfer.setData("text/plain", type);
+          }
+          renderAll();
+        };
+        b.ondragend = () => { app.dragTileType = null; };
         b.innerHTML = `${tileSvg({type, rot:0}, 36)}<div>${TILE_LABELS[type]}</div>`;
         if (type === "jump" || type === "diagonalJump") {
           let remaining = 0;
@@ -914,6 +930,20 @@
           }
           if (validSet.has(key(r, c))) btn.classList.add("valid");
           btn.onclick = () => onCellClick(r, c);
+          btn.ondragover = (ev) => {
+            if (!app.dragTileType) return;
+            if (!validSet.has(key(r, c))) return;
+            ev.preventDefault();
+            if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
+          };
+          btn.ondrop = (ev) => {
+            ev.preventDefault();
+            const draggedType = (ev.dataTransfer && ev.dataTransfer.getData("text/plain")) || app.dragTileType;
+            if (!draggedType) return;
+            app.selectedTile = draggedType;
+            app.dragTileType = null;
+            attemptPlaceAtCell(r, c, draggedType);
+          };
 
           if (cell.tile) {
             btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, 52)}</div>`;
