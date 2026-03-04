@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tile Path Game</title>
+  <style>
+    :root {
+      --bg: #0b1220;
+      --panel: #131d33;
+      --panel-2: #1a2744;
+      --text: #eef4ff;
+      --muted: #a7b6d6;
+      --accent: #7c9bff;
+      --danger: #ff6b6b;
+      --grid: #2a3e66;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: radial-gradient(1200px 800px at 20% -10%, #1a2b52, #0b1220 60%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .app {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .card {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid #2a3b62;
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+    .setup {
+      max-width: 860px;
+      margin: 40px auto;
+      padding: 22px;
+    }
+    h1, h2, h3 { margin: 0; }
+    .sub { color: var(--muted); margin: 8px 0 18px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .field label { font-weight: 600; font-size: 14px; color: #dbe7ff; }
+    select, input[type="text"], button {
+      border: 1px solid #3b5283;
+      background: #0f1830;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    button {
+      cursor: pointer;
+      background: linear-gradient(180deg, #28427e, #1f3568);
+      border-color: #4566a4;
+      font-weight: 600;
+    }
+    button:hover { filter: brightness(1.08); }
+    .hidden { display: none !important; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1px solid #446096;
+      background: #101b35;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      color: #cde0ff;
+    }
+    .game {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 14px;
+      margin-top: 10px;
+    }
+    .board-wrap {
+      padding: 12px;
+      overflow: auto;
+    }
+    .board {
+      display: grid;
+      gap: 1px;
+      background: var(--grid);
+      border: 1px solid #3a5185;
+      border-radius: 10px;
+      padding: 1px;
+      width: max-content;
+      margin: 0 auto;
+    }
+    .cell {
+      width: 52px;
+      height: 52px;
+      background: #0d1730;
+      position: relative;
+      cursor: pointer;
+      border: none;
+      padding: 0;
+    }
+    .cell.valid { outline: 2px solid #58e2a9; outline-offset: -2px; }
+    .cell.invalid { cursor: not-allowed; }
+    .cell.dead {
+      background:
+        linear-gradient(45deg, transparent 45%, #b83f4e 45%, #b83f4e 55%, transparent 55%),
+        linear-gradient(-45deg, transparent 45%, #b83f4e 45%, #b83f4e 55%, transparent 55%),
+        #251226;
+    }
+    .cell.start { background: #16233f; }
+    .start-p1 { box-shadow: inset 0 0 0 2px #ff5a6f; }
+    .start-p2 { box-shadow: inset 0 0 0 2px #5aa0ff; }
+    .start-p3 { box-shadow: inset 0 0 0 2px #59d37e; }
+    .start-p4 { box-shadow: inset 0 0 0 2px #ffd65a; }
+    .token {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,.8);
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 4;
+    }
+    .token.p1 { background: #ff5a6f; }
+    .token.p2 { background: #5aa0ff; }
+    .token.p3 { background: #59d37e; }
+    .token.p4 { background: #ffd65a; }
+    .sidebar {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .panel {
+      padding: 12px;
+      border: 1px solid #3b5387;
+      border-radius: 10px;
+      background: #0f1a34;
+    }
+    .panel h3 {
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #dce8ff;
+    }
+    .status { font-size: 13px; color: #d1e0ff; line-height: 1.4; }
+    .status strong { color: #fff; }
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .tile-btn {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: center;
+      padding: 8px 6px;
+      font-size: 12px;
+      min-height: 84px;
+    }
+    .tile-btn.selected { outline: 2px solid #7eb4ff; }
+    .tile-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .rot-row, .entry-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .rot-btn, .entry-btn { padding: 6px 8px; font-size: 12px; }
+    .log {
+      max-height: 180px;
+      overflow: auto;
+      border: 1px solid #2f4777;
+      border-radius: 8px;
+      padding: 8px;
+      background: #0c162c;
+      font-size: 12px;
+      color: #c9dafd;
+      line-height: 1.35;
+      white-space: pre-wrap;
+    }
+    .winner {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffe38a;
+    }
+    @media (max-width: 1120px) {
+      .game { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div id="setupView" class="setup card">
+      <h1>Tile Path Game</h1>
+      <p class="sub">Pass-and-play strategy game with path tiles, jump pads, and elimination traps.</p>
+      <div class="grid-2">
+        <div class="field">
+          <label for="boardSize">Board Size</label>
+          <select id="boardSize">
+            <option value="7">7 × 7</option>
+            <option value="13" selected>13 × 13</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="playerCount">Players</label>
+          <select id="playerCount">
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4" selected>4</option>
+          </select>
+        </div>
+      </div>
+      <div id="threePlayerCornerField" class="field hidden" style="margin-top: 12px;">
+        <label for="deadCornerSelect">3-player mode: choose dead corner</label>
+        <select id="deadCornerSelect">
+          <option value="0">Top-left</option>
+          <option value="1">Top-right</option>
+          <option value="2">Bottom-right</option>
+          <option value="3" selected>Bottom-left</option>
+        </select>
+      </div>
+      <div class="field" style="margin-top: 12px;">
+        <label for="jumpSelection">Jump Pad Selection</label>
+        <select id="jumpSelection">
+          <option value="cardinal">Cardinal jump only</option>
+          <option value="diagonal">Diagonal jump only</option>
+          <option value="both" selected>Both</option>
+          <option value="none">Neither</option>
+        </select>
+      </div>
+      <div id="bothPoolField" class="field" style="margin-top: 12px;">
+        <label for="poolMode">Both enabled: pool mode</label>
+        <select id="poolMode">
+          <option value="combined">Combined pool</option>
+          <option value="separate" selected>Separate pools (2 each)</option>
+        </select>
+      </div>
+      <div class="grid-2" style="margin-top: 12px;">
+        <div class="field"><label for="p1Name">Player 1</label><input id="p1Name" type="text" value="Player 1"></div>
+        <div class="field"><label for="p2Name">Player 2</label><input id="p2Name" type="text" value="Player 2"></div>
+        <div class="field"><label for="p3Name">Player 3</label><input id="p3Name" type="text" value="Player 3"></div>
+        <div class="field"><label for="p4Name">Player 4</label><input id="p4Name" type="text" value="Player 4"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+        <button id="startBtn">Start Game</button>
+      </div>
+    </div>
+
+    <div id="gameView" class="hidden">
+      <div class="chip-row" id="headerChips"></div>
+      <div class="game">
+        <div class="board-wrap card">
+          <div id="board" class="board"></div>
+        </div>
+        <div class="sidebar card">
+          <div class="panel">
+            <h3>Game Status</h3>
+            <div id="statusText" class="status"></div>
+            <div id="winnerText" class="winner hidden"></div>
+          </div>
+          <div class="panel">
+            <h3>Tile Selection</h3>
+            <div id="tileGrid" class="tile-grid"></div>
+            <div style="margin-top:8px;">
+              <div style="font-size:12px;color:#c5d5f9;margin-bottom:6px;">Rotation</div>
+              <div id="rotRow" class="rot-row"></div>
+            </div>
+            <div id="entrySelectWrap" class="hidden" style="margin-top:8px;">
+              <div style="font-size:12px;color:#ffdba8;margin-bottom:6px;">First turn: choose entry touching your base</div>
+              <div id="entryRow" class="entry-row"></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Players</h3>
+            <div id="playersText" class="status"></div>
+          </div>
+          <div class="panel">
+            <h3>Action Log</h3>
+            <div id="log" class="log"></div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button id="newGameBtn">New Game</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const COLORS = ["p1", "p2", "p3", "p4"];
+    const CORNERS = ["TL", "TR", "BR", "BL"];
+    const DEAD_ZONES_13 = new Set([
+      "3,6","4,4","4,8","5,5","5,7","6,3","6,6","6,9","7,5","7,7","8,4","8,8","9,6"
+    ]);
+    const DEAD_ZONES_7 = new Set(["2,2","2,4","3,3","4,2","4,4"]);
+
+    const BASE_TILE_DEFS = {
+      straightaway: [[0,5],[1,4],[2,7],[3,6]],
+      uturn: [[0,1],[2,3],[4,5],[6,7]],
+      centrifugal: [[0,7],[1,2],[3,4],[5,6]],
+      diagonal: [[0,3],[1,6],[4,7],[5,2]],
+      weave: [[0,4],[1,5],[2,6],[3,7]],
+      jump: [[0,5],[1,4],[2,7],[3,6]],
+      diagonalJump: [[0,3],[1,6],[4,7],[5,2]],
+    };
+
+    const TILE_LABELS = {
+      straightaway: "Straight",
+      uturn: "U-Turn",
+      centrifugal: "Centrifugal",
+      diagonal: "Diagonal",
+      weave: "Weave",
+      jump: "Jump",
+      diagonalJump: "Diag Jump",
+    };
+
+    const app = {
+      config: null,
+      board: [],
+      players: [],
+      currentPlayerIdx: 0,
+      selectedTile: "straightaway",
+      selectedRot: 0,
+      gameOver: false,
+      winner: null,
+      pendingFirstPlacement: null,
+      logs: [],
+    };
+
+    const el = {
+      setupView: document.getElementById("setupView"),
+      gameView: document.getElementById("gameView"),
+      board: document.getElementById("board"),
+      statusText: document.getElementById("statusText"),
+      winnerText: document.getElementById("winnerText"),
+      playersText: document.getElementById("playersText"),
+      tileGrid: document.getElementById("tileGrid"),
+      rotRow: document.getElementById("rotRow"),
+      entrySelectWrap: document.getElementById("entrySelectWrap"),
+      entryRow: document.getElementById("entryRow"),
+      log: document.getElementById("log"),
+      headerChips: document.getElementById("headerChips"),
+      boardSize: document.getElementById("boardSize"),
+      playerCount: document.getElementById("playerCount"),
+      deadCornerSelect: document.getElementById("deadCornerSelect"),
+      threePlayerCornerField: document.getElementById("threePlayerCornerField"),
+      jumpSelection: document.getElementById("jumpSelection"),
+      poolMode: document.getElementById("poolMode"),
+      bothPoolField: document.getElementById("bothPoolField"),
+      p1Name: document.getElementById("p1Name"),
+      p2Name: document.getElementById("p2Name"),
+      p3Name: document.getElementById("p3Name"),
+      p4Name: document.getElementById("p4Name"),
+      startBtn: document.getElementById("startBtn"),
+      newGameBtn: document.getElementById("newGameBtn"),
+    };
+
+    function key(r, c) { return `${r},${c}`; }
+    function inBounds(size, r, c) { return r >= 0 && c >= 0 && r < size && c < size; }
+    function edgeDir(i) { if (i <= 1) return "N"; if (i <= 3) return "E"; if (i <= 5) return "S"; return "W"; }
+    function stepCard(r, c, d) {
+      if (d === "N") return [r - 1, c];
+      if (d === "E") return [r, c + 1];
+      if (d === "S") return [r + 1, c];
+      return [r, c - 1];
+    }
+    function stepDiag(r, c, d) {
+      if (d === "NE") return [r - 1, c + 1];
+      if (d === "NW") return [r - 1, c - 1];
+      if (d === "SE") return [r + 1, c + 1];
+      return [r + 1, c - 1];
+    }
+    function oppositeEntrance(i) {
+      const map = {0:5,1:4,2:7,3:6,4:1,5:0,6:3,7:2};
+      return map[i];
+    }
+    function rotateIdx(i, rot) { return (i + rot * 2) % 8; }
+    function unrotateIdx(i, rot) { return (i - rot * 2 + 16) % 8; }
+    function rotateDiagDirection(dir, rot) {
+      const arr = ["NE","SE","SW","NW"];
+      return arr[(arr.indexOf(dir) + rot) % 4];
+    }
+    function getEntrancePoint(i) {
+      const pts = {
+        0:[.30,.06],1:[.70,.06],2:[.94,.30],3:[.94,.70],4:[.70,.94],5:[.30,.94],6:[.06,.70],7:[.06,.30]
+      };
+      return pts[i];
+    }
+
+    function setupBindings() {
+      el.playerCount.addEventListener("change", () => {
+        el.threePlayerCornerField.classList.toggle("hidden", el.playerCount.value !== "3");
+      });
+      el.jumpSelection.addEventListener("change", () => {
+        el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
+      });
+      el.startBtn.addEventListener("click", startGame);
+      el.newGameBtn.addEventListener("click", () => {
+        el.gameView.classList.add("hidden");
+        el.setupView.classList.remove("hidden");
+      });
+    }
+
+    function getBaseCells(size, corner) {
+      const is13 = size === 13;
+      if (!is13) {
+        const map = { TL:[[0,0]], TR:[[0,6]], BR:[[6,6]], BL:[[6,0]] };
+        return map[corner];
+      }
+      if (corner === "TL") return [[0,0],[0,1],[1,0],[1,1]];
+      if (corner === "TR") return [[0,11],[0,12],[1,11],[1,12]];
+      if (corner === "BR") return [[11,11],[11,12],[12,11],[12,12]];
+      return [[11,0],[11,1],[12,0],[12,1]];
+    }
+
+    function getAdjacentToBase(size, corner) {
+      if (size === 7) {
+        const map = {
+          TL:[[0,1],[1,0]],
+          TR:[[0,5],[1,6]],
+          BR:[[5,6],[6,5]],
+          BL:[[5,0],[6,1]],
+        };
+        return map[corner];
+      }
+      const map = {
+        TL:[[0,2],[1,2],[2,0],[2,1]],
+        TR:[[0,10],[1,10],[2,11],[2,12]],
+        BR:[[10,11],[10,12],[11,10],[12,10]],
+        BL:[[10,0],[10,1],[11,2],[12,2]],
+      };
+      return map[corner];
+    }
+
+    function startGame() {
+      const size = Number(el.boardSize.value);
+      const playerCount = Number(el.playerCount.value);
+      const jumpSelection = el.jumpSelection.value;
+      const poolMode = el.poolMode.value;
+      const names = [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value];
+
+      const activeCorners = [];
+      let deadCorner = null;
+      if (playerCount === 2) {
+        activeCorners.push("TL", "BR");
+      } else if (playerCount === 3) {
+        deadCorner = Number(el.deadCornerSelect.value);
+        CORNERS.forEach((c, i) => { if (i !== deadCorner) activeCorners.push(c); });
+      } else {
+        activeCorners.push(...CORNERS);
+      }
+
+      app.config = { size, playerCount, jumpSelection, poolMode, activeCorners };
+      app.board = Array.from({ length: size }, (_, r) =>
+        Array.from({ length: size }, (_, c) => ({ r, c, tile: null, dead: false, startOwner: null }))
+      );
+      app.players = [];
+      app.currentPlayerIdx = 0;
+      app.selectedTile = "straightaway";
+      app.selectedRot = 0;
+      app.pendingFirstPlacement = null;
+      app.logs = [];
+      app.gameOver = false;
+      app.winner = null;
+
+      const interior = size === 13 ? DEAD_ZONES_13 : DEAD_ZONES_7;
+      for (const k of interior) {
+        const [r, c] = k.split(",").map(Number);
+        app.board[r][c].dead = true;
+      }
+
+      CORNERS.forEach((corner, i) => {
+        const cells = getBaseCells(size, corner);
+        const isActive = activeCorners.includes(corner);
+        for (const [r, c] of cells) {
+          if (isActive) app.board[r][c].startOwner = activeCorners.indexOf(corner);
+          else app.board[r][c].dead = true;
+        }
+      });
+
+      activeCorners.forEach((corner, i) => {
+        const limitSingle = size === 13 ? 4 : 3;
+        const p = {
+          id: i,
+          name: names[i] || `Player ${i + 1}`,
+          color: COLORS[i],
+          corner,
+          baseCells: getBaseCells(size, corner),
+          adjacentFirst: getAdjacentToBase(size, corner),
+          row: null,
+          col: null,
+          entrance: null,
+          alive: true,
+          hasPlacedFirstTile: false,
+          jumpLeft: 0,
+          diagonalJumpLeft: 0,
+          combinedJumpLeft: 0,
+        };
+        if (jumpSelection === "cardinal") p.jumpLeft = limitSingle;
+        if (jumpSelection === "diagonal") p.diagonalJumpLeft = limitSingle;
+        if (jumpSelection === "both") {
+          if (poolMode === "combined") p.combinedJumpLeft = limitSingle;
+          else { p.jumpLeft = 2; p.diagonalJumpLeft = 2; }
+        }
+        app.players.push(p);
+      });
+
+      log(`Game started: ${size}×${size}, ${playerCount} players, jump mode "${jumpSelection}".`);
+      el.setupView.classList.add("hidden");
+      el.gameView.classList.remove("hidden");
+      renderAll();
+    }
+
+    function log(msg) {
+      app.logs.unshift(`${new Date().toLocaleTimeString()}  ${msg}`);
+      if (app.logs.length > 80) app.logs.pop();
+    }
+
+    function currentPlayer() { return app.players[app.currentPlayerIdx]; }
+
+    function getRotatedPairs(tileType, rot) {
+      return BASE_TILE_DEFS[tileType].map(([a, b]) => [rotateIdx(a, rot), rotateIdx(b, rot)]);
+    }
+
+    function getExitEntrance(tile, entry) {
+      const pairs = getRotatedPairs(tile.type, tile.rot);
+      for (const [a, b] of pairs) {
+        if (a === entry) return b;
+        if (b === entry) return a;
+      }
+      return null;
+    }
+
+    function getForwardCell(row, col, entrance) {
+      const d = edgeDir(entrance);
+      return stepCard(row, col, d);
+    }
+
+    function getEntranceOfNeighbor(exitEntrance) {
+      return oppositeEntrance(exitEntrance);
+    }
+
+    function playerOwnsBaseCell(player, r, c) {
+      return player.baseCells.some(([br, bc]) => br === r && bc === c);
+    }
+    function inAnyOpponentBase(player, r, c) {
+      return app.players.some(p => p.id !== player.id && p.alive && p.baseCells.some(([br, bc]) => br === r && bc === c));
+    }
+
+    function canUseTile(player, tileType) {
+      if (tileType !== "jump" && tileType !== "diagonalJump") return true;
+      const js = app.config.jumpSelection;
+      if (js === "none") return false;
+      if (js === "cardinal") return tileType === "jump" && player.jumpLeft > 0;
+      if (js === "diagonal") return tileType === "diagonalJump" && player.diagonalJumpLeft > 0;
+      if (js === "both") {
+        if (app.config.poolMode === "combined") return player.combinedJumpLeft > 0;
+        return tileType === "jump" ? player.jumpLeft > 0 : player.diagonalJumpLeft > 0;
+      }
+      return false;
+    }
+
+    function consumeTile(player, tileType) {
+      if (tileType !== "jump" && tileType !== "diagonalJump") return;
+      const js = app.config.jumpSelection;
+      if (js === "cardinal") player.jumpLeft--;
+      else if (js === "diagonal") player.diagonalJumpLeft--;
+      else if (js === "both") {
+        if (app.config.poolMode === "combined") player.combinedJumpLeft--;
+        else if (tileType === "jump") player.jumpLeft--;
+        else player.diagonalJumpLeft--;
+      }
+    }
+
+    function validFirstTurnCells(player) {
+      return player.adjacentFirst.filter(([r, c]) => inBounds(app.config.size, r, c) &&
+        !app.board[r][c].dead && app.board[r][c].startOwner == null && app.board[r][c].tile == null);
+    }
+
+    function validSubsequentCell(player) {
+      const [r, c] = getForwardCell(player.row, player.col, player.entrance);
+      if (!inBounds(app.config.size, r, c)) return null;
+      const cell = app.board[r][c];
+      if (cell.dead || cell.startOwner != null || cell.tile != null) return null;
+      return [r, c];
+    }
+
+    function getFirstTurnEntryChoices(player, tileR, tileC) {
+      const result = [];
+      for (let i = 0; i < 8; i++) {
+        const d = edgeDir(i);
+        const [nr, nc] = stepCard(tileR, tileC, d);
+        if (playerOwnsBaseCell(player, nr, nc)) result.push(i);
+      }
+      return result;
+    }
+
+    function onCellClick(r, c) {
+      if (app.gameOver) return;
+      const p = currentPlayer();
+      if (!p || !p.alive) return;
+      if (!canUseTile(p, app.selectedTile)) return;
+
+      if (!p.hasPlacedFirstTile) {
+        const valid = validFirstTurnCells(p).some(([vr, vc]) => vr === r && vc === c);
+        if (!valid) return;
+        app.pendingFirstPlacement = { r, c };
+        const entries = getFirstTurnEntryChoices(p, r, c);
+        renderEntryChoices(entries, (entry) => {
+          placeTile(r, c, app.selectedTile, app.selectedRot);
+          consumeTile(p, app.selectedTile);
+          executeFirstTurnMovement(p, r, c, entry);
+          p.hasPlacedFirstTile = true;
+          app.pendingFirstPlacement = null;
+          el.entrySelectWrap.classList.add("hidden");
+          postTurnAdvance();
+        });
+        return;
+      }
+
+      const valid = validSubsequentCell(p);
+      if (!valid || valid[0] !== r || valid[1] !== c) return;
+
+      placeTile(r, c, app.selectedTile, app.selectedRot);
+      consumeTile(p, app.selectedTile);
+      resolveAfterPlacement(r, c);
+      postTurnAdvance();
+    }
+
+    function placeTile(r, c, type, rot) {
+      app.board[r][c].tile = { type, rot };
+      log(`${currentPlayer().name} placed ${TILE_LABELS[type]} (${rot * 90}°) at (${r},${c}).`);
+    }
+
+    function executeFirstTurnMovement(player, tileR, tileC, entry) {
+      let curR = tileR, curC = tileC, curEntry = entry;
+      const tile = app.board[curR][curC].tile;
+      const exit = getExitEntrance(tile, curEntry);
+      const next = jumpOrAdjacent(curR, curC, curEntry, exit, tile.type, tile.rot);
+      if (next.eliminated) {
+        eliminatePlayer(player, `${player.name} was eliminated on first move.`);
+        return;
+      }
+      if (next.win) {
+        app.gameOver = true;
+        app.winner = player.id;
+        log(`${player.name} wins by reaching opponent base.`);
+        return;
+      }
+      player.row = next.row;
+      player.col = next.col;
+      player.entrance = next.entrance;
+      log(`${player.name} ends first turn at (${player.row},${player.col}) on entrance ${entranceName(player.entrance)}.`);
+    }
+
+    function resolveAfterPlacement(placedR, placedC) {
+      const affected = app.players
+        .filter(p => p.alive && p.hasPlacedFirstTile && p.row != null)
+        .filter(p => {
+          const [fr, fc] = getForwardCell(p.row, p.col, p.entrance);
+          return fr === placedR && fc === placedC;
+        })
+        .sort((a, b) => a.id - b.id);
+
+      for (const p of affected) {
+        if (!p.alive || app.gameOver) continue;
+        resolveMovement(p);
+      }
+
+      checkPositionDraw();
+      if (app.gameOver) return;
+
+      const alive = app.players.filter(p => p.alive);
+      if (alive.length === 1) {
+        app.gameOver = true;
+        app.winner = alive[0].id;
+        log(`${alive[0].name} wins as last player alive.`);
+      }
+    }
+
+    function resolveMovement(player) {
+      const visited = new Set();
+      while (true) {
+        const stateK = `${player.row},${player.col},${player.entrance}`;
+        if (visited.has(stateK)) {
+          eliminatePlayer(player, `${player.name} got stuck in a loop and is eliminated.`);
+          return;
+        }
+        visited.add(stateK);
+
+        const cell = app.board[player.row][player.col];
+        if (!cell.tile) return;
+
+        const exit = getExitEntrance(cell.tile, player.entrance);
+        const next = jumpOrAdjacent(player.row, player.col, player.entrance, exit, cell.tile.type, cell.tile.rot, player);
+
+        if (next.eliminated) {
+          eliminatePlayer(player, `${player.name} was eliminated.`);
+          return;
+        }
+        if (next.win) {
+          app.gameOver = true;
+          app.winner = player.id;
+          log(`${player.name} wins by reaching opponent base.`);
+          return;
+        }
+
+        player.row = next.row;
+        player.col = next.col;
+        player.entrance = next.entrance;
+        if (!app.board[player.row][player.col].tile) return;
+      }
+    }
+
+    function jumpOrAdjacent(row, col, entry, exit, tileType, rot, playerRef = currentPlayer()) {
+      const player = playerRef;
+      const result = { eliminated: false, win: false, row: null, col: null, entrance: null };
+
+      let nextRow, nextCol, nextEntrance;
+      if (tileType === "jump") {
+        const dir = edgeDir(exit);
+        const [sr, sc] = stepCard(row, col, dir);
+        const [lr, lc] = stepCard(sr, sc, dir);
+        if (isFatal(sr, sc, player) || isFatal(lr, lc, player)) { result.eliminated = true; return result; }
+        if (isOpponentBaseCell(player, lr, lc)) { result.win = true; return result; }
+        nextRow = lr; nextCol = lc; nextEntrance = entry;
+      } else if (tileType === "diagonalJump") {
+        const dir = getDiagonalDirection(entry, exit, rot);
+        const [sr, sc] = stepDiag(row, col, dir);
+        const [lr, lc] = stepDiag(sr, sc, dir);
+        if (isFatal(sr, sc, player) || isFatal(lr, lc, player)) { result.eliminated = true; return result; }
+        if (isOpponentBaseCell(player, lr, lc)) { result.win = true; return result; }
+        nextRow = lr; nextCol = lc; nextEntrance = entry;
+      } else {
+        const d = edgeDir(exit);
+        const [nr, nc] = stepCard(row, col, d);
+        if (isFatal(nr, nc, player)) { result.eliminated = true; return result; }
+        if (isOpponentBaseCell(player, nr, nc)) { result.win = true; return result; }
+        nextRow = nr; nextCol = nc; nextEntrance = getEntranceOfNeighbor(exit);
+      }
+      result.row = nextRow;
+      result.col = nextCol;
+      result.entrance = nextEntrance;
+      return result;
+    }
+
+    function getDiagonalDirection(entry, exit, rot) {
+      const ue = unrotateIdx(entry, rot);
+      const ux = unrotateIdx(exit, rot);
+      const map = {
+        "0-3":"SE","3-0":"NW","1-6":"SW","6-1":"NE",
+        "5-2":"NE","2-5":"SW","4-7":"NW","7-4":"SE",
+      };
+      return rotateDiagDirection(map[`${ue}-${ux}`], rot);
+    }
+
+    function isFatal(r, c, player) {
+      if (!inBounds(app.config.size, r, c)) return true;
+      const cell = app.board[r][c];
+      if (cell.dead) return true;
+      if (playerOwnsBaseCell(player, r, c)) return true;
+      return false;
+    }
+    function isOpponentBaseCell(player, r, c) {
+      return app.players.some(p => p.id !== player.id && p.baseCells.some(([br, bc]) => br === r && bc === c));
+    }
+
+    function eliminatePlayer(player, msg) {
+      player.alive = false;
+      log(msg);
+    }
+
+    function checkPositionDraw() {
+      const alive = app.players.filter(p => p.alive && p.row != null);
+      for (let i = 0; i < alive.length; i++) {
+        for (let j = i + 1; j < alive.length; j++) {
+          const a = alive[i], b = alive[j];
+          if (a.row === b.row && a.col === b.col && a.entrance === b.entrance) {
+            app.gameOver = true;
+            app.winner = null;
+            log(`Draw: ${a.name} and ${b.name} landed on same position.`);
+            return;
+          }
+        }
+      }
+    }
+
+    function postTurnAdvance() {
+      if (!app.gameOver) {
+        let idx = app.currentPlayerIdx;
+        for (let i = 0; i < app.players.length; i++) {
+          idx = (idx + 1) % app.players.length;
+          if (app.players[idx].alive) {
+            app.currentPlayerIdx = idx;
+            break;
+          }
+        }
+      }
+      renderAll();
+    }
+
+    function entranceName(i) { return ["N0","N1","E0","E1","S0","S1","W0","W1"][i]; }
+
+    function renderEntryChoices(entries, onPick) {
+      el.entrySelectWrap.classList.remove("hidden");
+      el.entryRow.innerHTML = "";
+      entries.forEach(i => {
+        const b = document.createElement("button");
+        b.className = "entry-btn";
+        b.textContent = entranceName(i);
+        b.onclick = () => onPick(i);
+        el.entryRow.appendChild(b);
+      });
+    }
+
+    function renderAll() {
+      renderHeader();
+      renderTiles();
+      renderBoard();
+      renderStatus();
+      renderPlayers();
+      el.log.textContent = app.logs.join("\n");
+    }
+
+    function renderHeader() {
+      el.headerChips.innerHTML = "";
+      const chips = [
+        `Board: ${app.config.size}×${app.config.size}`,
+        `Players: ${app.config.playerCount}`,
+        `Jump: ${app.config.jumpSelection}${app.config.jumpSelection === "both" ? ` (${app.config.poolMode})` : ""}`,
+      ];
+      chips.forEach(t => {
+        const d = document.createElement("div");
+        d.className = "chip";
+        d.textContent = t;
+        el.headerChips.appendChild(d);
+      });
+    }
+
+    function tileIsEnabledForSelection(type) {
+      if (type !== "jump" && type !== "diagonalJump") return true;
+      const js = app.config.jumpSelection;
+      if (js === "none") return false;
+      if (js === "cardinal") return type === "jump";
+      if (js === "diagonal") return type === "diagonalJump";
+      return true;
+    }
+
+    function renderTiles() {
+      el.tileGrid.innerHTML = "";
+      const p = currentPlayer();
+      const types = Object.keys(TILE_LABELS);
+      types.forEach(type => {
+        const b = document.createElement("button");
+        b.className = "tile-btn" + (app.selectedTile === type ? " selected" : "");
+        const enabledByMode = tileIsEnabledForSelection(type);
+        const enabledByPool = p && canUseTile(p, type);
+        b.disabled = app.gameOver || !enabledByMode || !enabledByPool;
+        b.onclick = () => { app.selectedTile = type; renderAll(); };
+        b.innerHTML = `${tileSvg({type, rot:0}, 36)}<div>${TILE_LABELS[type]}</div>`;
+        if (type === "jump" || type === "diagonalJump") {
+          let remaining = 0;
+          if (app.config.jumpSelection === "both" && app.config.poolMode === "combined") remaining = p.combinedJumpLeft;
+          else remaining = type === "jump" ? p.jumpLeft : p.diagonalJumpLeft;
+          const c = document.createElement("div");
+          c.style.fontSize = "11px";
+          c.style.color = "#a6c1ff";
+          c.textContent = `left: ${remaining}`;
+          b.appendChild(c);
+        }
+        el.tileGrid.appendChild(b);
+      });
+
+      el.rotRow.innerHTML = "";
+      [0,1,2,3].forEach(rot => {
+        const b = document.createElement("button");
+        b.className = "rot-btn";
+        if (app.selectedRot === rot) b.style.outline = "2px solid #8ab8ff";
+        b.textContent = `${rot * 90}°`;
+        b.onclick = () => { app.selectedRot = rot; renderAll(); };
+        el.rotRow.appendChild(b);
+      });
+    }
+
+    function renderBoard() {
+      const size = app.config.size;
+      el.board.style.gridTemplateColumns = `repeat(${size}, 52px)`;
+      el.board.innerHTML = "";
+
+      const validSet = new Set();
+      const p = currentPlayer();
+      if (!app.gameOver && p?.alive) {
+        if (!p.hasPlacedFirstTile) validFirstTurnCells(p).forEach(([r, c]) => validSet.add(key(r, c)));
+        else {
+          const one = validSubsequentCell(p);
+          if (one) validSet.add(key(one[0], one[1]));
+        }
+      }
+
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const cell = app.board[r][c];
+          const btn = document.createElement("button");
+          btn.className = "cell";
+          if (cell.dead) btn.classList.add("dead");
+          if (cell.startOwner != null) {
+            btn.classList.add("start", `start-p${cell.startOwner + 1}`);
+          }
+          if (validSet.has(key(r, c))) btn.classList.add("valid");
+          btn.onclick = () => onCellClick(r, c);
+
+          if (cell.tile) {
+            btn.innerHTML = tileSvg(cell.tile, 52);
+          }
+
+          const tokens = playersAtCell(r, c);
+          tokens.forEach(tok => {
+            const t = document.createElement("div");
+            t.className = `token ${tok.color}`;
+            const [x, y] = getTokenPosition(tok);
+            t.style.left = `${x * 100}%`;
+            t.style.top = `${y * 100}%`;
+            btn.appendChild(t);
+          });
+          el.board.appendChild(btn);
+        }
+      }
+    }
+
+    function playersAtCell(r, c) {
+      const out = [];
+      for (const p of app.players) {
+        if (!p.alive) continue;
+        if (!p.hasPlacedFirstTile && p.baseCells.some(([br, bc]) => br === r && bc === c)) {
+          out.push({ color: p.color, entrance: null, inBase: true });
+        } else if (p.row === r && p.col === c) {
+          out.push({ color: p.color, entrance: p.entrance, inBase: false });
+        }
+      }
+      return out;
+    }
+
+    function getTokenPosition(tok) {
+      if (tok.inBase || tok.entrance == null) return [.5, .5];
+      return getEntrancePoint(tok.entrance);
+    }
+
+    function renderStatus() {
+      const p = currentPlayer();
+      if (app.gameOver) {
+        el.statusText.innerHTML = "Game over.";
+        if (app.winner == null) {
+          el.winnerText.textContent = "Result: Draw";
+        } else {
+          el.winnerText.textContent = `Winner: ${app.players[app.winner].name}`;
+        }
+        el.winnerText.classList.remove("hidden");
+      } else {
+        const turnText = p ? `<strong>${p.name}</strong> (${p.color.toUpperCase()})` : "-";
+        const phase = p && !p.hasPlacedFirstTile ? "First turn placement" : "Place tile in front of your entrance";
+        el.statusText.innerHTML = `Turn: ${turnText}<br>Phase: ${phase}`;
+        el.winnerText.classList.add("hidden");
+      }
+    }
+
+    function renderPlayers() {
+      const lines = app.players.map(p => {
+        const life = p.alive ? "alive" : "eliminated";
+        const pos = p.row == null ? "at base" : `(${p.row},${p.col}) ${entranceName(p.entrance)}`;
+        let jumps = "";
+        if (app.config.jumpSelection === "cardinal") jumps = `jump:${p.jumpLeft}`;
+        else if (app.config.jumpSelection === "diagonal") jumps = `diag:${p.diagonalJumpLeft}`;
+        else if (app.config.jumpSelection === "both") jumps = app.config.poolMode === "combined"
+          ? `combined:${p.combinedJumpLeft}` : `jump:${p.jumpLeft}, diag:${p.diagonalJumpLeft}`;
+        return `${p.name} — ${life}, ${pos}${jumps ? `, ${jumps}` : ""}`;
+      });
+      el.playersText.innerHTML = lines.join("<br>");
+    }
+
+    function tileSvg(tile, size) {
+      const pairs = getRotatedPairs(tile.type, tile.rot);
+      const lines = pairs.map(([a, b]) => {
+        const [x1, y1] = getEntrancePoint(a);
+        const [x2, y2] = getEntrancePoint(b);
+        return `<line x1="${x1 * size}" y1="${y1 * size}" x2="${x2 * size}" y2="${y2 * size}" stroke="#d9e8ff" stroke-width="2.2"/>`;
+      }).join("");
+      const jumpCircle = (tile.type === "jump" || tile.type === "diagonalJump")
+        ? `<circle cx="${size/2}" cy="${size/2}" r="${size*0.12}" fill="none" stroke="#ffd46b" stroke-width="2.4"/>` : "";
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="position:absolute;inset:0;">
+        ${lines}
+        ${jumpCircle}
+      </svg>`;
+    }
+
+    setupBindings();
+    el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
+  </script>
+</body>
+</html>
