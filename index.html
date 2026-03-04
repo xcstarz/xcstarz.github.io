@@ -166,9 +166,24 @@
       padding: 8px 6px;
       font-size: 12px;
       min-height: 84px;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
     }
     .tile-btn.selected { outline: 2px solid #7eb4ff; }
     .tile-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: .85;
+      background: rgba(19, 29, 51, .92);
+      border: 2px solid #7eb4ff;
+      border-radius: 8px;
+      padding: 4px;
+      transform: translate(-50%, -50%);
+    }
+    .cell.drag-hover { outline: 3px solid #7eb4ff; outline-offset: -3px; }
     .rot-row, .entry-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .rot-btn, .entry-btn { padding: 6px 8px; font-size: 12px; }
     .log {
@@ -330,7 +345,7 @@
       winner: null,
       pendingFirstPlacement: null,
       logs: [],
-      dragTileType: null,
+      drag: { active: false, tileType: null, ghost: null, hoveredCell: null },
     };
 
     const el = {
@@ -405,6 +420,59 @@
         el.gameView.classList.add("hidden");
         el.setupView.classList.remove("hidden");
       });
+
+      document.addEventListener("pointermove", onDragMove);
+      document.addEventListener("pointerup", onDragEnd);
+      document.addEventListener("pointercancel", onDragEnd);
+    }
+
+    function onDragStart(tileType, ev) {
+      ev.preventDefault();
+      app.selectedTile = tileType;
+      const ghost = document.createElement("div");
+      ghost.className = "drag-ghost";
+      ghost.innerHTML = tileSvg({ type: tileType, rot: app.selectedRot }, 48);
+      document.body.appendChild(ghost);
+      const x = ev.clientX, y = ev.clientY;
+      ghost.style.left = x + "px";
+      ghost.style.top = y + "px";
+      app.drag = { active: true, tileType, ghost, hoveredCell: null };
+    }
+
+    function onDragMove(ev) {
+      if (!app.drag.active) return;
+      app.drag.ghost.style.left = ev.clientX + "px";
+      app.drag.ghost.style.top = ev.clientY + "px";
+
+      if (app.drag.hoveredCell) {
+        app.drag.hoveredCell.classList.remove("drag-hover");
+        app.drag.hoveredCell = null;
+      }
+      const target = document.elementFromPoint(ev.clientX, ev.clientY);
+      if (target) {
+        const cell = target.closest(".cell[data-rc]");
+        if (cell && cell.classList.contains("valid")) {
+          cell.classList.add("drag-hover");
+          app.drag.hoveredCell = cell;
+        }
+      }
+    }
+
+    function onDragEnd(ev) {
+      if (!app.drag.active) return;
+      if (app.drag.ghost) app.drag.ghost.remove();
+      if (app.drag.hoveredCell) app.drag.hoveredCell.classList.remove("drag-hover");
+
+      const tileType = app.drag.tileType;
+      const x = ev.clientX, y = ev.clientY;
+      app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
+
+      const target = document.elementFromPoint(x, y);
+      if (!target) return;
+      const cell = target.closest(".cell[data-rc]");
+      if (!cell || !cell.classList.contains("valid")) return;
+      const [r, c] = cell.dataset.rc.split(",").map(Number);
+      attemptPlaceAtCell(r, c, tileType);
     }
 
     function getBaseCells(size, corner) {
@@ -868,16 +936,13 @@
         const enabledByPool = p && canUseTile(p, type);
         b.disabled = app.gameOver || !enabledByMode || !enabledByPool;
         b.onclick = () => { app.selectedTile = type; renderAll(); };
-        b.draggable = !b.disabled;
-        b.ondragstart = (ev) => {
-          app.dragTileType = type;
-          app.selectedTile = type;
-          if (ev.dataTransfer) {
-            ev.dataTransfer.effectAllowed = "copy";
-            ev.dataTransfer.setData("text/plain", type);
-          }
-        };
-        b.ondragend = () => { app.dragTileType = null; };
+        b.draggable = false;
+        if (!b.disabled) {
+          b.onpointerdown = (ev) => {
+            if (ev.button !== 0) return;
+            onDragStart(type, ev);
+          };
+        }
         b.innerHTML = `${tileSvg({type, rot:0}, 36)}<div>${TILE_LABELS[type]}</div>`;
         if (type === "jump" || type === "diagonalJump") {
           let remaining = 0;
@@ -927,26 +992,9 @@
           if (cell.startOwner != null) {
             btn.classList.add("start", `start-p${cell.startOwner + 1}`);
           }
+          btn.dataset.rc = `${r},${c}`;
           if (validSet.has(key(r, c))) btn.classList.add("valid");
           btn.onclick = () => onCellClick(r, c);
-          btn.ondragover = (ev) => {
-            if (!app.dragTileType) return;
-            if (!validSet.has(key(r, c))) return;
-            ev.preventDefault();
-            if (ev.dataTransfer) ev.dataTransfer.dropEffect = "copy";
-          };
-          btn.ondrop = (ev) => {
-            ev.preventDefault();
-            let draggedType = "";
-            if (ev.dataTransfer) {
-              draggedType = ev.dataTransfer.getData("text/plain") || "";
-            }
-            if (!draggedType) draggedType = app.dragTileType || "";
-            if (!draggedType) return;
-            app.selectedTile = draggedType;
-            app.dragTileType = null;
-            attemptPlaceAtCell(r, c, draggedType);
-          };
 
           if (cell.tile) {
             btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, 52)}</div>`;
