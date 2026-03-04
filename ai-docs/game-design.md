@@ -122,7 +122,7 @@ Every tile can be placed in one of **4 rotations** (0°, 90°, 180°, 270° cloc
 
 ---
 
-## 3. Six Tile Types
+## 3. Seven Tile Types
 
 There are **7 tile types**. Each defines **4 internal paths** connecting pairs of entrances. Below are the path connections at 0° rotation. **(Confirmed correct by designer.)**
 
@@ -196,24 +196,24 @@ A **straightaway with a jump pad**. Uses the same path layout as the straightawa
 
 ### 3.7 Diagonal Jump Tile
 
-A **diagonal straightaway with a jump pad**. Uses the same path layout as the diagonal straightaway (N0↔E1, N1↔W0, S0↔W1, S1↔E0), but the player **jumps diagonally** — skipping one cell diagonally and landing two cells away diagonally (see §5.3).
+A **diagonal straightaway with a jump pad**. Uses the same path layout as the diagonal straightaway (N0↔E1, N1↔W0, S0↔W1, S1↔E0), but the player **jumps diagonally to the corner-touching tile** (see §5.3).
 
 The diagonal direction is determined by which corner of the tile the exit entrance is nearest to:
 
 ```
-Connections & diagonal jump directions (at 0° rotation):
+Connections & diagonal jump directions (at 0° rotation, corner-touch landing):
 ```
 
-| Entry Entrance | Exit Entrance | Jump Direction | Skip Cell          | Land Cell          |
-|----------------|---------------|----------------|--------------------|--------------------|
-| N0             | E1            | SE             | (row+1, col+1)    | (row+2, col+2)    |
-| E1             | N0            | NW             | (row-1, col-1)    | (row-2, col-2)    |
-| N1             | W0            | SW             | (row+1, col-1)    | (row+2, col-2)    |
-| W0             | N1            | NE             | (row-1, col+1)    | (row-2, col+2)    |
-| S1             | E0            | NE             | (row-1, col+1)    | (row-2, col+2)    |
-| E0             | S1            | SW             | (row+1, col-1)    | (row+2, col-2)    |
-| S0             | W1            | NW             | (row-1, col-1)    | (row-2, col-2)    |
-| W1             | S0            | SE             | (row+1, col+1)    | (row+2, col+2)    |
+| Entry Entrance | Exit Entrance | Jump Direction | Land Cell          |
+|----------------|---------------|----------------|--------------------|
+| N0             | E1            | SE             | (row+1, col+1)    |
+| E1             | N0            | NW             | (row-1, col-1)    |
+| N1             | W0            | SW             | (row+1, col-1)    |
+| W0             | N1            | NE             | (row-1, col+1)    |
+| S1             | E0            | NE             | (row-1, col+1)    |
+| E0             | S1            | SW             | (row+1, col-1)    |
+| S0             | W1            | NW             | (row-1, col-1)    |
+| W1             | S0            | SE             | (row+1, col+1)    |
 
 Same entrance preservation rule applies: entering via entrance X → land on entrance X.
 
@@ -357,18 +357,20 @@ After a tile is placed, **all players whose current entrance now connects to a n
 
 ### 5.3 Jump Pad Movement
 
-There are two types of jump tiles: **Jump** (cardinal) and **Diagonal Jump** (diagonal). Both follow the same rules, differing only in jump direction.
+There are two types of jump tiles: **Jump** (cardinal) and **Diagonal Jump** (diagonal). Both preserve entrance index on landing.
 
 **Jump Tile (cardinal):** The player jumps in the cardinal direction (N/S/E/W) determined by the exit entrance. Skip one cell, land two cells away in that direction.
 
-**Diagonal Jump Tile:** The player jumps diagonally (NE/NW/SE/SW) determined by the path's diagonal direction (see §3.7 for the full direction table). Skip one cell diagonally, land two cells away diagonally.
+**Diagonal Jump Tile:** The player jumps diagonally (NE/NW/SE/SW) to the **corner-touching diagonal tile** determined by the path's diagonal direction (see §3.7). This is a one-step diagonal landing.
 
 **Common rules for both jump types:**
-- The player **flies over** the skipped cell, ignoring any tile on it. **(Confirmed.)**
 - The player lands on the **same entrance index** they used to enter the jump tile (e.g., S1 → S1). **(Confirmed.)**
 - If the landing cell is blank, the player stops there on that entrance.
 - If the landing cell has a tile, the player enters via that entrance and continues following paths (chaining).
-- If the skipped cell or landing cell is off the board / dead zone / own base — the player is **eliminated**.
+- If the landing cell is off the board / dead zone / own base — the player is **eliminated**.
+
+**Cardinal-jump-specific rule:**
+- The player **flies over** the skipped cell, ignoring any tile on it. **(Confirmed.)**
 
 ### 5.4 Turn Order
 
@@ -413,16 +415,17 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 
 - Use **SVG** for crisp rendering at any zoom level.
 - Each cell is a square (e.g., 60×60 px).
-- Paths inside tiles rendered as colored curves/lines.
+- Paths inside tiles rendered as straight line segments.
 - Player tokens rendered as colored circles on their current entrance position.
 - Dead zones marked with a red X pattern.
 - Start positions marked with player color halos.
 - Blank cells shown as light grid squares.
-- Hovering over a valid placement cell shows a **ghost preview** of the selected tile.
+- The board shows only placed tiles; placement guidance is shown via valid-cell highlighting.
 
 ### 7.3 Tile Selector
 
 - 7 tile buttons in the sidebar, each showing a small preview of the tile type.
+- Tile graphics are visible in the tile menu **at all times** (not only on hover/place).
 - Jump tile and diagonal jump tile buttons show remaining count; grayed out when exhausted.
 - A rotation slider or 4 rotation buttons (0°, 90°, 180°, 270°).
 
@@ -559,8 +562,7 @@ function resolveMovement(player):
             nextEntrance = player.entrance  // S1→S1
         else if tile.type == 'diagonalJump':
             direction = getDiagonalDirection(player.entrance, exitEntrance)  // NE, NW, SE, SW
-            (skipRow, skipCol) = stepDiag(player.row, player.col, direction)
-            (nextRow, nextCol) = stepDiag(skipRow, skipCol, direction)
+            (nextRow, nextCol) = stepDiag(player.row, player.col, direction)
             nextEntrance = player.entrance  // S1→S1
         else:
             (nextRow, nextCol, nextEntrance) = getAdjacentCell(
@@ -610,7 +612,7 @@ function resolveMovement(player):
 | Q15 | First move chaining | **No chaining.** Player ends on a blank cell on their first turn. |
 | Q16 | Loop detection | Player stuck in a **loop is eliminated**. Detected by revisiting the same (row, col, entrance). |
 | Q17 | 7×7 base size | **1×1** (single corner cell), unlike the 13×13 board's 2×2 bases. |
-| Q18 | Diagonal jump tile | Added as 7th tile type. Same paths as diagonal straightaway + diagonal jump mechanic. See §3.7. |
+| Q18 | Diagonal jump tile | Added as 7th tile type. Same paths as diagonal straightaway + diagonal jump mechanic with corner-touch landing. See §3.7. |
 | Q19 | Tile graphics | All paths are **straight lines**. Jump tiles have a **circle** symbol in the center. See §3.8. |
 | Q20 | Jump pad supply | **Configurable** at setup: single type (full pool), both combined (shared pool), both separate (2 each), or neither. See §3.9 and §7.5. |
 
