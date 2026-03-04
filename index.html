@@ -125,6 +125,11 @@
       pointer-events: none;
       z-index: 4;
     }
+    .tile-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
     .token.p1 { background: #ff5a6f; }
     .token.p2 { background: #5aa0ff; }
     .token.p3 { background: #59d37e; }
@@ -910,7 +915,7 @@
           btn.onclick = () => onCellClick(r, c);
 
           if (cell.tile) {
-            btn.innerHTML = tileSvg(cell.tile, 52);
+            btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, 52)}</div>`;
           }
 
           const tokens = playersAtCell(r, c);
@@ -986,7 +991,7 @@
       }).join("");
       const jumpCircle = (tile.type === "jump" || tile.type === "diagonalJump")
         ? `<circle cx="${size/2}" cy="${size/2}" r="${size*0.12}" fill="none" stroke="#ffd46b" stroke-width="2.4"/>` : "";
-      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="position:absolute;inset:0;">
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
         ${lines}
         ${jumpCircle}
       </svg>`;
