@@ -583,7 +583,9 @@
     }
 
     function validSubsequentCell(player) {
-      const [r, c] = getForwardCell(player.row, player.col, player.entrance);
+      // Players rest on a blank cell entrance; subsequent placement occurs on that same blank cell.
+      const r = player.row;
+      const c = player.col;
       if (!inBounds(app.config.size, r, c)) return null;
       const cell = app.board[r][c];
       if (cell.dead || cell.startOwner != null || cell.tile != null) return null;
@@ -662,8 +664,7 @@
       const affected = app.players
         .filter(p => p.alive && p.hasPlacedFirstTile && p.row != null)
         .filter(p => {
-          const [fr, fc] = getForwardCell(p.row, p.col, p.entrance);
-          return fr === placedR && fc === placedC;
+          return p.row === placedR && p.col === placedC;
         })
         .sort((a, b) => a.id - b.id);
 
@@ -982,9 +983,29 @@
       el.playersText.innerHTML = lines.join("<br>");
     }
 
+    function getEdgeForEntrance(i) {
+      if (i <= 1) return "N";
+      if (i <= 3) return "E";
+      if (i <= 5) return "S";
+      return "W";
+    }
+
+    function uTurnPath(a, b, size) {
+      const [x1, y1] = getEntrancePoint(a).map(v => v * size);
+      const [x2, y2] = getEntrancePoint(b).map(v => v * size);
+      const edge = getEdgeForEntrance(a);
+      if (edge === "N") return `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${size * 0.26} ${x2} ${y2}`;
+      if (edge === "S") return `M ${x1} ${y1} Q ${(x1 + x2) / 2} ${size * 0.74} ${x2} ${y2}`;
+      if (edge === "E") return `M ${x1} ${y1} Q ${size * 0.74} ${(y1 + y2) / 2} ${x2} ${y2}`;
+      return `M ${x1} ${y1} Q ${size * 0.26} ${(y1 + y2) / 2} ${x2} ${y2}`;
+    }
+
     function tileSvg(tile, size) {
       const pairs = getRotatedPairs(tile.type, tile.rot);
       const lines = pairs.map(([a, b]) => {
+        if (tile.type === "uturn") {
+          return `<path d="${uTurnPath(a, b, size)}" fill="none" stroke="#d9e8ff" stroke-width="2.2"/>`;
+        }
         const [x1, y1] = getEntrancePoint(a);
         const [x2, y2] = getEntrancePoint(b);
         return `<line x1="${x1 * size}" y1="${y1 * size}" x2="${x2 * size}" y2="${y2 * size}" stroke="#d9e8ff" stroke-width="2.2"/>`;
