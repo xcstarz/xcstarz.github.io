@@ -18,7 +18,7 @@ A single-HTML, pass-and-play, turn-based board game for 2–4 players. Players p
   - **13×13:** 2×2 base (4 cells per player)
   - **7×7:** 1×1 base (1 cell per player)
 - Base cells are permanently occupied and cannot have tiles placed on them.
-- Certain cells are pre-marked as **dead zones (X)** as part of the board layout. See §3.8 and §3.9 for dead zone maps.
+- Certain cells are pre-marked as **dead zones (X)** as part of the board layout. See §3.10 and §3.11 for dead zone maps.
 - **Tiles may NOT be placed on start bases or dead zones.**
 
 ### 1.1 Coordinate System
@@ -124,7 +124,7 @@ Every tile can be placed in one of **4 rotations** (0°, 90°, 180°, 270° cloc
 
 ## 3. Six Tile Types
 
-Each tile type defines **4 internal paths** connecting pairs of entrances. Below are the path connections at 0° rotation. **(Confirmed correct by designer.)**
+There are **7 tile types**. Each defines **4 internal paths** connecting pairs of entrances. Below are the path connections at 0° rotation. **(Confirmed correct by designer.)**
 
 ### 3.1 Straightaway
 
@@ -190,13 +190,50 @@ The N-S and E-W paths visually cross/weave over each other.
 
 ### 3.6 Jump Tile
 
-A special tile that contains a **jump pad**. The jump pad causes the player to skip over the next cell in the direction of travel and land on the cell beyond it (see §5.3).
-
-The jump tile uses the same path layout as the **straightaway** (N0↔S1, N1↔S0, E0↔W1, E1↔W0), but with the jump mechanic on each path.
+A **straightaway with a jump pad**. Uses the same path layout as the straightaway (N0↔S1, N1↔S0, E0↔W1, E1↔W0), but the player **jumps cardinally** — skipping one cell in the exit direction and landing two cells away (see §5.3).
 
 **Jump entrance preservation rule:** When a player enters a jump tile via entrance X, they land on the **same entrance index X** on the destination cell (two cells away). For example, entering via S1 means landing on S1 of the cell beyond the skipped cell.
 
-### 3.7 Tile Supply
+### 3.7 Diagonal Jump Tile
+
+A **diagonal straightaway with a jump pad**. Uses the same path layout as the diagonal straightaway (N0↔E1, N1↔W0, S0↔W1, S1↔E0), but the player **jumps diagonally** — skipping one cell diagonally and landing two cells away diagonally (see §5.3).
+
+The diagonal direction is determined by which corner of the tile the exit entrance is nearest to:
+
+```
+Connections & diagonal jump directions (at 0° rotation):
+```
+
+| Entry Entrance | Exit Entrance | Jump Direction | Skip Cell          | Land Cell          |
+|----------------|---------------|----------------|--------------------|--------------------|
+| N0             | E1            | SE             | (row+1, col+1)    | (row+2, col+2)    |
+| E1             | N0            | NW             | (row-1, col-1)    | (row-2, col-2)    |
+| N1             | W0            | SW             | (row+1, col-1)    | (row+2, col-2)    |
+| W0             | N1            | NE             | (row-1, col+1)    | (row-2, col+2)    |
+| S1             | E0            | NE             | (row-1, col+1)    | (row-2, col+2)    |
+| E0             | S1            | SW             | (row+1, col-1)    | (row+2, col-2)    |
+| S0             | W1            | NW             | (row-1, col-1)    | (row-2, col-2)    |
+| W1             | S0            | SE             | (row+1, col+1)    | (row+2, col+2)    |
+
+Same entrance preservation rule applies: entering via entrance X → land on entrance X.
+
+### 3.8 Tile Graphics
+
+All tile paths are rendered as **straight lines** (no curves). Visual style per tile:
+
+| Tile                  | Graphic Description                                           |
+|-----------------------|---------------------------------------------------------------|
+| Straightaway          | 4 straight parallel lines (2 vertical + 2 horizontal)        |
+| U-Turn                | Straight lines connecting pairs on the same edge (hairpin)    |
+| Centrifugal           | Straight lines connecting adjacent-edge entrances (90° angles)|
+| Diagonal Straightaway | 4 straight diagonal lines crossing the tile                  |
+| Weave                 | Straight lines crossing in the center (X pattern)            |
+| Jump Tile             | Straightaway lines + a **circle** (jump pad symbol) in the center |
+| Diagonal Jump Tile    | Diagonal straightaway lines + a **circle** (jump pad symbol) in the center |
+
+The circle distinguishes jump tiles from their non-jump counterparts at a glance.
+
+### 3.9 Tile Supply
 
 | Tile Type             | Per-player limit (7×7) | Per-player limit (13×13) | Unlimited? |
 |-----------------------|------------------------|--------------------------|------------|
@@ -205,9 +242,17 @@ The jump tile uses the same path layout as the **straightaway** (N0↔S1, N1↔S
 | Centrifugal           | —                      | —                        | Yes        |
 | Diagonal Straightaway | —                      | —                        | Yes        |
 | Weave                 | —                      | —                        | Yes        |
-| Jump                  | 3                      | 4                        | No         |
+| Jump                  | 3                      | 4                        | No*        |
+| Diagonal Jump         | 3                      | 4                        | No*        |
 
-### 3.8 Dead Zone Layout — 13×13 Board (Confirmed)
+*Jump pad availability is **configurable** during game setup (see §7.5). Options:
+- **Single type only** (cardinal or diagonal): 3 on 7×7, 4 on 13×13 per player.
+- **Both types — combined pool**: 3 on 7×7 / 4 on 13×13 total per player, freely split between the two types.
+- **Both types — separate pools**: 2 of each type per player.
+- **Neither**: No jump tiles available.
+Disabled jump types do not appear in the tile selector.
+
+### 3.10 Dead Zone Layout — 13×13 Board (Confirmed)
 
 **13 fixed interior dead zones** form a 4-fold rotationally symmetric diamond pattern centered on (6,6):
 
@@ -241,7 +286,7 @@ B = Start base (2×2)    X = Dead zone    . = Blank
 
 These 13 interior dead zones are **fixed** and present in all games regardless of player count. In 2- or 3-player mode, the unused corner 2×2 bases also become dead zones (adding 4 or 8 more dead-zone cells).
 
-### 3.9 Dead Zone Layout — 7×7 Board (Confirmed)
+### 3.11 Dead Zone Layout — 7×7 Board (Confirmed)
 
 **5 fixed interior dead zones** form a 4-fold rotationally symmetric diamond pattern centered on (3,3):
 
@@ -312,13 +357,18 @@ After a tile is placed, **all players whose current entrance now connects to a n
 
 ### 5.3 Jump Pad Movement
 
-When a player is on a tile that is a **jump tile**:
-- Instead of moving to the adjacent cell, the player **skips over** the immediately adjacent cell and lands on the cell **two steps away** in the direction of travel.
+There are two types of jump tiles: **Jump** (cardinal) and **Diagonal Jump** (diagonal). Both follow the same rules, differing only in jump direction.
+
+**Jump Tile (cardinal):** The player jumps in the cardinal direction (N/S/E/W) determined by the exit entrance. Skip one cell, land two cells away in that direction.
+
+**Diagonal Jump Tile:** The player jumps diagonally (NE/NW/SE/SW) determined by the path's diagonal direction (see §3.7 for the full direction table). Skip one cell diagonally, land two cells away diagonally.
+
+**Common rules for both jump types:**
 - The player **flies over** the skipped cell, ignoring any tile on it. **(Confirmed.)**
 - The player lands on the **same entrance index** they used to enter the jump tile (e.g., S1 → S1). **(Confirmed.)**
 - If the landing cell is blank, the player stops there on that entrance.
 - If the landing cell has a tile, the player enters via that entrance and continues following paths (chaining).
-- If the skipped cell or landing cell is off the board / dead zone — the player is **eliminated**.
+- If the skipped cell or landing cell is off the board / dead zone / own base — the player is **eliminated**.
 
 ### 5.4 Turn Order
 
@@ -372,8 +422,8 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 
 ### 7.3 Tile Selector
 
-- 6 tile buttons in the sidebar, each showing a small preview of the tile type.
-- Jump tile button shows remaining count; grayed out when exhausted.
+- 7 tile buttons in the sidebar, each showing a small preview of the tile type.
+- Jump tile and diagonal jump tile buttons show remaining count; grayed out when exhausted.
 - A rotation slider or 4 rotation buttons (0°, 90°, 180°, 270°).
 
 ### 7.4 Interaction Flow
@@ -388,6 +438,13 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 
 - Choose board size: 7×7 or 13×13.
 - Choose number of players: 2, 3, or 4.
+- **Jump pad selection:** Choose which jump pad types to include:
+  - Cardinal jump only (3 on 7×7, 4 on 13×13 per player)
+  - Diagonal jump only (3 on 7×7, 4 on 13×13 per player)
+  - Both → sub-option for pool mode:
+    - **Combined pool:** 3 on 7×7 / 4 on 13×13 total per player, shared across both types
+    - **Separate pools:** 2 of each type per player (4 total on 7×7, 4 total on 13×13)
+  - Neither (no jump pads at all)
 - Enter player names (optional).
 - "Start Game" button.
 
@@ -433,7 +490,10 @@ Cell = {
   row: number,
   col: number,
   type: 'blank' | 'tile' | 'start' | 'deadzone',
-  tile: null | { tileType: string, rotation: 0|1|2|3 },
+  tile: null | {
+    tileType: 'straightaway'|'uturn'|'centrifugal'|'diagonal'|'weave'|'jump'|'diagonalJump',
+    rotation: 0|1|2|3
+  },
   owner: null | playerId   // for start base cells
 }
 
@@ -493,9 +553,14 @@ function resolveMovement(player):
         exitEntrance = tile.getConnectedExit(player.entrance)
 
         if tile.type == 'jump':
-            direction = getDirection(exitEntrance)
+            direction = getCardinalDirection(exitEntrance)  // N, E, S, W
             (skipRow, skipCol) = step(player.row, player.col, direction)
             (nextRow, nextCol) = step(skipRow, skipCol, direction)
+            nextEntrance = player.entrance  // S1→S1
+        else if tile.type == 'diagonalJump':
+            direction = getDiagonalDirection(player.entrance, exitEntrance)  // NE, NW, SE, SW
+            (skipRow, skipCol) = stepDiag(player.row, player.col, direction)
+            (nextRow, nextCol) = stepDiag(skipRow, skipCol, direction)
             nextEntrance = player.entrance  // S1→S1
         else:
             (nextRow, nextCol, nextEntrance) = getAdjacentCell(
@@ -530,7 +595,7 @@ function resolveMovement(player):
 |---|----------|--------|
 | Q1 | Tile path connections | **Confirmed correct** as documented in §3. |
 | Q2 | Tile placement — "in front of" | The single blank cell the player's entrance directly faces. |
-| Q3 | Dead zone layout (13×13) | **13 interior dead zones confirmed** — see §3.8 for exact coordinates. |
+| Q3 | Dead zone layout (13×13) | **13 interior dead zones confirmed** — see §3.10 for exact coordinates. |
 | Q4 | First move | Player places on **any blank cell adjacent to their base** (4 options on 13×13, 2 options on 7×7), then picks an entrance facing the base. |
 | Q5 | Who moves after placement | **All affected players** move immediately, not just the current player. |
 | Q6 | Movement order | **Sequential by player order** (P1, P2, P3, P4), like chess. |
@@ -541,10 +606,13 @@ function resolveMovement(player):
 | Q11 | Tiles on start/dead zones | **No.** Tiles may not be placed on start bases or dead zones. |
 | Q12 | Jump — landing entrance | Player lands on the **same entrance index** they used to enter the jump tile (S1 → S1). |
 | Q13 | Elimination at dead zone | Player is **eliminated at the boundary** — they do not enter the dead zone cell. |
-| Q14 | Dead zone layout (7×7) | **5 interior dead zones confirmed** — (2,2), (2,4), (3,3), (4,2), (4,4). See §3.9. |
+| Q14 | Dead zone layout (7×7) | **5 interior dead zones confirmed** — (2,2), (2,4), (3,3), (4,2), (4,4). See §3.11. |
 | Q15 | First move chaining | **No chaining.** Player ends on a blank cell on their first turn. |
 | Q16 | Loop detection | Player stuck in a **loop is eliminated**. Detected by revisiting the same (row, col, entrance). |
 | Q17 | 7×7 base size | **1×1** (single corner cell), unlike the 13×13 board's 2×2 bases. |
+| Q18 | Diagonal jump tile | Added as 7th tile type. Same paths as diagonal straightaway + diagonal jump mechanic. See §3.7. |
+| Q19 | Tile graphics | All paths are **straight lines**. Jump tiles have a **circle** symbol in the center. See §3.8. |
+| Q20 | Jump pad supply | **Configurable** at setup: single type (full pool), both combined (shared pool), both separate (2 each), or neither. See §3.9 and §7.5. |
 
 ### All Questions Resolved
 
