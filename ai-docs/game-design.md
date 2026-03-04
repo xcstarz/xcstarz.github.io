@@ -416,7 +416,7 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 - Use **SVG** for crisp rendering at any zoom level.
 - Each cell is a square (e.g., 60×60 px).
 - Paths inside tiles rendered as straight line segments.
-- Player tokens rendered as colored circles on their current entrance position.
+- Player tokens rendered as colored **lines** on their current entrance position (horizontal on N/S edges, vertical on E/W edges). Players still in their start base before placing their first tile are shown as small circles.
 - Dead zones marked with a red X pattern.
 - Start positions marked with player color halos.
 - Blank cells shown as light grid squares.
@@ -435,7 +435,8 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 2. Player selects rotation.
 3. Player clicks a valid blank cell on the board to place the tile.
 4. Movement animates automatically (paths light up, player tokens slide along paths).
-5. If no elimination/win occurs, turn passes to next player.
+5. If a player is eliminated, a **full-screen overlay** appears showing "Player X was eliminated!" with an OK button the player clicks to dismiss it.
+6. If no elimination/win occurs (or after dismissing the overlay), turn passes to next player.
 
 ### 7.5 Setup Screen
 
@@ -457,6 +458,7 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 - Dark board background with light grid lines.
 - Distinct, colorblind-friendly player colors (Red, Blue, Green, Yellow with pattern fallbacks).
 - Smooth CSS animations for token movement.
+- Elimination overlay: dark backdrop with centered panel, animated entrance, and a clear dismiss button.
 
 ---
 

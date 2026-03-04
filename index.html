@@ -117,13 +117,18 @@
     .start-p4 { box-shadow: inset 0 0 0 2px #ffd65a; }
     .token {
       position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 4;
+      border-radius: 2px;
+    }
+    .token.h-line { width: 16px; height: 4px; }
+    .token.v-line { width: 4px; height: 16px; }
+    .token.base-token {
       width: 10px;
       height: 10px;
       border-radius: 50%;
       border: 1px solid rgba(255,255,255,.8);
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-      z-index: 4;
     }
     .tile-layer {
       position: absolute;
@@ -203,6 +208,39 @@
       font-weight: 700;
       color: #ffe38a;
     }
+    .elimination-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, .72);
+      backdrop-filter: blur(6px);
+    }
+    .elimination-box {
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 2px solid var(--danger);
+      border-radius: 18px;
+      padding: 44px 64px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+      animation: elimPop .25s ease-out;
+    }
+    @keyframes elimPop {
+      from { transform: scale(.85); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    .elimination-box h2 {
+      font-size: 28px;
+      color: var(--danger);
+      margin: 0 0 28px;
+    }
+    .elimination-box button {
+      padding: 12px 48px;
+      font-size: 16px;
+      border-radius: 12px;
+    }
     @media (max-width: 1120px) {
       .game { grid-template-columns: 1fr; }
     }
@@ -267,6 +305,12 @@
     </div>
 
     <div id="gameView" class="hidden">
+      <div id="eliminationOverlay" class="elimination-overlay hidden">
+        <div class="elimination-box">
+          <h2 id="elimText"></h2>
+          <button id="elimOkBtn">OK</button>
+        </div>
+      </div>
       <div class="chip-row" id="headerChips"></div>
       <div class="game">
         <div class="board-wrap card">
@@ -346,6 +390,7 @@
       pendingFirstPlacement: null,
       logs: [],
       drag: { active: false, tileType: null, ghost: null, hoveredCell: null },
+      eliminationQueue: [],
     };
 
     const el = {
@@ -374,6 +419,9 @@
       p4Name: document.getElementById("p4Name"),
       startBtn: document.getElementById("startBtn"),
       newGameBtn: document.getElementById("newGameBtn"),
+      eliminationOverlay: document.getElementById("eliminationOverlay"),
+      elimText: document.getElementById("elimText"),
+      elimOkBtn: document.getElementById("elimOkBtn"),
     };
 
     function key(r, c) { return `${r},${c}`; }
@@ -420,6 +468,8 @@
         el.gameView.classList.add("hidden");
         el.setupView.classList.remove("hidden");
       });
+
+      el.elimOkBtn.addEventListener("click", dismissElimination);
 
       document.addEventListener("pointermove", onDragMove);
       document.addEventListener("pointerup", onDragEnd);
@@ -536,6 +586,7 @@
       app.logs = [];
       app.gameOver = false;
       app.winner = null;
+      app.eliminationQueue = [];
 
       const interior = size === 13 ? DEAD_ZONES_13 : DEAD_ZONES_7;
       for (const k of interior) {
@@ -847,6 +898,19 @@
     function eliminatePlayer(player, msg) {
       player.alive = false;
       log(msg);
+      app.eliminationQueue.push(player);
+    }
+
+    function showNextElimination() {
+      if (app.eliminationQueue.length === 0) return;
+      const p = app.eliminationQueue.shift();
+      el.elimText.textContent = `${p.name} was eliminated!`;
+      el.eliminationOverlay.classList.remove("hidden");
+    }
+
+    function dismissElimination() {
+      el.eliminationOverlay.classList.add("hidden");
+      showNextElimination();
     }
 
     function checkPositionDraw() {
@@ -876,6 +940,7 @@
         }
       }
       renderAll();
+      showNextElimination();
     }
 
     function entranceName(i) { return ["N0","N1","E0","E1","S0","S1","W0","W1"][i]; }
@@ -1003,7 +1068,12 @@
           const tokens = playersAtCell(r, c);
           tokens.forEach(tok => {
             const t = document.createElement("div");
-            t.className = `token ${tok.color}`;
+            let shape = "base-token";
+            if (!tok.inBase && tok.entrance != null) {
+              const edge = edgeDir(tok.entrance);
+              shape = (edge === "N" || edge === "S") ? "h-line" : "v-line";
+            }
+            t.className = `token ${tok.color} ${shape}`;
             const [x, y] = getTokenPosition(tok);
             t.style.left = `${x * 100}%`;
             t.style.top = `${y * 100}%`;

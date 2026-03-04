@@ -257,3 +257,5 @@ P1 -> P2 -> P3 -> P4 -> repeat, skipping eliminated players.
 | Two players same final position | Draw between those two |
 | One player remains alive | Win |
 
+When a player is eliminated, a full-screen overlay displays "Player X was eliminated!" which the player dismisses by clicking OK before play continues.
+
