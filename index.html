@@ -776,19 +776,37 @@
       player.trail.push(point);
     }
 
-    function appendMovementPath(player, fromR, fromC, entry, exit, toR, toC, toEntrance) {
+    function getUTurnBendPoint(entry, exit) {
+      const [x1, y1] = getEntrancePoint(entry);
+      const [x2, y2] = getEntrancePoint(exit);
+      const edge = edgeDir(entry);
+      if (edge === "N") return { ax: (x1 + x2) / 2, ay: 0.26 };
+      if (edge === "S") return { ax: (x1 + x2) / 2, ay: 0.74 };
+      if (edge === "E") return { ax: 0.74, ay: (y1 + y2) / 2 };
+      return { ax: 0.26, ay: (y1 + y2) / 2 };
+    }
+
+    function appendMovementPath(player, fromR, fromC, entry, exit, toR, toC, toEntrance, tileType) {
       const [fromAx, fromAy] = getEntrancePoint(entry);
       const [exitAx, exitAy] = getEntrancePoint(exit);
       const [toAx, toAy] = getEntrancePoint(toEntrance);
       appendTrailPoint(player, { row: fromR, col: fromC, ax: fromAx, ay: fromAy });
+      if (tileType === "uturn") {
+        const bend = getUTurnBendPoint(entry, exit);
+        appendTrailPoint(player, { row: fromR, col: fromC, ax: bend.ax, ay: bend.ay });
+      }
       appendTrailPoint(player, { row: fromR, col: fromC, ax: exitAx, ay: exitAy });
       appendTrailPoint(player, { row: toR, col: toC, ax: toAx, ay: toAy });
     }
 
-    function appendExitOnlyPath(player, row, col, entry, exit) {
+    function appendExitOnlyPath(player, row, col, entry, exit, tileType) {
       const [fromAx, fromAy] = getEntrancePoint(entry);
       const [exitAx, exitAy] = getEntrancePoint(exit);
       appendTrailPoint(player, { row, col, ax: fromAx, ay: fromAy });
+      if (tileType === "uturn") {
+        const bend = getUTurnBendPoint(entry, exit);
+        appendTrailPoint(player, { row, col, ax: bend.ax, ay: bend.ay });
+      }
       appendTrailPoint(player, { row, col, ax: exitAx, ay: exitAy });
     }
 
@@ -798,8 +816,8 @@
       const exit = getExitEntrance(tile, curEntry);
       const next = jumpOrAdjacent(curR, curC, curEntry, exit, tile.type, tile.rot);
       player.trail = [];
-      if (next.eliminated || next.win) appendExitOnlyPath(player, curR, curC, curEntry, exit);
-      else appendMovementPath(player, curR, curC, curEntry, exit, next.row, next.col, next.entrance);
+      if (next.eliminated || next.win) appendExitOnlyPath(player, curR, curC, curEntry, exit, tile.type);
+      else appendMovementPath(player, curR, curC, curEntry, exit, next.row, next.col, next.entrance, tile.type);
       if (next.eliminated) {
         eliminatePlayer(player, `${player.name} was eliminated on first move.`);
         return;
@@ -855,8 +873,8 @@
 
         const exit = getExitEntrance(cell.tile, player.entrance);
         const next = jumpOrAdjacent(player.row, player.col, player.entrance, exit, cell.tile.type, cell.tile.rot, player);
-        if (next.eliminated || next.win) appendExitOnlyPath(player, player.row, player.col, player.entrance, exit);
-        else appendMovementPath(player, player.row, player.col, player.entrance, exit, next.row, next.col, next.entrance);
+        if (next.eliminated || next.win) appendExitOnlyPath(player, player.row, player.col, player.entrance, exit, cell.tile.type);
+        else appendMovementPath(player, player.row, player.col, player.entrance, exit, next.row, next.col, next.entrance, cell.tile.type);
 
         if (next.eliminated) {
           eliminatePlayer(player, `${player.name} was eliminated.`);
