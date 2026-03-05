@@ -128,19 +128,6 @@
     .start-p2 { box-shadow: inset 0 0 0 2px #5aa0ff; }
     .start-p3 { box-shadow: inset 0 0 0 2px #59d37e; }
     .start-p4 { box-shadow: inset 0 0 0 2px #ffd65a; }
-    .token {
-      position: absolute;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-      z-index: 4;
-      border-radius: 2px;
-    }
-    .token.base-token {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,.8);
-    }
     .tile-layer {
       position: absolute;
       inset: 0;
@@ -1096,35 +1083,10 @@
             btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, 52)}</div>`;
           }
 
-          const tokens = basePlayersAtCell(r, c);
-          tokens.forEach(tok => {
-            const t = document.createElement("div");
-            t.className = `token ${tok.color} base-token`;
-            const [x, y] = getTokenPosition(tok);
-            t.style.left = `${x * 100}%`;
-            t.style.top = `${y * 100}%`;
-            btn.appendChild(t);
-          });
           el.board.appendChild(btn);
         }
       }
       renderPlayerTrails();
-    }
-
-    function basePlayersAtCell(r, c) {
-      const out = [];
-      for (const p of app.players) {
-        if (!p.alive) continue;
-        if (!p.hasPlacedFirstTile && p.baseCells.some(([br, bc]) => br === r && bc === c)) {
-          out.push({ color: p.color, entrance: null, inBase: true });
-        }
-      }
-      return out;
-    }
-
-    function getTokenPosition(tok) {
-      if (tok.inBase || tok.entrance == null) return [.5, .5];
-      return getEntrancePoint(tok.entrance);
     }
 
     function boardPointForState(state) {
@@ -1152,20 +1114,9 @@
         polyline.setAttribute("stroke-width", "4");
         polyline.setAttribute("stroke-linecap", "round");
         polyline.setAttribute("stroke-linejoin", "round");
-        polyline.setAttribute("opacity", "0.95");
-
-        const end = p.trail[p.trail.length - 1];
-        const [ex, ey] = boardPointForState(end);
-        const endpoint = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        endpoint.setAttribute("cx", `${ex}`);
-        endpoint.setAttribute("cy", `${ey}`);
-        endpoint.setAttribute("r", "4");
-        endpoint.setAttribute("fill", playerColorHex(p.color));
-        endpoint.setAttribute("stroke", "#f2f7ff");
-        endpoint.setAttribute("stroke-width", "1");
+        polyline.setAttribute("opacity", "1");
 
         el.trailLayer.appendChild(polyline);
-        el.trailLayer.appendChild(endpoint);
       });
     }
 
