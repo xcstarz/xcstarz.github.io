@@ -107,8 +107,8 @@
       z-index: 3;
     }
     .cell {
-      width: 52px;
-      height: 52px;
+      width: 60px;
+      height: 60px;
       background: #0d1730;
       position: relative;
       cursor: pointer;
@@ -359,7 +359,7 @@
       "3,6","4,4","4,8","5,5","5,7","6,3","6,6","6,9","7,5","7,7","8,4","8,8","9,6"
     ]);
     const DEAD_ZONES_7 = new Set(["2,2","2,4","3,3","4,2","4,4"]);
-    const BOARD_CELL_SIZE = 52;
+    const BOARD_CELL_SIZE = 60;
     const BOARD_CELL_GAP = 0;
     const BOARD_FRAME = 2; // 1px border + 1px padding on each side
 
@@ -457,7 +457,7 @@
     }
     function getEntrancePoint(i) {
       const pts = {
-        0:[.30,.06],1:[.70,.06],2:[.94,.30],3:[.94,.70],4:[.70,.94],5:[.30,.94],6:[.06,.70],7:[.06,.30]
+        0:[.30,.01],1:[.70,.01],2:[.99,.30],3:[.99,.70],4:[.70,.99],5:[.30,.99],6:[.01,.70],7:[.01,.30]
       };
       return pts[i];
     }
@@ -1130,7 +1130,7 @@
           btn.onclick = () => onCellClick(r, c);
 
           if (cell.tile) {
-            btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, 52)}</div>`;
+            btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, BOARD_CELL_SIZE)}</div>`;
           }
 
           el.board.appendChild(btn);
