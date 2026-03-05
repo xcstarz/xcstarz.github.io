@@ -334,7 +334,10 @@ Each player tracks:
 
 ### 5.1 Placement Phase
 
-**First turn (special):** The player places a tile on **any blank cell adjacent to their base** (see §1.2 for adjacent cell counts per board size). They then choose one of the entrances on that tile that faces their base, and their token is placed on that entrance. The player **ends on a blank cell** — there is no path to chain onto from the first tile. **(Confirmed.)**
+**First turn (special, 2 steps):**  
+1. Place a tile on **any blank cell adjacent to your base** (see §1.2 for adjacent cell counts per board size).  
+2. Choose one of that tile's entrances on the side **touching your base**; your token is placed on that entrance.  
+The player then **ends on a blank cell** — there is no path to chain onto from the first tile. **(Confirmed.)**
 
 **Subsequent turns:** The player selects a tile type and rotation, then places the tile on the **single blank cell directly in front of the entrance they are currently on**. The entrance determines which adjacent cell is "in front" (e.g., if on entrance N0 or N1 of a cell, the cell to the North is "in front"). **(Confirmed: most restrictive option — strategic planning is essential.)**
 

@@ -333,7 +333,7 @@
               <div id="rotRow" class="rot-row"></div>
             </div>
             <div id="entrySelectWrap" class="hidden" style="margin-top:8px;">
-              <div style="font-size:12px;color:#ffdba8;margin-bottom:6px;">First turn: choose entry touching your base</div>
+              <div style="font-size:12px;color:#ffdba8;margin-bottom:6px;">Step 2: choose the entry on the side touching your base</div>
               <div id="entryRow" class="entry-row"></div>
             </div>
           </div>
@@ -741,6 +741,7 @@
         if (!valid) return;
         app.pendingFirstPlacement = { r, c };
         const entries = getFirstTurnEntryChoices(p, r, c);
+        log(`${p.name} first move: now choose one of the entry points touching your base.`);
         renderEntryChoices(entries, (entry) => {
           placeTile(r, c, tileType, app.selectedRot);
           consumeTile(p, tileType);
@@ -1013,6 +1014,18 @@
     }
 
     function entranceName(i) { return ["N0","N1","E0","E1","S0","S1","W0","W1"][i]; }
+    function entranceHint(i) {
+      return [
+        "top-left",
+        "top-right",
+        "right-top",
+        "right-bottom",
+        "bottom-right",
+        "bottom-left",
+        "left-bottom",
+        "left-top",
+      ][i];
+    }
 
     function renderEntryChoices(entries, onPick) {
       el.entrySelectWrap.classList.remove("hidden");
@@ -1020,7 +1033,7 @@
       entries.forEach(i => {
         const b = document.createElement("button");
         b.className = "entry-btn";
-        b.textContent = entranceName(i);
+        b.textContent = `${entranceName(i)} (${entranceHint(i)})`;
         b.onclick = () => onPick(i);
         el.entryRow.appendChild(b);
       });
@@ -1190,8 +1203,14 @@
         el.winnerText.classList.remove("hidden");
       } else {
         const turnText = p ? `<strong>${p.name}</strong> (${p.color.toUpperCase()})` : "-";
-        const phase = p && !p.hasPlacedFirstTile ? "First turn placement" : "Place tile in front of your entrance";
-        el.statusText.innerHTML = `Turn: ${turnText}<br>Phase: ${phase}`;
+        if (p && !p.hasPlacedFirstTile) {
+          const pending = app.pendingFirstPlacement
+            ? `Step 2/2: Pick entry for tile at (${app.pendingFirstPlacement.r},${app.pendingFirstPlacement.c})`
+            : "Step 1/2: Click any green cell adjacent to your base";
+          el.statusText.innerHTML = `Turn: ${turnText}<br>First move: ${pending}`;
+        } else {
+          el.statusText.innerHTML = `Turn: ${turnText}<br>Phase: Place tile in front of your entrance`;
+        }
         el.winnerText.classList.add("hidden");
       }
     }

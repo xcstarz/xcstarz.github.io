@@ -215,7 +215,9 @@ Fixed interior dead zones:
 ### 5.1 Placement
 
 - Place exactly one tile per turn.
-- First turn: place on any blank cell adjacent to your base; choose an entrance facing your base.
+- First turn (2 steps):
+  1. Place a tile on any blank cell adjacent to your base.
+  2. Choose one of that tile's entrances on the side touching your base.
 - Subsequent turns: place on the single blank cell directly in front of your current entrance.
 - Cannot place on start bases or dead zones.
 
