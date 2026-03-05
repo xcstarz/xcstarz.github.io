@@ -457,7 +457,7 @@
     }
     function getEntrancePoint(i) {
       const pts = {
-        0:[.30,.01],1:[.70,.01],2:[.99,.30],3:[.99,.70],4:[.70,.99],5:[.30,.99],6:[.01,.70],7:[.01,.30]
+        0:[.30,0],1:[.70,0],2:[1,.30],3:[1,.70],4:[.70,1],5:[.30,1],6:[0,.70],7:[0,.30]
       };
       return pts[i];
     }
@@ -1230,11 +1230,11 @@
       const pairs = getRotatedPairs(tile.type, tile.rot);
       const lines = pairs.map(([a, b]) => {
         if (tile.type === "uturn") {
-          return `<path d="${uTurnPath(a, b, size)}" fill="none" stroke="#d9e8ff" stroke-width="2.2"/>`;
+          return `<path d="${uTurnPath(a, b, size)}" fill="none" stroke="#d9e8ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
         }
         const [x1, y1] = getEntrancePoint(a);
         const [x2, y2] = getEntrancePoint(b);
-        return `<line x1="${x1 * size}" y1="${y1 * size}" x2="${x2 * size}" y2="${y2 * size}" stroke="#d9e8ff" stroke-width="2.2"/>`;
+        return `<line x1="${x1 * size}" y1="${y1 * size}" x2="${x2 * size}" y2="${y2 * size}" stroke="#d9e8ff" stroke-width="2.2" stroke-linecap="round"/>`;
       }).join("");
       const jumpCircle = (tile.type === "jump" || tile.type === "diagonalJump")
         ? `<circle cx="${size/2}" cy="${size/2}" r="${size*0.12}" fill="none" stroke="#ffd46b" stroke-width="2.4"/>` : "";
