@@ -776,7 +776,7 @@
       player.trail.push(point);
     }
 
-    function getUTurnBendPoint(entry, exit) {
+    function getUTurnControlPoint(entry, exit) {
       const [x1, y1] = getEntrancePoint(entry);
       const [x2, y2] = getEntrancePoint(exit);
       const edge = edgeDir(entry);
@@ -786,28 +786,42 @@
       return { ax: 0.26, ay: (y1 + y2) / 2 };
     }
 
+    function appendUTurnCurve(player, row, col, entry, exit) {
+      const [sx, sy] = getEntrancePoint(entry);
+      const [ex, ey] = getEntrancePoint(exit);
+      const cp = getUTurnControlPoint(entry, exit);
+      appendTrailPoint(player, { row, col, ax: sx, ay: sy });
+      [0.25, 0.5, 0.75].forEach((t) => {
+        const mt = 1 - t;
+        const ax = mt * mt * sx + 2 * mt * t * cp.ax + t * t * ex;
+        const ay = mt * mt * sy + 2 * mt * t * cp.ay + t * t * ey;
+        appendTrailPoint(player, { row, col, ax, ay });
+      });
+      appendTrailPoint(player, { row, col, ax: ex, ay: ey });
+    }
+
     function appendMovementPath(player, fromR, fromC, entry, exit, toR, toC, toEntrance, tileType) {
-      const [fromAx, fromAy] = getEntrancePoint(entry);
-      const [exitAx, exitAy] = getEntrancePoint(exit);
       const [toAx, toAy] = getEntrancePoint(toEntrance);
-      appendTrailPoint(player, { row: fromR, col: fromC, ax: fromAx, ay: fromAy });
       if (tileType === "uturn") {
-        const bend = getUTurnBendPoint(entry, exit);
-        appendTrailPoint(player, { row: fromR, col: fromC, ax: bend.ax, ay: bend.ay });
+        appendUTurnCurve(player, fromR, fromC, entry, exit);
+      } else {
+        const [fromAx, fromAy] = getEntrancePoint(entry);
+        const [exitAx, exitAy] = getEntrancePoint(exit);
+        appendTrailPoint(player, { row: fromR, col: fromC, ax: fromAx, ay: fromAy });
+        appendTrailPoint(player, { row: fromR, col: fromC, ax: exitAx, ay: exitAy });
       }
-      appendTrailPoint(player, { row: fromR, col: fromC, ax: exitAx, ay: exitAy });
       appendTrailPoint(player, { row: toR, col: toC, ax: toAx, ay: toAy });
     }
 
     function appendExitOnlyPath(player, row, col, entry, exit, tileType) {
-      const [fromAx, fromAy] = getEntrancePoint(entry);
-      const [exitAx, exitAy] = getEntrancePoint(exit);
-      appendTrailPoint(player, { row, col, ax: fromAx, ay: fromAy });
       if (tileType === "uturn") {
-        const bend = getUTurnBendPoint(entry, exit);
-        appendTrailPoint(player, { row, col, ax: bend.ax, ay: bend.ay });
+        appendUTurnCurve(player, row, col, entry, exit);
+      } else {
+        const [fromAx, fromAy] = getEntrancePoint(entry);
+        const [exitAx, exitAy] = getEntrancePoint(exit);
+        appendTrailPoint(player, { row, col, ax: fromAx, ay: fromAy });
+        appendTrailPoint(player, { row, col, ax: exitAx, ay: exitAy });
       }
-      appendTrailPoint(player, { row, col, ax: exitAx, ay: exitAy });
     }
 
     function executeFirstTurnMovement(player, tileR, tileC, entry) {
