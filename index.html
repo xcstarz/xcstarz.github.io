@@ -1083,10 +1083,11 @@
       }
       el.selectedTilePreview.innerHTML = tileSvg(tile, 116, {
         showEntrances: true,
+        showEntranceLabels: true,
         highlightedEntrances,
       });
       el.selectedTileNote.textContent = highlightedEntrances.length
-        ? "Yellow dots are valid entries touching your base."
+        ? "Green dots are valid entries touching your base."
         : "Dots show all tile entrances.";
     }
 
@@ -1288,9 +1289,20 @@
       return `M ${x1} ${y1} Q ${size * 0.26} ${(y1 + y2) / 2} ${x2} ${y2}`;
     }
 
+    function entranceLabelSpec(i, size) {
+      const [x, y] = getEntrancePoint(i);
+      const edge = getEdgeForEntrance(i);
+      const edgeInset = size * 0.09;
+      if (edge === "N") return { x: x * size, y: y * size + edgeInset, anchor: "middle" };
+      if (edge === "S") return { x: x * size, y: y * size - edgeInset * 0.6, anchor: "middle" };
+      if (edge === "E") return { x: x * size - edgeInset * 0.65, y: y * size + size * 0.01, anchor: "end" };
+      return { x: x * size + edgeInset * 0.65, y: y * size + size * 0.01, anchor: "start" };
+    }
+
     function tileSvg(tile, size, options = {}) {
       const pairs = getRotatedPairs(tile.type, tile.rot);
       const showEntrances = !!options.showEntrances;
+      const showEntranceLabels = !!options.showEntranceLabels;
       const highlightedEntrances = new Set(options.highlightedEntrances || []);
       const lines = pairs.map(([a, b]) => {
         if (tile.type === "uturn") {
@@ -1303,8 +1315,15 @@
       const entranceDots = showEntrances
         ? Array.from({ length: 8 }, (_, i) => {
           const [x, y] = getEntrancePoint(i);
-          const fill = highlightedEntrances.has(i) ? "#ffd46b" : "#8fb0df";
+          const fill = highlightedEntrances.has(i) ? "#58e2a9" : "#8fb0df";
           return `<circle cx="${x * size}" cy="${y * size}" r="${size * 0.045}" fill="${fill}" stroke="#0d1730" stroke-width="${Math.max(1.6, size * 0.015)}"/>`;
+        }).join("")
+        : "";
+      const entranceLabels = showEntranceLabels
+        ? Array.from({ length: 8 }, (_, i) => {
+          const label = entranceName(i);
+          const pos = entranceLabelSpec(i, size);
+          return `<text x="${pos.x}" y="${pos.y}" text-anchor="${pos.anchor}" font-size="${Math.max(9, size * 0.09)}" font-weight="700" fill="#dce8ff" stroke="#0d1730" stroke-width="${Math.max(0.8, size * 0.01)}" paint-order="stroke">${label}</text>`;
         }).join("")
         : "";
       const jumpCircle = (tile.type === "jump" || tile.type === "diagonalJump")
@@ -1312,6 +1331,7 @@
       return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
         ${lines}
         ${entranceDots}
+        ${entranceLabels}
         ${jumpCircle}
       </svg>`;
     }
