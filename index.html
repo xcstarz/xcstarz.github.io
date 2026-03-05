@@ -90,7 +90,7 @@
     }
     .board {
       display: grid;
-      gap: 1px;
+      gap: 0;
       background: var(--grid);
       border: 1px solid #3a5185;
       border-radius: 10px;
@@ -360,7 +360,7 @@
     ]);
     const DEAD_ZONES_7 = new Set(["2,2","2,4","3,3","4,2","4,4"]);
     const BOARD_CELL_SIZE = 52;
-    const BOARD_CELL_GAP = 1;
+    const BOARD_CELL_GAP = 0;
     const BOARD_FRAME = 2; // 1px border + 1px padding on each side
 
     const BASE_TILE_DEFS = {
@@ -917,7 +917,8 @@
         const dir = edgeDir(exit);
         const [sr, sc] = stepCard(row, col, dir);
         const [lr, lc] = stepCard(sr, sc, dir);
-        if (isFatal(sr, sc, player) || isFatal(lr, lc, player)) { result.eliminated = true; return result; }
+        // Cardinal jump flies over the skipped cell; only landing cell is evaluated.
+        if (isFatal(lr, lc, player)) { result.eliminated = true; return result; }
         if (isOpponentBaseCell(player, lr, lc)) { result.win = true; return result; }
         nextRow = lr; nextCol = lc; nextEntrance = entry;
       } else if (tileType === "diagonalJump") {
