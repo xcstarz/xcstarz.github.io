@@ -770,10 +770,26 @@
       log(`${currentPlayer().name} placed ${TILE_LABELS[type]} (${rot * 90}°) at (${r},${c}).`);
     }
 
-    function pushTrailPoint(player, row, col, entrance) {
+    function appendTrailPoint(player, point) {
       const last = player.trail[player.trail.length - 1];
-      if (last && last.row === row && last.col === col && last.entrance === entrance) return;
-      player.trail.push({ row, col, entrance });
+      if (last && last.row === point.row && last.col === point.col && last.ax === point.ax && last.ay === point.ay) return;
+      player.trail.push(point);
+    }
+
+    function appendMovementPath(player, fromR, fromC, entry, exit, toR, toC, toEntrance) {
+      const [fromAx, fromAy] = getEntrancePoint(entry);
+      const [exitAx, exitAy] = getEntrancePoint(exit);
+      const [toAx, toAy] = getEntrancePoint(toEntrance);
+      appendTrailPoint(player, { row: fromR, col: fromC, ax: fromAx, ay: fromAy });
+      appendTrailPoint(player, { row: fromR, col: fromC, ax: exitAx, ay: exitAy });
+      appendTrailPoint(player, { row: toR, col: toC, ax: toAx, ay: toAy });
+    }
+
+    function appendExitOnlyPath(player, row, col, entry, exit) {
+      const [fromAx, fromAy] = getEntrancePoint(entry);
+      const [exitAx, exitAy] = getEntrancePoint(exit);
+      appendTrailPoint(player, { row, col, ax: fromAx, ay: fromAy });
+      appendTrailPoint(player, { row, col, ax: exitAx, ay: exitAy });
     }
 
     function executeFirstTurnMovement(player, tileR, tileC, entry) {
@@ -781,6 +797,9 @@
       const tile = app.board[curR][curC].tile;
       const exit = getExitEntrance(tile, curEntry);
       const next = jumpOrAdjacent(curR, curC, curEntry, exit, tile.type, tile.rot);
+      player.trail = [];
+      if (next.eliminated || next.win) appendExitOnlyPath(player, curR, curC, curEntry, exit);
+      else appendMovementPath(player, curR, curC, curEntry, exit, next.row, next.col, next.entrance);
       if (next.eliminated) {
         eliminatePlayer(player, `${player.name} was eliminated on first move.`);
         return;
@@ -794,9 +813,6 @@
       player.row = next.row;
       player.col = next.col;
       player.entrance = next.entrance;
-      player.trail = [];
-      pushTrailPoint(player, tileR, tileC, entry);
-      pushTrailPoint(player, player.row, player.col, player.entrance);
       log(`${player.name} ends first turn at (${player.row},${player.col}) on entrance ${entranceName(player.entrance)}.`);
     }
 
@@ -839,6 +855,8 @@
 
         const exit = getExitEntrance(cell.tile, player.entrance);
         const next = jumpOrAdjacent(player.row, player.col, player.entrance, exit, cell.tile.type, cell.tile.rot, player);
+        if (next.eliminated || next.win) appendExitOnlyPath(player, player.row, player.col, player.entrance, exit);
+        else appendMovementPath(player, player.row, player.col, player.entrance, exit, next.row, next.col, next.entrance);
 
         if (next.eliminated) {
           eliminatePlayer(player, `${player.name} was eliminated.`);
@@ -854,7 +872,6 @@
         player.row = next.row;
         player.col = next.col;
         player.entrance = next.entrance;
-        pushTrailPoint(player, player.row, player.col, player.entrance);
         if (!app.board[player.row][player.col].tile) return;
       }
     }
@@ -1089,8 +1106,8 @@
       renderPlayerTrails();
     }
 
-    function boardPointForState(state) {
-      const [ax, ay] = state.entrance == null ? [.5, .5] : getEntrancePoint(state.entrance);
+    function boardPointForTrailPoint(state) {
+      const { ax, ay } = state;
       return [
         BOARD_FRAME + state.col * (BOARD_CELL_SIZE + BOARD_CELL_GAP) + ax * BOARD_CELL_SIZE,
         BOARD_FRAME + state.row * (BOARD_CELL_SIZE + BOARD_CELL_GAP) + ay * BOARD_CELL_SIZE,
@@ -1106,7 +1123,7 @@
 
       app.players.forEach(p => {
         if (!p.alive || !p.hasPlacedFirstTile || p.trail.length < 2) return;
-        const points = p.trail.map(boardPointForState).map(([x, y]) => `${x},${y}`).join(" ");
+        const points = p.trail.map(boardPointForTrailPoint).map(([x, y]) => `${x},${y}`).join(" ");
         const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
         polyline.setAttribute("points", points);
         polyline.setAttribute("fill", "none");
