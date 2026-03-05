@@ -259,3 +259,5 @@ P1 -> P2 -> P3 -> P4 -> repeat, skipping eliminated players.
 
 When a player is eliminated, a full-screen overlay displays "Player X was eliminated!" which the player dismisses by clicking OK before play continues.
 
+Player position rendering uses a visible line trail showing the path each player has taken to reach their current entrance location.
+

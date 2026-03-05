@@ -92,6 +92,7 @@
       padding: 1px;
       width: max-content;
       margin: 0 auto;
+      position: relative;
     }
     .cell {
       width: 52px;
@@ -134,6 +135,12 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
+    }
+    .path-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3;
     }
     .token.p1 { background: #ff5a6f; }
     .token.p2 { background: #5aa0ff; }
@@ -456,6 +463,29 @@
       };
       return pts[i];
     }
+    function playerColorHex(color) {
+      const map = { p1: "#ff5a6f", p2: "#5aa0ff", p3: "#59d37e", p4: "#ffd65a" };
+      return map[color] || "#ffffff";
+    }
+    function appendPathPoint(player, point) {
+      const last = player.pathPoints[player.pathPoints.length - 1];
+      if (last && last.r === point.r && last.c === point.c && last.ax === point.ax && last.ay === point.ay) return;
+      player.pathPoints.push(point);
+    }
+    function appendMovementPath(player, fromR, fromC, entry, exit, toR, toC, toEntrance) {
+      const [fromAx, fromAy] = getEntrancePoint(entry);
+      const [exitAx, exitAy] = getEntrancePoint(exit);
+      const [toAx, toAy] = getEntrancePoint(toEntrance);
+      appendPathPoint(player, { r: fromR, c: fromC, ax: fromAx, ay: fromAy });
+      appendPathPoint(player, { r: fromR, c: fromC, ax: exitAx, ay: exitAy });
+      appendPathPoint(player, { r: toR, c: toC, ax: toAx, ay: toAy });
+    }
+    function appendExitOnlyPath(player, r, c, entry, exit) {
+      const [entryAx, entryAy] = getEntrancePoint(entry);
+      const [exitAx, exitAy] = getEntrancePoint(exit);
+      appendPathPoint(player, { r, c, ax: entryAx, ay: entryAy });
+      appendPathPoint(player, { r, c, ax: exitAx, ay: exitAy });
+    }
 
     function setupBindings() {
       el.playerCount.addEventListener("change", () => {
@@ -621,6 +651,7 @@
           jumpLeft: 0,
           diagonalJumpLeft: 0,
           combinedJumpLeft: 0,
+          pathPoints: [],
         };
         if (jumpSelection === "cardinal") p.jumpLeft = limitSingle;
         if (jumpSelection === "diagonal") p.diagonalJumpLeft = limitSingle;
@@ -769,6 +800,8 @@
       const tile = app.board[curR][curC].tile;
       const exit = getExitEntrance(tile, curEntry);
       const next = jumpOrAdjacent(curR, curC, curEntry, exit, tile.type, tile.rot);
+      if (next.eliminated || next.win) appendExitOnlyPath(player, curR, curC, curEntry, exit);
+      else appendMovementPath(player, curR, curC, curEntry, exit, next.row, next.col, next.entrance);
       if (next.eliminated) {
         eliminatePlayer(player, `${player.name} was eliminated on first move.`);
         return;
@@ -824,6 +857,8 @@
 
         const exit = getExitEntrance(cell.tile, player.entrance);
         const next = jumpOrAdjacent(player.row, player.col, player.entrance, exit, cell.tile.type, cell.tile.rot, player);
+        if (next.eliminated || next.win) appendExitOnlyPath(player, player.row, player.col, player.entrance, exit);
+        else appendMovementPath(player, player.row, player.col, player.entrance, exit, next.row, next.col, next.entrance);
 
         if (next.eliminated) {
           eliminatePlayer(player, `${player.name} was eliminated.`);
@@ -1083,6 +1118,39 @@
           el.board.appendChild(btn);
         }
       }
+      renderPathOverlay();
+    }
+    function renderPathOverlay() {
+      const size = app.config.size;
+      const cellSize = 52;
+      const gap = 1;
+      const boardSizePx = size * cellSize + (size - 1) * gap + 2;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "path-overlay");
+      svg.setAttribute("width", String(boardSizePx));
+      svg.setAttribute("height", String(boardSizePx));
+      svg.setAttribute("viewBox", `0 0 ${boardSizePx} ${boardSizePx}`);
+
+      for (const p of app.players) {
+        if (!p.alive || p.pathPoints.length < 2) continue;
+        const points = p.pathPoints
+          .map(pt => {
+            const x = 1 + pt.c * (cellSize + gap) + pt.ax * cellSize;
+            const y = 1 + pt.r * (cellSize + gap) + pt.ay * cellSize;
+            return `${x},${y}`;
+          })
+          .join(" ");
+        const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        polyline.setAttribute("points", points);
+        polyline.setAttribute("fill", "none");
+        polyline.setAttribute("stroke", playerColorHex(p.color));
+        polyline.setAttribute("stroke-width", "3");
+        polyline.setAttribute("stroke-linecap", "round");
+        polyline.setAttribute("stroke-linejoin", "round");
+        polyline.setAttribute("opacity", "0.75");
+        svg.appendChild(polyline);
+      }
+      el.board.appendChild(svg);
     }
 
     function playersAtCell(r, c) {

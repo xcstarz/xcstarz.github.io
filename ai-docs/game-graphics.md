@@ -29,7 +29,8 @@ The center circle is the visual marker that distinguishes jump-capable tiles.
 - Use SVG for crisp scaling at any zoom level.
 - Render each board cell as a square (for example, 60x60 px).
 - Render tile paths as straight SVG segments.
-- Render player tokens as colored **lines** positioned on entrance anchors (horizontal on N/S edges, vertical on E/W edges). Players still at their start base (before first tile) are shown as small circles.
+- Render a per-player colored **path trail line** that shows the route the player took to reach their current position.
+- Keep the current-position marker on the active entrance anchor (horizontal on N/S edges, vertical on E/W edges). Players still at their start base (before first tile) are shown as small circles.
 - Render dead zones with a red X marker.
 - Render start bases with color-coded halos.
 - Render blank cells as light grid squares.
@@ -84,7 +85,7 @@ To keep visuals aligned with rules:
    - active paths light up;
    - tokens slide along routes;
    - jump moves animate as clear leaps.
-5. If a player is eliminated, a **full-screen overlay** appears with "Player X was eliminated!" and an OK button to dismiss.
+5. If a player is eliminated, a **full-screen elimination overlay** appears with "Player X was eliminated!" and an OK button to dismiss before play continues.
 6. UI updates elimination/win/draw state and advances turn when appropriate.
 
 Animation goals:
