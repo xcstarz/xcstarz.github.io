@@ -83,6 +83,11 @@
       padding: 12px;
       overflow: auto;
     }
+    .board-stack {
+      position: relative;
+      width: max-content;
+      margin: 0 auto;
+    }
     .board {
       display: grid;
       gap: 1px;
@@ -93,6 +98,13 @@
       width: max-content;
       margin: 0 auto;
       position: relative;
+      z-index: 2;
+    }
+    .trail-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 3;
     }
     .cell {
       width: 52px;
@@ -123,8 +135,6 @@
       z-index: 4;
       border-radius: 2px;
     }
-    .token.h-line { width: 16px; height: 4px; }
-    .token.v-line { width: 4px; height: 16px; }
     .token.base-token {
       width: 10px;
       height: 10px;
@@ -135,12 +145,6 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
-    }
-    .path-overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 3;
     }
     .token.p1 { background: #ff5a6f; }
     .token.p2 { background: #5aa0ff; }
@@ -322,7 +326,10 @@
       <div class="chip-row" id="headerChips"></div>
       <div class="game">
         <div class="board-wrap card">
-          <div id="board" class="board"></div>
+          <div class="board-stack">
+            <svg id="trailLayer" class="trail-layer"></svg>
+            <div id="board" class="board"></div>
+          </div>
         </div>
         <div class="sidebar card">
           <div class="panel">
@@ -365,6 +372,9 @@
       "3,6","4,4","4,8","5,5","5,7","6,3","6,6","6,9","7,5","7,7","8,4","8,8","9,6"
     ]);
     const DEAD_ZONES_7 = new Set(["2,2","2,4","3,3","4,2","4,4"]);
+    const BOARD_CELL_SIZE = 52;
+    const BOARD_CELL_GAP = 1;
+    const BOARD_FRAME = 2; // 1px border + 1px padding on each side
 
     const BASE_TILE_DEFS = {
       straightaway: [[0,5],[1,4],[2,7],[3,6]],
@@ -405,6 +415,7 @@
       setupView: document.getElementById("setupView"),
       gameView: document.getElementById("gameView"),
       board: document.getElementById("board"),
+      trailLayer: document.getElementById("trailLayer"),
       statusText: document.getElementById("statusText"),
       winnerText: document.getElementById("winnerText"),
       playersText: document.getElementById("playersText"),
@@ -462,29 +473,6 @@
         0:[.30,.06],1:[.70,.06],2:[.94,.30],3:[.94,.70],4:[.70,.94],5:[.30,.94],6:[.06,.70],7:[.06,.30]
       };
       return pts[i];
-    }
-    function playerColorHex(color) {
-      const map = { p1: "#ff5a6f", p2: "#5aa0ff", p3: "#59d37e", p4: "#ffd65a" };
-      return map[color] || "#ffffff";
-    }
-    function appendPathPoint(player, point) {
-      const last = player.pathPoints[player.pathPoints.length - 1];
-      if (last && last.r === point.r && last.c === point.c && last.ax === point.ax && last.ay === point.ay) return;
-      player.pathPoints.push(point);
-    }
-    function appendMovementPath(player, fromR, fromC, entry, exit, toR, toC, toEntrance) {
-      const [fromAx, fromAy] = getEntrancePoint(entry);
-      const [exitAx, exitAy] = getEntrancePoint(exit);
-      const [toAx, toAy] = getEntrancePoint(toEntrance);
-      appendPathPoint(player, { r: fromR, c: fromC, ax: fromAx, ay: fromAy });
-      appendPathPoint(player, { r: fromR, c: fromC, ax: exitAx, ay: exitAy });
-      appendPathPoint(player, { r: toR, c: toC, ax: toAx, ay: toAy });
-    }
-    function appendExitOnlyPath(player, r, c, entry, exit) {
-      const [entryAx, entryAy] = getEntrancePoint(entry);
-      const [exitAx, exitAy] = getEntrancePoint(exit);
-      appendPathPoint(player, { r, c, ax: entryAx, ay: entryAy });
-      appendPathPoint(player, { r, c, ax: exitAx, ay: exitAy });
     }
 
     function setupBindings() {
@@ -651,7 +639,7 @@
           jumpLeft: 0,
           diagonalJumpLeft: 0,
           combinedJumpLeft: 0,
-          pathPoints: [],
+          trail: [],
         };
         if (jumpSelection === "cardinal") p.jumpLeft = limitSingle;
         if (jumpSelection === "diagonal") p.diagonalJumpLeft = limitSingle;
@@ -795,13 +783,17 @@
       log(`${currentPlayer().name} placed ${TILE_LABELS[type]} (${rot * 90}°) at (${r},${c}).`);
     }
 
+    function pushTrailPoint(player, row, col, entrance) {
+      const last = player.trail[player.trail.length - 1];
+      if (last && last.row === row && last.col === col && last.entrance === entrance) return;
+      player.trail.push({ row, col, entrance });
+    }
+
     function executeFirstTurnMovement(player, tileR, tileC, entry) {
       let curR = tileR, curC = tileC, curEntry = entry;
       const tile = app.board[curR][curC].tile;
       const exit = getExitEntrance(tile, curEntry);
       const next = jumpOrAdjacent(curR, curC, curEntry, exit, tile.type, tile.rot);
-      if (next.eliminated || next.win) appendExitOnlyPath(player, curR, curC, curEntry, exit);
-      else appendMovementPath(player, curR, curC, curEntry, exit, next.row, next.col, next.entrance);
       if (next.eliminated) {
         eliminatePlayer(player, `${player.name} was eliminated on first move.`);
         return;
@@ -815,6 +807,9 @@
       player.row = next.row;
       player.col = next.col;
       player.entrance = next.entrance;
+      player.trail = [];
+      pushTrailPoint(player, tileR, tileC, entry);
+      pushTrailPoint(player, player.row, player.col, player.entrance);
       log(`${player.name} ends first turn at (${player.row},${player.col}) on entrance ${entranceName(player.entrance)}.`);
     }
 
@@ -857,8 +852,6 @@
 
         const exit = getExitEntrance(cell.tile, player.entrance);
         const next = jumpOrAdjacent(player.row, player.col, player.entrance, exit, cell.tile.type, cell.tile.rot, player);
-        if (next.eliminated || next.win) appendExitOnlyPath(player, player.row, player.col, player.entrance, exit);
-        else appendMovementPath(player, player.row, player.col, player.entrance, exit, next.row, next.col, next.entrance);
 
         if (next.eliminated) {
           eliminatePlayer(player, `${player.name} was eliminated.`);
@@ -874,6 +867,7 @@
         player.row = next.row;
         player.col = next.col;
         player.entrance = next.entrance;
+        pushTrailPoint(player, player.row, player.col, player.entrance);
         if (!app.board[player.row][player.col].tile) return;
       }
     }
@@ -933,6 +927,7 @@
 
     function eliminatePlayer(player, msg) {
       player.alive = false;
+      player.trail = [];
       log(msg);
       app.eliminationQueue.push(player);
     }
@@ -1071,7 +1066,7 @@
 
     function renderBoard() {
       const size = app.config.size;
-      el.board.style.gridTemplateColumns = `repeat(${size}, 52px)`;
+      el.board.style.gridTemplateColumns = `repeat(${size}, ${BOARD_CELL_SIZE}px)`;
       el.board.innerHTML = "";
 
       const validSet = new Set();
@@ -1101,15 +1096,10 @@
             btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, 52)}</div>`;
           }
 
-          const tokens = playersAtCell(r, c);
+          const tokens = basePlayersAtCell(r, c);
           tokens.forEach(tok => {
             const t = document.createElement("div");
-            let shape = "base-token";
-            if (!tok.inBase && tok.entrance != null) {
-              const edge = edgeDir(tok.entrance);
-              shape = (edge === "N" || edge === "S") ? "h-line" : "v-line";
-            }
-            t.className = `token ${tok.color} ${shape}`;
+            t.className = `token ${tok.color} base-token`;
             const [x, y] = getTokenPosition(tok);
             t.style.left = `${x * 100}%`;
             t.style.top = `${y * 100}%`;
@@ -1118,49 +1108,15 @@
           el.board.appendChild(btn);
         }
       }
-      renderPathOverlay();
-    }
-    function renderPathOverlay() {
-      const size = app.config.size;
-      const cellSize = 52;
-      const gap = 1;
-      const boardSizePx = size * cellSize + (size - 1) * gap + 2;
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("class", "path-overlay");
-      svg.setAttribute("width", String(boardSizePx));
-      svg.setAttribute("height", String(boardSizePx));
-      svg.setAttribute("viewBox", `0 0 ${boardSizePx} ${boardSizePx}`);
-
-      for (const p of app.players) {
-        if (!p.alive || p.pathPoints.length < 2) continue;
-        const points = p.pathPoints
-          .map(pt => {
-            const x = 1 + pt.c * (cellSize + gap) + pt.ax * cellSize;
-            const y = 1 + pt.r * (cellSize + gap) + pt.ay * cellSize;
-            return `${x},${y}`;
-          })
-          .join(" ");
-        const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-        polyline.setAttribute("points", points);
-        polyline.setAttribute("fill", "none");
-        polyline.setAttribute("stroke", playerColorHex(p.color));
-        polyline.setAttribute("stroke-width", "3");
-        polyline.setAttribute("stroke-linecap", "round");
-        polyline.setAttribute("stroke-linejoin", "round");
-        polyline.setAttribute("opacity", "0.75");
-        svg.appendChild(polyline);
-      }
-      el.board.appendChild(svg);
+      renderPlayerTrails();
     }
 
-    function playersAtCell(r, c) {
+    function basePlayersAtCell(r, c) {
       const out = [];
       for (const p of app.players) {
         if (!p.alive) continue;
         if (!p.hasPlacedFirstTile && p.baseCells.some(([br, bc]) => br === r && bc === c)) {
           out.push({ color: p.color, entrance: null, inBase: true });
-        } else if (p.row === r && p.col === c) {
-          out.push({ color: p.color, entrance: p.entrance, inBase: false });
         }
       }
       return out;
@@ -1169,6 +1125,55 @@
     function getTokenPosition(tok) {
       if (tok.inBase || tok.entrance == null) return [.5, .5];
       return getEntrancePoint(tok.entrance);
+    }
+
+    function boardPointForState(state) {
+      const [ax, ay] = state.entrance == null ? [.5, .5] : getEntrancePoint(state.entrance);
+      return [
+        BOARD_FRAME + state.col * (BOARD_CELL_SIZE + BOARD_CELL_GAP) + ax * BOARD_CELL_SIZE,
+        BOARD_FRAME + state.row * (BOARD_CELL_SIZE + BOARD_CELL_GAP) + ay * BOARD_CELL_SIZE,
+      ];
+    }
+
+    function renderPlayerTrails() {
+      const span = app.config.size * BOARD_CELL_SIZE + (app.config.size - 1) * BOARD_CELL_GAP + BOARD_FRAME * 2;
+      el.trailLayer.setAttribute("viewBox", `0 0 ${span} ${span}`);
+      el.trailLayer.setAttribute("width", `${span}`);
+      el.trailLayer.setAttribute("height", `${span}`);
+      el.trailLayer.innerHTML = "";
+
+      app.players.forEach(p => {
+        if (!p.alive || !p.hasPlacedFirstTile || p.trail.length < 2) return;
+        const points = p.trail.map(boardPointForState).map(([x, y]) => `${x},${y}`).join(" ");
+        const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+        polyline.setAttribute("points", points);
+        polyline.setAttribute("fill", "none");
+        polyline.setAttribute("stroke", playerColorHex(p.color));
+        polyline.setAttribute("stroke-width", "4");
+        polyline.setAttribute("stroke-linecap", "round");
+        polyline.setAttribute("stroke-linejoin", "round");
+        polyline.setAttribute("opacity", "0.95");
+
+        const end = p.trail[p.trail.length - 1];
+        const [ex, ey] = boardPointForState(end);
+        const endpoint = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        endpoint.setAttribute("cx", `${ex}`);
+        endpoint.setAttribute("cy", `${ey}`);
+        endpoint.setAttribute("r", "4");
+        endpoint.setAttribute("fill", playerColorHex(p.color));
+        endpoint.setAttribute("stroke", "#f2f7ff");
+        endpoint.setAttribute("stroke-width", "1");
+
+        el.trailLayer.appendChild(polyline);
+        el.trailLayer.appendChild(endpoint);
+      });
+    }
+
+    function playerColorHex(color) {
+      if (color === "p1") return "#ff5a6f";
+      if (color === "p2") return "#5aa0ff";
+      if (color === "p3") return "#59d37e";
+      return "#ffd65a";
     }
 
     function renderStatus() {

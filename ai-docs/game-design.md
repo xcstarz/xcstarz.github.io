@@ -416,8 +416,9 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 - Use **SVG** for crisp rendering at any zoom level.
 - Each cell is a square (e.g., 60×60 px).
 - Paths inside tiles rendered as straight line segments.
-- Player presence is shown as a colored **path trail line** that accumulates the route they have taken to reach their current position.
-- The current position still uses an entrance-aligned indicator (horizontal on N/S edges, vertical on E/W edges). Players still in their start base before placing their first tile are shown as small circles.
+- Active player positions are rendered as colored **path trails** that show the route each player has taken to their current entrance position.
+- The trail endpoint marks the player's current entrance anchor.
+- Players still in their start base before placing their first tile are shown as small circles.
 - Dead zones marked with a red X pattern.
 - Start positions marked with player color halos.
 - Blank cells shown as light grid squares.
@@ -435,8 +436,8 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 1. Player selects a tile type from the sidebar.
 2. Player selects rotation.
 3. Player clicks a valid blank cell on the board to place the tile.
-4. Movement animates automatically (paths light up, player tokens slide along paths).
-5. If a player is eliminated, a **full-screen elimination overlay** appears showing "Player X was eliminated!" with an OK button the player clicks to dismiss it before play continues.
+4. Movement animates automatically (paths light up and player trail lines extend along routes).
+5. If a player is eliminated, a **full-screen elimination overlay** appears showing "Player X was eliminated!" with an OK button the player clicks to dismiss it.
 6. If no elimination/win occurs (or after dismissing the overlay), turn passes to next player.
 
 ### 7.5 Setup Screen
@@ -458,7 +459,7 @@ Players take turns in order: P1 → P2 → P3 → P4 → P1 → ... (skipping el
 - Clean, modern flat design.
 - Dark board background with light grid lines.
 - Distinct, colorblind-friendly player colors (Red, Blue, Green, Yellow with pattern fallbacks).
-- Smooth CSS animations for token movement.
+- Smooth CSS animations for trail growth and path readability.
 - Elimination overlay: dark backdrop with centered panel, animated entrance, and a clear dismiss button.
 
 ---

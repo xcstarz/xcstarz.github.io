@@ -202,6 +202,7 @@ Fixed interior dead zones:
 | `id` | 1-4 |
 | `color` | Red / Blue / Green / Yellow |
 | `position` | `{row, col, entranceIndex}` |
+| `positionTrail` | ordered list of visited entrance positions used to render the player's on-board trail line |
 | `alive` | elimination status |
 | `hasPlacedFirstTile` | whether first tile was placed |
 | `jumpTilesRemaining` | jump tiles left |
@@ -257,7 +258,7 @@ P1 -> P2 -> P3 -> P4 -> repeat, skipping eliminated players.
 | Two players same final position | Draw between those two |
 | One player remains alive | Win |
 
-When a player is eliminated, a full-screen overlay displays "Player X was eliminated!" which the player dismisses by clicking OK before play continues.
+Player positions are visualized as a colored trail line that shows the route taken to the current entrance position; players still in base are shown as circles.
 
-Player position rendering uses a visible line trail showing the path each player has taken to reach their current entrance location.
+When a player is eliminated, a full-screen elimination overlay displays "Player X was eliminated!" which the player dismisses by clicking OK before play continues.
 

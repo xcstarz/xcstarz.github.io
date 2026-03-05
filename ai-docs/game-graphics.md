@@ -29,8 +29,9 @@ The center circle is the visual marker that distinguishes jump-capable tiles.
 - Use SVG for crisp scaling at any zoom level.
 - Render each board cell as a square (for example, 60x60 px).
 - Render tile paths as straight SVG segments.
-- Render a per-player colored **path trail line** that shows the route the player took to reach their current position.
-- Keep the current-position marker on the active entrance anchor (horizontal on N/S edges, vertical on E/W edges). Players still at their start base (before first tile) are shown as small circles.
+- Render each active player's position as a colored **trail line** showing the route they have taken to their current entrance anchor.
+- Render a small endpoint marker at the current entrance anchor.
+- Players still at their start base (before first tile) are shown as small circles.
 - Render dead zones with a red X marker.
 - Render start bases with color-coded halos.
 - Render blank cells as light grid squares.
@@ -40,7 +41,7 @@ The center circle is the visual marker that distinguishes jump-capable tiles.
 
 To keep visuals aligned with rules:
 - Entrances `N0/N1`, `E0/E1`, `S0/S1`, `W0/W1` map to fixed anchor points on each cell edge.
-- Token placement should snap precisely to entrance anchor points.
+- Trail endpoints should snap precisely to entrance anchor points.
 - Rotation should transform tile path graphics around tile center.
 
 ---
@@ -83,9 +84,9 @@ To keep visuals aligned with rules:
 3. Player clicks highlighted valid cell.
 4. Movement animation plays automatically:
    - active paths light up;
-   - tokens slide along routes;
+   - trail lines extend along routes;
    - jump moves animate as clear leaps.
-5. If a player is eliminated, a **full-screen elimination overlay** appears with "Player X was eliminated!" and an OK button to dismiss before play continues.
+5. If a player is eliminated, show a **full-screen elimination overlay** with "Player X was eliminated!" and an OK button to dismiss before continuing.
 6. UI updates elimination/win/draw state and advances turn when appropriate.
 
 Animation goals:
@@ -119,7 +120,7 @@ Animation goals:
   - Green
   - Yellow
 - Include pattern/shape fallbacks for color differentiation.
-- Use subtle CSS transitions for hover, selection, and token movement.
+- Use subtle CSS transitions for hover, selection, and trail updates.
 - Elimination overlay uses a dark semi-transparent backdrop with blur, a centered panel with a pop-in animation, and a prominent dismiss button.
 
 ---
