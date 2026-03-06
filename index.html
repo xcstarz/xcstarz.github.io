@@ -472,6 +472,15 @@
       font-size: 16px;
       border-radius: 12px;
     }
+    .win-overlay {
+      background: rgba(14, 90, 34, .58);
+    }
+    .win-box {
+      border-color: #4ecf78;
+    }
+    .win-box h2 {
+      color: #7ef3a2;
+    }
     @media (max-width: 1120px) {
       .game { grid-template-columns: 1fr; }
     }
@@ -565,6 +574,12 @@
             <div class="elimination-box">
               <h2 id="elimText"></h2>
               <button id="elimOkBtn">OK</button>
+            </div>
+          </div>
+          <div id="winOverlay" class="elimination-overlay win-overlay hidden">
+            <div class="elimination-box win-box">
+              <h2 id="winText"></h2>
+              <button id="winOkBtn">OK</button>
             </div>
           </div>
 
@@ -694,6 +709,7 @@
       logs: [],
       drag: { active: false, tileType: null, ghost: null, hoveredCell: null },
       eliminationQueue: [],
+      winShown: false,
     };
 
     const el = {
@@ -728,6 +744,9 @@
       eliminationOverlay: document.getElementById("eliminationOverlay"),
       elimText: document.getElementById("elimText"),
       elimOkBtn: document.getElementById("elimOkBtn"),
+      winOverlay: document.getElementById("winOverlay"),
+      winText: document.getElementById("winText"),
+      winOkBtn: document.getElementById("winOkBtn"),
       tabPlayBtn: document.getElementById("tabPlayBtn"),
       tabTutorialBtn: document.getElementById("tabTutorialBtn"),
       playTabPanel: document.getElementById("playTabPanel"),
@@ -804,6 +823,7 @@
       });
 
       el.elimOkBtn.addEventListener("click", dismissElimination);
+      el.winOkBtn.addEventListener("click", dismissWin);
 
       document.addEventListener("pointermove", onDragMove);
       document.addEventListener("pointerup", onDragEnd);
@@ -982,6 +1002,9 @@
       app.gameOver = false;
       app.winner = null;
       app.eliminationQueue = [];
+      app.winShown = false;
+      el.eliminationOverlay.classList.add("hidden");
+      el.winOverlay.classList.add("hidden");
 
       const interior = size === 13 ? DEAD_ZONES_13 : DEAD_ZONES_7;
       for (const k of interior) {
@@ -1375,6 +1398,22 @@
     function dismissElimination() {
       el.eliminationOverlay.classList.add("hidden");
       showNextElimination();
+      showWinIfReady();
+    }
+
+    function showWinIfReady() {
+      if (!app.gameOver || app.winner == null || app.winShown) return;
+      if (app.eliminationQueue.length > 0) return;
+      if (!el.eliminationOverlay.classList.contains("hidden")) return;
+      const winner = app.players[app.winner];
+      if (!winner) return;
+      el.winText.textContent = `${winner.name} Wins!`;
+      el.winOverlay.classList.remove("hidden");
+      app.winShown = true;
+    }
+
+    function dismissWin() {
+      el.winOverlay.classList.add("hidden");
     }
 
     function checkPositionDraw() {
@@ -1405,6 +1444,7 @@
       }
       renderAll();
       showNextElimination();
+      showWinIfReady();
     }
 
     function entranceName(i) { return ["N0","N1","E0","E1","S0","S1","W0","W1"][i]; }
