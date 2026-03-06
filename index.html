@@ -75,7 +75,7 @@
       min-height: 420px;
     }
     .chess-tutorial-shell {
-      width: min(100%, 460px);
+      width: min(100%, 430px);
       margin: 10px auto 0;
       border-radius: 18px;
       overflow: hidden;
@@ -85,7 +85,7 @@
     }
     .chess-tutorial-board {
       position: relative;
-      height: 510px;
+      height: 410px;
       overflow: hidden;
       background:
         radial-gradient(120% 100% at 30% -5%, rgba(80, 95, 116, .18), transparent 42%),
@@ -93,10 +93,10 @@
     }
     .lesson-tile {
       position: absolute;
-      width: 94px;
-      height: 94px;
+      width: 84px;
+      height: 84px;
       border-radius: 16px;
-      transform: rotate(45deg);
+      transform: translate(-50%, -50%) rotate(45deg);
       background: linear-gradient(145deg, #205f6a, #184953);
       border: 1px solid rgba(90, 179, 196, .35);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 12px 16px rgba(0, 0, 0, .25);
@@ -104,13 +104,20 @@
       align-items: center;
       justify-content: center;
     }
-    .lesson-tile-icon {
+    .lesson-tile-art {
       transform: rotate(-45deg);
-      font-size: 34px;
-      color: rgba(223, 245, 255, .25);
-      font-weight: 800;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       pointer-events: none;
       user-select: none;
+    }
+    .lesson-tile-art svg {
+      width: 50px;
+      height: 50px;
+      opacity: .8;
     }
     .lesson-tile.active {
       background: linear-gradient(145deg, #5ef0da, #33b9b5);
@@ -119,21 +126,27 @@
     }
     .lesson-piece {
       position: absolute;
-      width: 50px;
-      height: 50px;
+      width: 54px;
+      height: 54px;
+      border-radius: 999px;
+      background: rgba(16, 31, 41, .85);
+      border: 1px solid rgba(130, 193, 207, .5);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 48px;
-      color: #f6f8ff;
-      text-shadow: 0 4px 6px rgba(0, 0, 0, .45);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, .3);
       user-select: none;
       pointer-events: none;
+    }
+    .lesson-piece svg {
+      width: 40px;
+      height: 40px;
+      opacity: .95;
     }
     .next-chip {
       position: absolute;
       left: 32px;
-      bottom: 56px;
+      bottom: 36px;
       border: 0;
       cursor: pointer;
       background: #f0f2f5;
@@ -163,14 +176,14 @@
       background: linear-gradient(180deg, rgba(16, 31, 41, .25), rgba(7, 23, 34, .7));
     }
     .tutorial-title {
-      font-size: 52px;
+      font-size: 48px;
       letter-spacing: .2px;
       margin: 0;
     }
     .tutorial-step {
       margin: 6px 0 18px;
       color: #ceecf7;
-      font-size: 24px;
+      font-size: 20px;
       font-weight: 600;
     }
     .tutorial-actions {
@@ -194,12 +207,12 @@
       border-radius: 16px;
       background: linear-gradient(180deg, #85c74e, #6ead3e);
       color: #f5ffe8;
-      font-size: 50px;
+      font-size: 40px;
       font-weight: 900;
       text-shadow: 0 2px 0 rgba(0, 0, 0, .25);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 8px 18px rgba(0, 0, 0, .3);
-      line-height: 1.05;
-      padding: 18px 12px;
+      line-height: 1;
+      padding: 14px 12px;
     }
     .tutorial-lesson-list {
       margin-top: 14px;
@@ -470,15 +483,15 @@
         position: static;
         height: auto;
       }
-      .chess-tutorial-board { height: 450px; }
+      .chess-tutorial-board { height: 360px; }
       .tutorial-title { font-size: 42px; }
-      .tutorial-step { font-size: 20px; }
+      .tutorial-step { font-size: 18px; }
       .next-chip {
         width: 102px;
         height: 74px;
         font-size: 30px;
       }
-      .tutorial-next-btn { font-size: 42px; }
+      .tutorial-next-btn { font-size: 32px; }
     }
   </style>
 </head>
@@ -605,20 +618,20 @@
           <h2>Tutorial</h2>
           <div class="chess-tutorial-shell">
             <div class="chess-tutorial-board">
-              <div class="lesson-tile active" style="left: 28px; top: 32px;"><span class="lesson-tile-icon">♟</span></div>
-              <div class="lesson-tile" style="left: 126px; top: 16px;"><span class="lesson-tile-icon">✕</span></div>
-              <div class="lesson-tile" style="left: 223px; top: 40px;"><span class="lesson-tile-icon">♜</span></div>
-              <div class="lesson-tile" style="left: 92px; top: 118px;"><span class="lesson-tile-icon">♞</span></div>
-              <div class="lesson-tile" style="left: 190px; top: 140px;"><span class="lesson-tile-icon">♝</span></div>
-              <div class="lesson-tile" style="left: 288px; top: 164px;"><span class="lesson-tile-icon">♛</span></div>
-              <div class="lesson-tile" style="left: 154px; top: 242px;"><span class="lesson-tile-icon">♚</span></div>
-              <div class="lesson-tile" style="left: 252px; top: 266px;"><span class="lesson-tile-icon">♙</span></div>
-              <div class="lesson-tile" style="left: 58px; top: 314px;"><span class="lesson-tile-icon">♜</span></div>
+              <div class="lesson-tile active" style="left: 22%; top: 18%;" data-tile-type="straightaway" data-tile-rot="0"><div class="lesson-tile-art"></div></div>
+              <div class="lesson-tile" style="left: 41%; top: 18%;" data-tile-type="uturn" data-tile-rot="1"><div class="lesson-tile-art"></div></div>
+              <div class="lesson-tile" style="left: 60%; top: 18%;" data-tile-type="centrifugal" data-tile-rot="2"><div class="lesson-tile-art"></div></div>
+              <div class="lesson-tile" style="left: 32%; top: 35%;" data-tile-type="diagonal" data-tile-rot="0"><div class="lesson-tile-art"></div></div>
+              <div class="lesson-tile" style="left: 51%; top: 35%;" data-tile-type="weave" data-tile-rot="1"><div class="lesson-tile-art"></div></div>
+              <div class="lesson-tile" style="left: 70%; top: 35%;" data-tile-type="jump" data-tile-rot="2"><div class="lesson-tile-art"></div></div>
+              <div class="lesson-tile" style="left: 41%; top: 52%;" data-tile-type="diagonalJump" data-tile-rot="0"><div class="lesson-tile-art"></div></div>
+              <div class="lesson-tile" style="left: 60%; top: 52%;" data-tile-type="straightaway" data-tile-rot="1"><div class="lesson-tile-art"></div></div>
+              <div class="lesson-tile" style="left: 32%; top: 69%;" data-tile-type="uturn" data-tile-rot="3"><div class="lesson-tile-art"></div></div>
 
-              <div class="lesson-piece" style="left: 245px; top: 80px;">♖</div>
-              <div class="lesson-piece" style="left: 44px; top: 258px;">♗</div>
-              <div class="lesson-piece" style="left: 261px; top: 360px;">♘</div>
-              <div class="lesson-piece" style="left: 64px; top: 382px;">♔</div>
+              <div class="lesson-piece" style="left: 70%; top: 18%;" data-piece-tile="jump" data-piece-rot="1"></div>
+              <div class="lesson-piece" style="left: 22%; top: 53%;" data-piece-tile="uturn" data-piece-rot="2"></div>
+              <div class="lesson-piece" style="left: 69%; top: 67%;" data-piece-tile="diagonalJump" data-piece-rot="3"></div>
+              <div class="lesson-piece" style="left: 21%; top: 78%;" data-piece-tile="weave" data-piece-rot="0"></div>
 
               <button id="tutorialBubbleBtn" class="next-chip" type="button">Next</button>
             </div>
@@ -627,7 +640,7 @@
               <div id="tutorialStepText" class="tutorial-step"></div>
               <div class="tutorial-actions">
                 <button id="tutorialListBtn" class="tutorial-list-btn" type="button">☰</button>
-                <button id="tutorialNextBtn" class="tutorial-next-btn" type="button">Next<br>Lesson</button>
+                <button id="tutorialNextBtn" class="tutorial-next-btn" type="button">Start<br>Lesson</button>
               </div>
               <div id="tutorialLessonList" class="tutorial-lesson-list hidden"></div>
             </div>
@@ -726,12 +739,12 @@
       tutorialLessonList: document.getElementById("tutorialLessonList"),
     };
     const tutorialLessons = [
-      { title: "Meet The Board", step: "Lesson 1 of 6" },
-      { title: "How Pieces Move", step: "Lesson 2 of 6" },
-      { title: "Captures And Trades", step: "Lesson 3 of 6" },
-      { title: "King Safety Basics", step: "Lesson 4 of 6" },
-      { title: "Simple Checkmates", step: "Lesson 5 of 6" },
-      { title: "Puzzle Warmup", step: "Lesson 6 of 6" },
+      { title: "Board, Bases, and Dead Zones", step: "Lesson 1 of 6" },
+      { title: "First-Turn Placement", step: "Lesson 2 of 6" },
+      { title: "Path Following", step: "Lesson 3 of 6" },
+      { title: "Jump Tile Basics", step: "Lesson 4 of 6" },
+      { title: "Elimination Rules", step: "Lesson 5 of 6" },
+      { title: "How To Win", step: "Lesson 6 of 6" },
     ];
     let tutorialLessonIndex = 0;
 
@@ -798,7 +811,7 @@
 
       if (el.tutorialBubbleBtn && el.tutorialNextBtn && el.tutorialListBtn) {
         el.tutorialBubbleBtn.addEventListener("click", cycleTutorialLesson);
-        el.tutorialNextBtn.addEventListener("click", cycleTutorialLesson);
+        el.tutorialNextBtn.addEventListener("click", startTutorialLesson);
         el.tutorialListBtn.addEventListener("click", () => {
           el.tutorialLessonList.classList.toggle("hidden");
         });
@@ -814,6 +827,7 @@
       if (!el.tutorialStepText || !el.tutorialLessonList) return;
       const lesson = tutorialLessons[tutorialLessonIndex];
       el.tutorialStepText.textContent = `${lesson.step} - ${lesson.title}`;
+      renderTutorialVisuals();
 
       el.tutorialLessonList.innerHTML = tutorialLessons.map((item, idx) =>
         `<button class="tutorial-lesson-item ${idx === tutorialLessonIndex ? "active" : ""}" data-lesson-idx="${idx}" type="button">${item.step}: ${item.title}</button>`
@@ -826,6 +840,35 @@
           el.tutorialLessonList.classList.add("hidden");
         });
       });
+    }
+
+    function renderTutorialVisuals() {
+      const tiles = document.querySelectorAll(".lesson-tile");
+      tiles.forEach((tileEl, idx) => {
+        tileEl.classList.toggle("active", idx === tutorialLessonIndex);
+        const tileType = tileEl.dataset.tileType || "straightaway";
+        const tileRot = Number(tileEl.dataset.tileRot || 0);
+        const art = tileEl.querySelector(".lesson-tile-art");
+        if (!art) return;
+        art.innerHTML = tileSvg({ type: tileType, rot: tileRot }, 50, {
+          showEntrances: idx === tutorialLessonIndex,
+        });
+      });
+
+      const pieces = document.querySelectorAll(".lesson-piece");
+      pieces.forEach((pieceEl) => {
+        const tileType = pieceEl.dataset.pieceTile || "weave";
+        const tileRot = Number(pieceEl.dataset.pieceRot || 0);
+        pieceEl.innerHTML = tileSvg({ type: tileType, rot: tileRot }, 40);
+      });
+    }
+
+    function startTutorialLesson() {
+      setTab("play");
+      el.setupView.classList.remove("hidden");
+      el.gameView.classList.add("hidden");
+      el.threePlayerCornerField.classList.toggle("hidden", el.playerCount.value !== "3");
+      el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
     }
 
     function onDragStart(tileType, ev) {
