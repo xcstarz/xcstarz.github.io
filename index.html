@@ -892,6 +892,7 @@
     }
 
     function onDragStart(tileType, ev) {
+      if (app.gameOver) return;
       ev.preventDefault();
       app.selectedTile = tileType;
       const ghost = document.createElement("div");
@@ -931,6 +932,7 @@
       const tileType = app.drag.tileType;
       const x = ev.clientX, y = ev.clientY;
       app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
+      if (app.gameOver) return;
 
       const target = document.elementFromPoint(x, y);
       if (!target) return;
@@ -1154,6 +1156,7 @@
         const entries = getFirstTurnEntryChoices(p, r, c);
         log(`${p.name} first move: now choose one of the entry points touching your base.`);
         renderEntryChoices(entries, (entry) => {
+          if (app.gameOver) return;
           placeTile(r, c, tileType, app.selectedRot);
           consumeTile(p, tileType);
           executeFirstTurnMovement(p, r, c, entry);
@@ -1416,8 +1419,19 @@
     function setWinner(playerId) {
       app.gameOver = true;
       app.winner = playerId;
-      app.winShown = false;
-      showWinIfReady();
+      app.winShown = true;
+      app.pendingFirstPlacement = null;
+      app.eliminationQueue = [];
+      el.entrySelectWrap.classList.add("hidden");
+      el.eliminationOverlay.classList.add("hidden");
+      if (app.drag.active) {
+        if (app.drag.ghost) app.drag.ghost.remove();
+        if (app.drag.hoveredCell) app.drag.hoveredCell.classList.remove("drag-hover");
+        app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
+      }
+      const winner = app.players[playerId];
+      if (winner) el.winText.textContent = `${winner.name} Wins!`;
+      el.winOverlay.classList.remove("hidden");
     }
 
     function checkPositionDraw() {
@@ -1472,7 +1486,10 @@
         const b = document.createElement("button");
         b.className = "entry-btn";
         b.textContent = `${entranceName(i)} (${entranceHint(i)})`;
-        b.onclick = () => onPick(i);
+        b.onclick = () => {
+          if (app.gameOver) return;
+          onPick(i);
+        };
         el.entryRow.appendChild(b);
       });
     }
