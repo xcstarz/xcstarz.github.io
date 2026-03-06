@@ -934,6 +934,10 @@
     function jumpOrAdjacent(row, col, entry, exit, tileType, rot, playerRef = currentPlayer()) {
       const player = playerRef;
       const result = { eliminated: false, win: false, row: null, col: null, entrance: null };
+      if (typeof exit !== "number") {
+        result.eliminated = true;
+        return result;
+      }
 
       let nextRow, nextCol, nextEntrance;
       if (tileType === "jump") {
@@ -943,9 +947,11 @@
         // Cardinal jump flies over the skipped cell; only landing cell is evaluated.
         if (isFatal(lr, lc, player)) { result.eliminated = true; return result; }
         if (isOpponentBaseCell(player, lr, lc)) { result.win = true; return result; }
-        nextRow = lr; nextCol = lc; nextEntrance = entry;
+        // Cardinal jumps preserve lane into the landing tile by entering from the opposite side of exit.
+        nextRow = lr; nextCol = lc; nextEntrance = getEntranceOfNeighbor(exit);
       } else if (tileType === "diagonalJump") {
         const dir = getDiagonalDirection(entry, exit, rot);
+        if (!dir) { result.eliminated = true; return result; }
         // Diagonal jump lands on the corner-touching diagonal tile.
         const [lr, lc] = stepDiag(row, col, dir);
         if (isFatal(lr, lc, player)) { result.eliminated = true; return result; }
