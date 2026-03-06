@@ -23,10 +23,61 @@
       color: var(--text);
       min-height: 100vh;
     }
+    .main-shell {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: 100vh;
+      gap: 16px;
+      padding: 16px;
+    }
+    .app-nav {
+      background: linear-gradient(180deg, #101722, #0c131e);
+      border: 1px solid #2b3448;
+      border-radius: 14px;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: sticky;
+      top: 16px;
+      height: calc(100vh - 32px);
+    }
+    .app-nav-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: #f4f8ff;
+      margin: 6px 8px 14px;
+    }
+    .app-nav-btn {
+      border: 1px solid #29354f;
+      background: #151d2b;
+      color: #e8f0ff;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 18px;
+      text-align: left;
+      transition: background .12s ease, border-color .12s ease;
+    }
+    .app-nav-btn:hover {
+      background: #1b2639;
+      border-color: #39527f;
+    }
+    .app-nav-btn.active {
+      background: #223450;
+      border-color: #64d17b;
+      box-shadow: inset 4px 0 0 #64d17b;
+    }
+    .tab-panel { min-width: 0; }
+    .tutorial-panel {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 22px;
+      min-height: 420px;
+    }
     .app {
       max-width: 1400px;
       margin: 0 auto;
-      padding: 16px;
+      padding: 0;
     }
     .card {
       background: linear-gradient(180deg, var(--panel), var(--panel-2));
@@ -138,7 +189,7 @@
     .token.p2 { background: #5aa0ff; }
     .token.p3 { background: #59d37e; }
     .token.p4 { background: #ffd65a; }
-    .sidebar {
+    .game-sidebar {
       padding: 14px;
       display: flex;
       flex-direction: column;
@@ -260,113 +311,138 @@
     @media (max-width: 1120px) {
       .game { grid-template-columns: 1fr; }
     }
+    @media (max-width: 900px) {
+      .main-shell {
+        grid-template-columns: 1fr;
+      }
+      .app-nav {
+        position: static;
+        height: auto;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="app">
-    <div id="setupView" class="setup card">
-      <h1>Tile Path Game</h1>
-      <p class="sub">Pass-and-play strategy game with path tiles, jump pads, and elimination traps.</p>
-      <div class="grid-2">
-        <div class="field">
-          <label for="boardSize">Board Size</label>
-          <select id="boardSize">
-            <option value="7">7 × 7</option>
-            <option value="13" selected>13 × 13</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="playerCount">Players</label>
-          <select id="playerCount">
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4" selected>4</option>
-          </select>
-        </div>
-      </div>
-      <div id="threePlayerCornerField" class="field hidden" style="margin-top: 12px;">
-        <label for="deadCornerSelect">3-player mode: choose dead corner</label>
-        <select id="deadCornerSelect">
-          <option value="0">Top-left</option>
-          <option value="1">Top-right</option>
-          <option value="2">Bottom-right</option>
-          <option value="3" selected>Bottom-left</option>
-        </select>
-      </div>
-      <div class="field" style="margin-top: 12px;">
-        <label for="jumpSelection">Jump Pad Selection</label>
-        <select id="jumpSelection">
-          <option value="cardinal">Cardinal jump only</option>
-          <option value="diagonal">Diagonal jump only</option>
-          <option value="both" selected>Both</option>
-          <option value="none">Neither</option>
-        </select>
-      </div>
-      <div id="bothPoolField" class="field" style="margin-top: 12px;">
-        <label for="poolMode">Both enabled: pool mode</label>
-        <select id="poolMode">
-          <option value="combined">Combined pool</option>
-          <option value="separate" selected>Separate pools (2 each)</option>
-        </select>
-      </div>
-      <div class="grid-2" style="margin-top: 12px;">
-        <div class="field"><label for="p1Name">Player 1</label><input id="p1Name" type="text" value="Player 1"></div>
-        <div class="field"><label for="p2Name">Player 2</label><input id="p2Name" type="text" value="Player 2"></div>
-        <div class="field"><label for="p3Name">Player 3</label><input id="p3Name" type="text" value="Player 3"></div>
-        <div class="field"><label for="p4Name">Player 4</label><input id="p4Name" type="text" value="Player 4"></div>
-      </div>
-      <div style="display:flex;justify-content:flex-end;margin-top:16px;">
-        <button id="startBtn">Start Game</button>
-      </div>
-    </div>
-
-    <div id="eliminationOverlay" class="elimination-overlay hidden">
-      <div class="elimination-box">
-        <h2 id="elimText"></h2>
-        <button id="elimOkBtn">OK</button>
-      </div>
-    </div>
-
-    <div id="gameView" class="hidden">
-      <div class="chip-row" id="headerChips"></div>
-      <div class="game">
-        <div class="board-wrap card">
-          <div class="board-stack">
-            <svg id="trailLayer" class="trail-layer"></svg>
-            <div id="board" class="board"></div>
-          </div>
-        </div>
-        <div class="sidebar card">
-          <div class="panel">
-            <h3>Game Status</h3>
-            <div id="statusText" class="status"></div>
-            <div id="winnerText" class="winner hidden"></div>
-          </div>
-          <div class="panel">
-            <h3>Tile Selection</h3>
-            <div id="tileGrid" class="tile-grid"></div>
-            <div style="margin-top:8px;">
-              <div style="font-size:12px;color:#c5d5f9;margin-bottom:6px;">Rotation</div>
-              <div id="rotRow" class="rot-row"></div>
+  <div class="main-shell">
+    <aside class="app-nav">
+      <div class="app-nav-title">Menu</div>
+      <button id="tabPlayBtn" class="app-nav-btn active" type="button">Play</button>
+      <button id="tabTutorialBtn" class="app-nav-btn" type="button">Tutorial</button>
+    </aside>
+    <div class="tab-panel-wrap">
+      <div id="playTabPanel" class="tab-panel">
+        <div class="app">
+          <div id="setupView" class="setup card">
+            <h1>Tile Path Game</h1>
+            <p class="sub">Pass-and-play strategy game with path tiles, jump pads, and elimination traps.</p>
+            <div class="grid-2">
+              <div class="field">
+                <label for="boardSize">Board Size</label>
+                <select id="boardSize">
+                  <option value="7">7 × 7</option>
+                  <option value="13" selected>13 × 13</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="playerCount">Players</label>
+                <select id="playerCount">
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4" selected>4</option>
+                </select>
+              </div>
             </div>
-            <div class="selected-tile-preview" id="selectedTilePreview"></div>
-            <div class="selected-tile-note" id="selectedTileNote">Dots show tile entrances.</div>
-            <div id="entrySelectWrap" class="hidden" style="margin-top:8px;">
-              <div style="font-size:12px;color:#ffdba8;margin-bottom:6px;">Step 2: choose the entry on the side touching your base</div>
-              <div id="entryRow" class="entry-row"></div>
+            <div id="threePlayerCornerField" class="field hidden" style="margin-top: 12px;">
+              <label for="deadCornerSelect">3-player mode: choose dead corner</label>
+              <select id="deadCornerSelect">
+                <option value="0">Top-left</option>
+                <option value="1">Top-right</option>
+                <option value="2">Bottom-right</option>
+                <option value="3" selected>Bottom-left</option>
+              </select>
+            </div>
+            <div class="field" style="margin-top: 12px;">
+              <label for="jumpSelection">Jump Pad Selection</label>
+              <select id="jumpSelection">
+                <option value="cardinal">Cardinal jump only</option>
+                <option value="diagonal">Diagonal jump only</option>
+                <option value="both" selected>Both</option>
+                <option value="none">Neither</option>
+              </select>
+            </div>
+            <div id="bothPoolField" class="field" style="margin-top: 12px;">
+              <label for="poolMode">Both enabled: pool mode</label>
+              <select id="poolMode">
+                <option value="combined">Combined pool</option>
+                <option value="separate" selected>Separate pools (2 each)</option>
+              </select>
+            </div>
+            <div class="grid-2" style="margin-top: 12px;">
+              <div class="field"><label for="p1Name">Player 1</label><input id="p1Name" type="text" value="Player 1"></div>
+              <div class="field"><label for="p2Name">Player 2</label><input id="p2Name" type="text" value="Player 2"></div>
+              <div class="field"><label for="p3Name">Player 3</label><input id="p3Name" type="text" value="Player 3"></div>
+              <div class="field"><label for="p4Name">Player 4</label><input id="p4Name" type="text" value="Player 4"></div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+              <button id="startBtn">Start Game</button>
             </div>
           </div>
-          <div class="panel">
-            <h3>Players</h3>
-            <div id="playersText" class="status"></div>
+
+          <div id="eliminationOverlay" class="elimination-overlay hidden">
+            <div class="elimination-box">
+              <h2 id="elimText"></h2>
+              <button id="elimOkBtn">OK</button>
+            </div>
           </div>
-          <div class="panel">
-            <h3>Action Log</h3>
-            <div id="log" class="log"></div>
+
+          <div id="gameView" class="hidden">
+            <div class="chip-row" id="headerChips"></div>
+            <div class="game">
+              <div class="board-wrap card">
+                <div class="board-stack">
+                  <svg id="trailLayer" class="trail-layer"></svg>
+                  <div id="board" class="board"></div>
+                </div>
+              </div>
+              <div class="game-sidebar card">
+                <div class="panel">
+                  <h3>Game Status</h3>
+                  <div id="statusText" class="status"></div>
+                  <div id="winnerText" class="winner hidden"></div>
+                </div>
+                <div class="panel">
+                  <h3>Tile Selection</h3>
+                  <div id="tileGrid" class="tile-grid"></div>
+                  <div style="margin-top:8px;">
+                    <div style="font-size:12px;color:#c5d5f9;margin-bottom:6px;">Rotation</div>
+                    <div id="rotRow" class="rot-row"></div>
+                  </div>
+                  <div class="selected-tile-preview" id="selectedTilePreview"></div>
+                  <div class="selected-tile-note" id="selectedTileNote">Dots show tile entrances.</div>
+                  <div id="entrySelectWrap" class="hidden" style="margin-top:8px;">
+                    <div style="font-size:12px;color:#ffdba8;margin-bottom:6px;">Step 2: choose the entry on the side touching your base</div>
+                    <div id="entryRow" class="entry-row"></div>
+                  </div>
+                </div>
+                <div class="panel">
+                  <h3>Players</h3>
+                  <div id="playersText" class="status"></div>
+                </div>
+                <div class="panel">
+                  <h3>Action Log</h3>
+                  <div id="log" class="log"></div>
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <button id="newGameBtn">New Game</button>
+                </div>
+              </div>
+            </div>
           </div>
-          <div style="display:flex; gap:8px;">
-            <button id="newGameBtn">New Game</button>
-          </div>
+        </div>
+      </div>
+      <div id="tutorialTabPanel" class="tab-panel hidden">
+        <div class="tutorial-panel card">
+          <h2>Tutorial</h2>
         </div>
       </div>
     </div>
@@ -450,7 +526,19 @@
       eliminationOverlay: document.getElementById("eliminationOverlay"),
       elimText: document.getElementById("elimText"),
       elimOkBtn: document.getElementById("elimOkBtn"),
+      tabPlayBtn: document.getElementById("tabPlayBtn"),
+      tabTutorialBtn: document.getElementById("tabTutorialBtn"),
+      playTabPanel: document.getElementById("playTabPanel"),
+      tutorialTabPanel: document.getElementById("tutorialTabPanel"),
     };
+
+    function setTab(tabName) {
+      const isPlay = tabName === "play";
+      el.playTabPanel.classList.toggle("hidden", !isPlay);
+      el.tutorialTabPanel.classList.toggle("hidden", isPlay);
+      el.tabPlayBtn.classList.toggle("active", isPlay);
+      el.tabTutorialBtn.classList.toggle("active", !isPlay);
+    }
 
     function key(r, c) { return `${r},${c}`; }
     function inBounds(size, r, c) { return r >= 0 && c >= 0 && r < size && c < size; }
@@ -485,6 +573,8 @@
     }
 
     function setupBindings() {
+      el.tabPlayBtn.addEventListener("click", () => setTab("play"));
+      el.tabTutorialBtn.addEventListener("click", () => setTab("tutorial"));
       el.playerCount.addEventListener("change", () => {
         el.threePlayerCornerField.classList.toggle("hidden", el.playerCount.value !== "3");
       });
