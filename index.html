@@ -710,6 +710,7 @@
       drag: { active: false, tileType: null, ghost: null, hoveredCell: null },
       eliminationQueue: [],
       winShown: false,
+      overlayMode: null,
     };
 
     const el = {
@@ -1005,8 +1006,12 @@
       app.winner = null;
       app.eliminationQueue = [];
       app.winShown = false;
+      app.overlayMode = null;
       el.eliminationOverlay.classList.add("hidden");
       el.winOverlay.classList.add("hidden");
+      el.eliminationOverlay.classList.remove("win-overlay");
+      const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
+      if (elimBox) elimBox.classList.remove("win-box");
 
       const interior = size === 13 ? DEAD_ZONES_13 : DEAD_ZONES_7;
       for (const k of interior) {
@@ -1391,25 +1396,22 @@
     function showNextElimination() {
       if (app.eliminationQueue.length === 0) return;
       const p = app.eliminationQueue.shift();
+      app.overlayMode = "elim";
+      el.eliminationOverlay.classList.remove("win-overlay");
+      const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
+      if (elimBox) elimBox.classList.remove("win-box");
       el.elimText.textContent = `${p.name} was eliminated!`;
       el.eliminationOverlay.classList.remove("hidden");
     }
 
     function dismissElimination() {
       el.eliminationOverlay.classList.add("hidden");
+      if (app.overlayMode === "win") {
+        app.overlayMode = null;
+        return;
+      }
       showNextElimination();
       showWinIfReady();
-    }
-
-    function showWinIfReady() {
-      if (!app.gameOver || app.winner == null || app.winShown) return;
-      if (app.eliminationQueue.length > 0) return;
-      if (!el.eliminationOverlay.classList.contains("hidden")) return;
-      const winner = app.players[app.winner];
-      if (!winner) return;
-      el.winText.textContent = `${winner.name} Wins!`;
-      el.winOverlay.classList.remove("hidden");
-      app.winShown = true;
     }
 
     function dismissWin() {
@@ -1419,19 +1421,17 @@
     function setWinner(playerId) {
       app.gameOver = true;
       app.winner = playerId;
-      app.winShown = true;
+      app.winShown = false;
       app.pendingFirstPlacement = null;
       app.eliminationQueue = [];
       el.entrySelectWrap.classList.add("hidden");
-      el.eliminationOverlay.classList.add("hidden");
+      showWinIfReady();
+      el.winOverlay.classList.add("hidden");
       if (app.drag.active) {
         if (app.drag.ghost) app.drag.ghost.remove();
         if (app.drag.hoveredCell) app.drag.hoveredCell.classList.remove("drag-hover");
         app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
       }
-      const winner = app.players[playerId];
-      if (winner) el.winText.textContent = `${winner.name} Wins!`;
-      el.winOverlay.classList.remove("hidden");
     }
 
     function checkPositionDraw() {
@@ -1618,6 +1618,7 @@
           }
           btn.dataset.rc = `${r},${c}`;
           if (validSet.has(key(r, c))) btn.classList.add("valid");
+          btn.disabled = app.gameOver;
           btn.onclick = () => onCellClick(r, c);
 
           if (cell.tile) {
@@ -1691,6 +1692,19 @@
         }
         el.winnerText.classList.add("hidden");
       }
+    }
+
+    function showWinIfReady() {
+      if (!app.gameOver || app.winner == null || app.winShown) return;
+      const winner = app.players[app.winner];
+      if (!winner) return;
+      app.overlayMode = "win";
+      el.eliminationOverlay.classList.add("win-overlay");
+      const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
+      if (elimBox) elimBox.classList.add("win-box");
+      el.elimText.textContent = `${winner.name} Wins!`;
+      el.eliminationOverlay.classList.remove("hidden");
+      app.winShown = true;
     }
 
     function renderPlayers() {
