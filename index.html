@@ -1250,8 +1250,7 @@
         return;
       }
       if (next.win) {
-        app.gameOver = true;
-        app.winner = player.id;
+        setWinner(player.id);
         log(`${player.name} wins by reaching opponent base.`);
         return;
       }
@@ -1279,8 +1278,7 @@
 
       const alive = app.players.filter(p => p.alive);
       if (alive.length === 1) {
-        app.gameOver = true;
-        app.winner = alive[0].id;
+        setWinner(alive[0].id);
         log(`${alive[0].name} wins as last player alive.`);
       }
     }
@@ -1308,8 +1306,7 @@
           return;
         }
         if (next.win) {
-          app.gameOver = true;
-          app.winner = player.id;
+          setWinner(player.id);
           log(`${player.name} wins by reaching opponent base.`);
           return;
         }
@@ -1414,6 +1411,13 @@
 
     function dismissWin() {
       el.winOverlay.classList.add("hidden");
+    }
+
+    function setWinner(playerId) {
+      app.gameOver = true;
+      app.winner = playerId;
+      app.winShown = false;
+      showWinIfReady();
     }
 
     function checkPositionDraw() {
@@ -1655,6 +1659,7 @@
           el.winnerText.textContent = "Result: Draw";
         } else {
           el.winnerText.textContent = `Winner: ${app.players[app.winner].name}`;
+          showWinIfReady();
         }
         el.winnerText.classList.remove("hidden");
       } else {
