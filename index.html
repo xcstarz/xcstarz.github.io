@@ -1283,12 +1283,6 @@
 
       checkPositionDraw();
       if (app.gameOver) return;
-
-      const alive = app.players.filter(p => p.alive);
-      if (alive.length === 1) {
-        setWinner(alive[0].id);
-        log(`${alive[0].name} wins as last player alive.`);
-      }
     }
 
     function resolveMovement(player) {
@@ -1391,6 +1385,13 @@
       player.trail = [];
       log(msg);
       app.eliminationQueue.push(player);
+      if (!app.gameOver) {
+        const alive = app.players.filter(p => p.alive);
+        if (alive.length === 1) {
+          setWinner(alive[0].id);
+          log(`${alive[0].name} wins as last player alive.`);
+        }
+      }
     }
 
     function showNextElimination() {
@@ -1411,7 +1412,6 @@
         return;
       }
       showNextElimination();
-      showWinIfReady();
     }
 
     function dismissWin() {
@@ -1421,17 +1421,23 @@
     function setWinner(playerId) {
       app.gameOver = true;
       app.winner = playerId;
-      app.winShown = false;
+      app.winShown = true;
       app.pendingFirstPlacement = null;
       app.eliminationQueue = [];
+      app.overlayMode = "win";
       el.entrySelectWrap.classList.add("hidden");
-      showWinIfReady();
       el.winOverlay.classList.add("hidden");
       if (app.drag.active) {
         if (app.drag.ghost) app.drag.ghost.remove();
         if (app.drag.hoveredCell) app.drag.hoveredCell.classList.remove("drag-hover");
         app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
       }
+      const winner = app.players[playerId];
+      if (winner) el.elimText.textContent = `${winner.name} Wins!`;
+      el.eliminationOverlay.classList.add("win-overlay");
+      const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
+      if (elimBox) elimBox.classList.add("win-box");
+      el.eliminationOverlay.classList.remove("hidden");
     }
 
     function checkPositionDraw() {
@@ -1462,7 +1468,6 @@
       }
       renderAll();
       showNextElimination();
-      showWinIfReady();
     }
 
     function entranceName(i) { return ["N0","N1","E0","E1","S0","S1","W0","W1"][i]; }
@@ -1677,7 +1682,6 @@
           el.winnerText.textContent = "Result: Draw";
         } else {
           el.winnerText.textContent = `Winner: ${app.players[app.winner].name}`;
-          showWinIfReady();
         }
         el.winnerText.classList.remove("hidden");
       } else {
@@ -1692,19 +1696,6 @@
         }
         el.winnerText.classList.add("hidden");
       }
-    }
-
-    function showWinIfReady() {
-      if (!app.gameOver || app.winner == null || app.winShown) return;
-      const winner = app.players[app.winner];
-      if (!winner) return;
-      app.overlayMode = "win";
-      el.eliminationOverlay.classList.add("win-overlay");
-      const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
-      if (elimBox) elimBox.classList.add("win-box");
-      el.elimText.textContent = `${winner.name} Wins!`;
-      el.eliminationOverlay.classList.remove("hidden");
-      app.winShown = true;
     }
 
     function renderPlayers() {
