@@ -1400,6 +1400,19 @@
       el.tutorialTopNotice.classList.toggle("hidden", !message);
     }
 
+    function isTutorialLessonOneFollowUpTurn(player = currentPlayer()) {
+      return app.tutorialMode?.lessonIdx === 0 && !!player?.alive && !!player?.hasPlacedFirstTile;
+    }
+
+    function getTutorialTopNoticeMessage() {
+      if (!app.tutorialMode) return "";
+      if (isTutorialLessonOneFollowUpTurn()) {
+        return "Choose a tile and place it in front of your entrance. The red line shows the path you took.";
+      }
+      const lesson = tutorialLessons[app.tutorialMode.lessonIdx];
+      return lesson?.playNotice || app.tutorialMode.message || "";
+    }
+
     function readGameOptionsFromControls() {
       return {
         size: Number(el.boardSize.value),
@@ -2289,6 +2302,7 @@
       renderBoard();
       renderStatus();
       renderPlayers();
+      setTutorialTopNotice(getTutorialTopNoticeMessage());
       el.log.textContent = app.logs.join("\n");
     }
 
@@ -2478,6 +2492,8 @@
             ? `Step 2/2: Pick entry for tile at (${app.pendingFirstPlacement.r},${app.pendingFirstPlacement.c})`
             : "Step 1/2: Click any green cell adjacent to your base";
           el.statusText.innerHTML = `Turn: ${turnText}<br>First move: ${pending}`;
+        } else if (isTutorialLessonOneFollowUpTurn(p)) {
+          el.statusText.innerHTML = `Turn: ${turnText}<br>Choose a tile and place it in front of your entrance. The red line shows the path you took.`;
         } else {
           el.statusText.innerHTML = `Turn: ${turnText}<br>Phase: Place tile in front of your entrance`;
         }
