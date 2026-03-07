@@ -1395,7 +1395,10 @@
     }
 
     function showNextElimination() {
-      if (app.eliminationQueue.length === 0) return;
+      if (app.eliminationQueue.length === 0) {
+        showWinnerOverlayIfReady();
+        return;
+      }
       const p = app.eliminationQueue.shift();
       app.overlayMode = "elim";
       el.eliminationOverlay.classList.remove("win-overlay");
