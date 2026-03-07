@@ -71,14 +71,14 @@
     .tutorial-panel {
       max-width: 1400px;
       margin: 0 auto;
-      padding: 22px;
+      padding: 14px;
       min-height: 420px;
       display: flex;
       justify-content: center;
     }
     .tutorial-shell {
-      width: min(100%, 430px);
-      margin: 6px auto 0;
+      width: min(100%, 444px);
+      margin: 0 auto;
       border-radius: 16px;
       overflow: hidden;
       border: 1px solid #2a3b62;
@@ -87,7 +87,7 @@
     }
     .tutorial-board {
       position: relative;
-      height: 410px;
+      height: 432px;
       overflow: hidden;
       background:
         radial-gradient(120% 100% at 30% -5%, rgba(80, 95, 116, .18), transparent 42%),
@@ -147,13 +147,13 @@
     }
     .next-chip {
       position: absolute;
-      left: 30px;
-      bottom: 30px;
+      left: 28px;
+      bottom: 24px;
       border: 0;
       cursor: pointer;
       background: #f0f2f5;
       color: #2f333a;
-      font-size: 40px;
+      font-size: 42px;
       font-weight: 800;
       border-radius: 12px;
       width: 120px;
@@ -174,19 +174,20 @@
       filter: drop-shadow(0 4px 4px rgba(0, 0, 0, .25));
     }
     .tutorial-content {
-      padding: 20px 24px 24px;
+      padding: 18px 24px 24px;
       background: linear-gradient(180deg, rgba(16, 31, 41, .25), rgba(7, 23, 34, .7));
     }
     .tutorial-title {
       font-size: 52px;
       letter-spacing: .2px;
       margin: 0;
+      line-height: .96;
     }
     .tutorial-step {
-      margin: 8px 0 16px;
+      margin: 8px 0 14px;
       color: #ceecf7;
-      font-size: 20px;
-      font-weight: 600;
+      font-size: 19px;
+      font-weight: 650;
       min-height: 24px;
     }
     .tutorial-actions {
@@ -200,22 +201,46 @@
       border-radius: 16px;
       background: linear-gradient(180deg, #314854, #223745);
       color: #d8edf6;
-      font-size: 34px;
-      font-weight: 700;
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 8px 18px rgba(0, 0, 0, .28);
       padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .list-icon {
+      width: 60px;
+      display: grid;
+      gap: 8px;
+    }
+    .list-icon-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .list-icon-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 99px;
+      background: rgba(216, 237, 246, .9);
+      flex: 0 0 auto;
+    }
+    .list-icon-line {
+      height: 5px;
+      border-radius: 99px;
+      background: rgba(216, 237, 246, .88);
+      flex: 1;
     }
     .tutorial-next-btn {
       border: 0;
       border-radius: 16px;
       background: linear-gradient(180deg, #85c74e, #6ead3e);
       color: #f5ffe8;
-      font-size: 54px;
+      font-size: 52px;
       font-weight: 900;
       text-shadow: 0 2px 0 rgba(0, 0, 0, .25);
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 8px 18px rgba(0, 0, 0, .3);
       line-height: 1;
-      padding: 10px 12px;
+      padding: 12px 12px;
     }
     .tutorial-lesson-list {
       margin-top: 14px;
@@ -495,7 +520,7 @@
         position: static;
         height: auto;
       }
-      .tutorial-board { height: 360px; }
+      .tutorial-board { height: 392px; }
       .tutorial-title { font-size: 42px; }
       .tutorial-step { font-size: 18px; }
       .next-chip {
@@ -503,7 +528,7 @@
         height: 74px;
         font-size: 30px;
       }
-      .tutorial-next-btn { font-size: 40px; }
+      .tutorial-next-btn { font-size: 44px; }
     }
   </style>
 </head>
@@ -656,7 +681,13 @@
               <h3 class="tutorial-title">Learn To Play</h3>
               <div id="tutorialStepText" class="tutorial-step"></div>
               <div class="tutorial-actions">
-                <button id="tutorialListBtn" class="tutorial-list-btn" type="button">☷</button>
+                <button id="tutorialListBtn" class="tutorial-list-btn" type="button" aria-label="Lesson list">
+                  <span class="list-icon" aria-hidden="true">
+                    <span class="list-icon-row"><span class="list-icon-dot"></span><span class="list-icon-line"></span></span>
+                    <span class="list-icon-row"><span class="list-icon-dot"></span><span class="list-icon-line"></span></span>
+                    <span class="list-icon-row"><span class="list-icon-dot"></span><span class="list-icon-line"></span></span>
+                  </span>
+                </button>
                 <button id="tutorialNextBtn" class="tutorial-next-btn" type="button">Next<br>Lesson</button>
               </div>
               <div id="tutorialLessonList" class="tutorial-lesson-list hidden"></div>
