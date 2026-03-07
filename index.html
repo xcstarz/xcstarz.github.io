@@ -1427,6 +1427,7 @@
       app.winner = playerId;
       app.winShown = false;
       app.pendingFirstPlacement = null;
+      app.eliminationQueue = [];
       el.entrySelectWrap.classList.add("hidden");
       el.winOverlay.classList.add("hidden");
       if (app.drag.active) {
