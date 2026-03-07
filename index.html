@@ -92,11 +92,19 @@
       padding: 40px 0;
       overflow: hidden;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 40px;
       background:
         radial-gradient(120% 100% at 30% -5%, rgba(80, 95, 116, .18), transparent 42%),
         linear-gradient(180deg, rgba(255, 255, 255, .03), transparent 42%);
+    }
+    .tutorial-default-visual {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .tutorial-grid {
       display: grid;
@@ -237,6 +245,140 @@
       width: 40px;
       height: 40px;
       opacity: .95;
+    }
+    .tutorial-demo-grid {
+      width: min(100%, 1120px);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      align-items: start;
+      gap: 18px;
+      padding: 0 24px;
+    }
+    .tutorial-demo-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid rgba(78, 120, 156, .55);
+      border-radius: 16px;
+      background: rgba(9, 24, 36, .72);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04);
+    }
+    .tutorial-demo-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .tutorial-demo-title {
+      font-size: 18px;
+      line-height: 1.1;
+    }
+    .tutorial-demo-progress {
+      color: #9fc0df;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .tutorial-demo-copy {
+      margin: 0;
+      color: #d8ebf7;
+      font-size: 14px;
+      line-height: 1.45;
+      min-height: 60px;
+    }
+    .tutorial-demo-board {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid #355173;
+      background: linear-gradient(180deg, rgba(8, 20, 33, .95), rgba(10, 23, 38, .85));
+    }
+    .tutorial-demo-board:hover {
+      border-color: #5d8ed0;
+    }
+    .tutorial-demo-board:focus-visible {
+      outline: 2px solid #7eb4ff;
+      outline-offset: 2px;
+    }
+    .tutorial-demo-board-shell {
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      padding: 2px 0 4px;
+    }
+    .board.board--tutorial {
+      --cell-size: 40px;
+    }
+    .board.board--tutorial .cell {
+      cursor: default;
+    }
+    .board.board--tutorial .token {
+      width: 16px;
+      height: 16px;
+      border-width: 1.5px;
+    }
+    .board.board--tutorial .tutorial-demo-badge {
+      right: 2px;
+      bottom: 2px;
+      padding: 1px 4px;
+      font-size: 9px;
+    }
+    .tutorial-demo-cell--goal {
+      background:
+        radial-gradient(circle at center, rgba(255, 217, 92, .22), transparent 62%),
+        #1e2036;
+    }
+    .tutorial-demo-cell--goal::after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border: 2px dashed rgba(255, 214, 90, .8);
+      border-radius: 9px;
+      pointer-events: none;
+    }
+    .tutorial-demo-cell--focus {
+      box-shadow:
+        inset 0 0 0 2px #7eb4ff,
+        inset 0 0 0 1px #2a3f69;
+    }
+    .tutorial-demo-badge {
+      position: absolute;
+      right: 4px;
+      bottom: 4px;
+      z-index: 3;
+      padding: 2px 5px;
+      border-radius: 999px;
+      background: #4ecf78;
+      color: #07210f;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .03em;
+    }
+    .tutorial-demo-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .tutorial-demo-hint {
+      color: #9fc0df;
+      font-size: 12px;
+    }
+    .tutorial-demo-buttons {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .tutorial-demo-btn {
+      min-width: 88px;
+    }
+    .tutorial-demo-btn--ghost {
+      background: #101b31;
+      border-color: #355173;
     }
     .tutorial-content {
       padding: 18px 24px 24px;
@@ -397,6 +539,7 @@
       margin: 0 auto;
     }
     .board {
+      --cell-size: 60px;
       display: grid;
       gap: 0;
       background: var(--grid);
@@ -415,8 +558,8 @@
       z-index: 3;
     }
     .cell {
-      width: 60px;
-      height: 60px;
+      width: var(--cell-size);
+      height: var(--cell-size);
       background: #0d1730;
       position: relative;
       cursor: pointer;
@@ -441,6 +584,25 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
+    }
+    .token-stack {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+    }
+    .token {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 2px solid rgba(238, 244, 255, .95);
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, .2),
+        0 2px 8px rgba(0, 0, 0, .35);
+      transform: translate(-50%, -50%);
     }
     .token.p1 { background: #ff5a6f; }
     .token.p2 { background: #5aa0ff; }
@@ -585,6 +747,10 @@
         position: static;
         height: auto;
       }
+      .tutorial-demo-grid {
+        grid-template-columns: 1fr;
+        max-width: 520px;
+      }
       .tutorial-board { min-height: 280px; }
       .tutorial-title { font-size: 42px; }
       .tutorial-step { font-size: 18px; }
@@ -720,19 +886,21 @@
         <div class="tutorial-panel card">
           <div class="tutorial-shell">
             <div class="tutorial-board">
-              <div class="tutorial-grid">
-                <!-- 9 Active lessons -->
-                <div class="lesson-tile active" data-tile-type="rule" data-tile-text="1"><div class="lesson-tile-art"></div></div>
-                <div class="lesson-tile" data-tile-type="rule" data-tile-text="2"><div class="lesson-tile-art"></div></div>
-                <div class="lesson-tile" data-tile-type="straightaway" data-tile-rot="0"><div class="lesson-tile-art"></div></div>
-                <div class="lesson-tile" data-tile-type="uturn" data-tile-rot="1"><div class="lesson-tile-art"></div></div>
-                <div class="lesson-tile" data-tile-type="centrifugal" data-tile-rot="2"><div class="lesson-tile-art"></div></div>
-                <div class="lesson-tile" data-tile-type="diagonal" data-tile-rot="0"><div class="lesson-tile-art"></div></div>
-                <div class="lesson-tile" data-tile-type="weave" data-tile-rot="1"><div class="lesson-tile-art"></div></div>
-                <div class="lesson-tile" data-tile-type="jump" data-tile-rot="2"><div class="lesson-tile-art"></div></div>
-                <div class="lesson-tile" data-tile-type="diagonalJump" data-tile-rot="3"><div class="lesson-tile-art"></div></div>
+              <div id="tutorialDefaultVisual" class="tutorial-default-visual">
+                <div class="tutorial-grid">
+                  <!-- 9 Active lessons -->
+                  <div class="lesson-tile active" data-tile-type="rule" data-tile-text="1"><div class="lesson-tile-art"></div></div>
+                  <div class="lesson-tile" data-tile-type="rule" data-tile-text="2"><div class="lesson-tile-art"></div></div>
+                  <div class="lesson-tile" data-tile-type="straightaway" data-tile-rot="0"><div class="lesson-tile-art"></div></div>
+                  <div class="lesson-tile" data-tile-type="uturn" data-tile-rot="1"><div class="lesson-tile-art"></div></div>
+                  <div class="lesson-tile" data-tile-type="centrifugal" data-tile-rot="2"><div class="lesson-tile-art"></div></div>
+                  <div class="lesson-tile" data-tile-type="diagonal" data-tile-rot="0"><div class="lesson-tile-art"></div></div>
+                  <div class="lesson-tile" data-tile-type="weave" data-tile-rot="1"><div class="lesson-tile-art"></div></div>
+                  <div class="lesson-tile" data-tile-type="jump" data-tile-rot="2"><div class="lesson-tile-art"></div></div>
+                  <div class="lesson-tile" data-tile-type="diagonalJump" data-tile-rot="3"><div class="lesson-tile-art"></div></div>
+                </div>
               </div>
-
+              <div id="tutorialLessonOneBoards" class="tutorial-demo-grid hidden"></div>
             </div>
             <div class="tutorial-content">
               <h3 class="tutorial-title">Learn To Play</h3>
@@ -763,6 +931,7 @@
     ]);
     const DEAD_ZONES_7 = new Set(["2,2","2,4","3,3","4,2","4,4"]);
     const BOARD_CELL_SIZE = 60;
+    const TUTORIAL_BOARD_CELL_SIZE = 40;
     const BOARD_CELL_GAP = 0;
     const BOARD_FRAME = 2; // 1px border + 1px padding on each side
 
@@ -847,9 +1016,11 @@
       tutorialListBtn: document.getElementById("tutorialListBtn"),
       tutorialStepText: document.getElementById("tutorialStepText"),
       tutorialLessonList: document.getElementById("tutorialLessonList"),
+      tutorialDefaultVisual: document.getElementById("tutorialDefaultVisual"),
+      tutorialLessonOneBoards: document.getElementById("tutorialLessonOneBoards"),
     };
     const tutorialLessons = [
-      { title: "Board, Bases, and Setup", step: "Lesson 1 of 9" },
+      { title: "Tutorial: Board, Bases, and Setup", step: "Lesson 1 of 9" },
       { title: "Elimination and Winning", step: "Lesson 2 of 9" },
       { title: "Straightaway Tile", step: "Lesson 3 of 9" },
       { title: "U-Turn Tile", step: "Lesson 4 of 9" },
@@ -858,6 +1029,181 @@
       { title: "Weave Tile", step: "Lesson 7 of 9" },
       { title: "Jump Tile", step: "Lesson 8 of 9" },
       { title: "Diagonal Jump Tile", step: "Lesson 9 of 9" },
+    ];
+    const tutorialDemoState = { setup: 0, movement: 0, win: 0 };
+    const tutorialBoardDemos = [
+      {
+        id: "setup",
+        title: "Game setup",
+        steps: [
+          {
+            copy: "Players begin in their own corner bases before any path tiles are placed.",
+            board: {
+              size: 7,
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+            },
+          },
+          {
+            copy: "On your first turn, the tile has to go in a green cell that touches your base.",
+            board: {
+              size: 7,
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              valid: [{ r: 0, c: 1 }, { r: 1, c: 0 }],
+            },
+          },
+          {
+            copy: "After placing that first tile, choose one of the highlighted entry dots that connects back to your base.",
+            board: {
+              size: 7,
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              valid: [{ r: 0, c: 1 }],
+              focus: [{ r: 0, c: 1 }],
+              tiles: [{ r: 0, c: 1, type: "straightaway", rot: 0, showEntrances: true, highlightedEntrances: [6, 7] }],
+            },
+          },
+        ],
+      },
+      {
+        id: "movement",
+        title: "Movement",
+        steps: [
+          {
+            copy: "Pawns can end up waiting on the same blank cell, each on a different entrance.",
+            board: {
+              size: 7,
+              starts: [
+                { r: 0, c: 0, owner: 0 },
+                { r: 0, c: 6, owner: 1 },
+                { r: 6, c: 6, owner: 2 },
+                { r: 6, c: 0, owner: 3 },
+              ],
+              focus: [{ r: 3, c: 3 }],
+              tokens: [
+                { r: 3, c: 3, color: "p1" },
+                { r: 3, c: 3, color: "p2" },
+                { r: 3, c: 3, color: "p3" },
+                { r: 3, c: 3, color: "p4" },
+              ],
+            },
+          },
+          {
+            copy: "When a tile is placed there, every pawn on that cell follows its own lane immediately.",
+            board: {
+              size: 7,
+              starts: [
+                { r: 0, c: 0, owner: 0 },
+                { r: 0, c: 6, owner: 1 },
+                { r: 6, c: 6, owner: 2 },
+                { r: 6, c: 0, owner: 3 },
+              ],
+              focus: [
+                { r: 3, c: 3 },
+                { r: 2, c: 3 },
+                { r: 3, c: 2 },
+                { r: 3, c: 4 },
+                { r: 4, c: 3 },
+              ],
+              tiles: [{ r: 3, c: 3, type: "straightaway", rot: 0, showEntrances: true }],
+              tokens: [
+                { r: 4, c: 3, color: "p1" },
+                { r: 3, c: 2, color: "p2" },
+                { r: 2, c: 3, color: "p3" },
+                { r: 3, c: 4, color: "p4" },
+              ],
+              trails: [
+                {
+                  color: "p1",
+                  points: [
+                    { row: 3, col: 3, ax: 0.3, ay: 0 },
+                    { row: 3, col: 3, ax: 0.3, ay: 1 },
+                    { row: 4, col: 3, ax: 0.3, ay: 0 },
+                  ],
+                },
+                {
+                  color: "p2",
+                  points: [
+                    { row: 3, col: 3, ax: 1, ay: 0.3 },
+                    { row: 3, col: 3, ax: 0, ay: 0.3 },
+                    { row: 3, col: 2, ax: 1, ay: 0.3 },
+                  ],
+                },
+                {
+                  color: "p3",
+                  points: [
+                    { row: 3, col: 3, ax: 0.7, ay: 1 },
+                    { row: 3, col: 3, ax: 0.7, ay: 0 },
+                    { row: 2, col: 3, ax: 0.7, ay: 1 },
+                  ],
+                },
+                {
+                  color: "p4",
+                  points: [
+                    { row: 3, col: 3, ax: 0, ay: 0.7 },
+                    { row: 3, col: 3, ax: 1, ay: 0.7 },
+                    { row: 3, col: 4, ax: 0, ay: 0.7 },
+                  ],
+                },
+              ],
+            },
+          },
+          {
+            copy: "If the next cells are blank, they all stop there and wait for the following placement.",
+            board: {
+              size: 7,
+              starts: [
+                { r: 0, c: 0, owner: 0 },
+                { r: 0, c: 6, owner: 1 },
+                { r: 6, c: 6, owner: 2 },
+                { r: 6, c: 0, owner: 3 },
+              ],
+              tiles: [{ r: 3, c: 3, type: "straightaway", rot: 0 }],
+              tokens: [
+                { r: 4, c: 3, color: "p1" },
+                { r: 3, c: 2, color: "p2" },
+                { r: 2, c: 3, color: "p3" },
+                { r: 3, c: 4, color: "p4" },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        id: "win",
+        title: "How to win",
+        steps: [
+          {
+            copy: "Reach any opponent base cell to win instantly, even if that happens during movement.",
+            board: {
+              size: 7,
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              goals: [{ r: 6, c: 6 }],
+              tokens: [{ r: 6, c: 5, color: "p1" }],
+            },
+          },
+          {
+            copy: "Here, one straight tile points the pawn directly into the blue player's base.",
+            board: {
+              size: 7,
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              goals: [{ r: 6, c: 6 }],
+              focus: [{ r: 6, c: 5 }, { r: 6, c: 6 }],
+              tiles: [{ r: 6, c: 5, type: "straightaway", rot: 0, showEntrances: true }],
+              tokens: [{ r: 6, c: 5, color: "p1" }],
+            },
+          },
+          {
+            copy: "Once the pawn crosses into that enemy base, the game ends right away.",
+            board: {
+              size: 7,
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              goals: [{ r: 6, c: 6 }],
+              tiles: [{ r: 6, c: 5, type: "straightaway", rot: 0 }],
+              tokens: [{ r: 6, c: 6, color: "p1" }],
+              badges: [{ r: 6, c: 6, label: "WIN" }],
+            },
+          },
+        ],
+      },
     ];
     let tutorialLessonIndex = 0;
 
@@ -923,11 +1269,25 @@
       document.addEventListener("pointerup", onDragEnd);
       document.addEventListener("pointercancel", onDragEnd);
 
-      if (el.tutorialBubbleBtn && el.tutorialNextBtn && el.tutorialListBtn) {
+      if (el.tutorialBubbleBtn) {
         el.tutorialBubbleBtn.addEventListener("click", cycleTutorialLesson);
+      }
+      if (el.tutorialNextBtn) {
         el.tutorialNextBtn.addEventListener("click", cycleTutorialLesson);
+      }
+      if (el.tutorialListBtn) {
         el.tutorialListBtn.addEventListener("click", () => {
           el.tutorialLessonList.classList.toggle("hidden");
+        });
+      }
+      if (el.tutorialLessonOneBoards) {
+        el.tutorialLessonOneBoards.addEventListener("click", (ev) => {
+          const actionBtn = ev.target.closest("[data-demo-action][data-demo-id]");
+          if (!actionBtn) return;
+          const { demoAction, demoId } = actionBtn.dataset;
+          if (!demoId) return;
+          if (demoAction === "reset") resetTutorialDemo(demoId);
+          else advanceTutorialDemo(demoId);
         });
       }
     }
@@ -964,8 +1324,21 @@
     }
 
     function renderTutorialVisuals() {
+      const isFirstLesson = tutorialLessons.length && tutorialLessonIndex === 0;
+      if (el.tutorialDefaultVisual) el.tutorialDefaultVisual.classList.toggle("hidden", isFirstLesson);
+      if (el.tutorialLessonOneBoards) el.tutorialLessonOneBoards.classList.toggle("hidden", !isFirstLesson);
+      if (isFirstLesson) {
+        renderTutorialLessonOneBoards();
+      }
+
       const tiles = document.querySelectorAll(".lesson-tile");
       const activeLessonIdx = tutorialLessons.length ? tutorialLessonIndex : -1;
+      if (isFirstLesson) {
+        tiles.forEach((tileEl, idx) => {
+          tileEl.classList.toggle("active", idx === activeLessonIdx);
+        });
+        return;
+      }
       tiles.forEach((tileEl, idx) => {
         tileEl.classList.toggle("active", idx === activeLessonIdx);
         const tileType = tileEl.dataset.tileType || "straightaway";
@@ -984,6 +1357,147 @@
           });
         }
       });
+    }
+
+    function advanceTutorialDemo(demoId) {
+      const demo = tutorialBoardDemos.find((item) => item.id === demoId);
+      if (!demo) return;
+      tutorialDemoState[demoId] = (tutorialDemoState[demoId] + 1) % demo.steps.length;
+      renderTutorialLessonOneBoards();
+    }
+
+    function resetTutorialDemo(demoId) {
+      if (!(demoId in tutorialDemoState)) return;
+      tutorialDemoState[demoId] = 0;
+      renderTutorialLessonOneBoards();
+    }
+
+    function renderTutorialLessonOneBoards() {
+      if (!el.tutorialLessonOneBoards) return;
+      el.tutorialLessonOneBoards.innerHTML = tutorialBoardDemos.map((demo) => {
+        const stepIdx = tutorialDemoState[demo.id] || 0;
+        const step = demo.steps[stepIdx];
+        const nextLabel = stepIdx === demo.steps.length - 1 ? "Replay" : "Next";
+        return `
+          <section class="tutorial-demo-card">
+            <div class="tutorial-demo-head">
+              <h4 class="tutorial-demo-title">${demo.title}</h4>
+              <span class="tutorial-demo-progress">Step ${stepIdx + 1}/${demo.steps.length}</span>
+            </div>
+            <p class="tutorial-demo-copy">${step.copy}</p>
+            <button class="tutorial-demo-board" type="button" data-demo-action="next" data-demo-id="${demo.id}" aria-label="Advance ${demo.title} demo">
+              ${renderTutorialDemoBoard(step.board)}
+            </button>
+            <div class="tutorial-demo-controls">
+              <span class="tutorial-demo-hint">Click the board or use the buttons.</span>
+              <div class="tutorial-demo-buttons">
+                <button class="tutorial-demo-btn" type="button" data-demo-action="next" data-demo-id="${demo.id}">${nextLabel}</button>
+                <button class="tutorial-demo-btn tutorial-demo-btn--ghost" type="button" data-demo-action="reset" data-demo-id="${demo.id}">Reset</button>
+              </div>
+            </div>
+          </section>
+        `;
+      }).join("");
+    }
+
+    function hasTutorialDemoCell(items = [], r, c) {
+      return items.some((item) => item.r === r && item.c === c);
+    }
+
+    function getTutorialDemoCell(items = [], r, c) {
+      return items.find((item) => item.r === r && item.c === c) || null;
+    }
+
+    function getTutorialDemoCells(items = [], r, c) {
+      return items.filter((item) => item.r === r && item.c === c);
+    }
+
+    function getDeadZoneSet(size) {
+      if (size === 13) return DEAD_ZONES_13;
+      if (size === 7) return DEAD_ZONES_7;
+      return new Set();
+    }
+
+    function getTokenOffsets(count, cellSize) {
+      const spread = Math.round(cellSize * 0.18);
+      if (count <= 1) return [[0, 0]];
+      if (count === 2) return [[-spread, 0], [spread, 0]];
+      if (count === 3) return [[-spread, -spread], [spread, -spread], [0, spread]];
+      return [[-spread, -spread], [spread, -spread], [-spread, spread], [spread, spread]];
+    }
+
+    function renderTokenStack(tokens = [], cellSize) {
+      if (!tokens.length) return "";
+      const offsets = getTokenOffsets(tokens.length, cellSize);
+      return `<div class="token-stack">${tokens.map((token, idx) => {
+        const [dx, dy] = offsets[idx] || [0, 0];
+        return `<div class="token ${token.color}" style="transform: translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px));"></div>`;
+      }).join("")}</div>`;
+    }
+
+    function boardPointForTrailPointAtSize(state, cellSize) {
+      const { ax, ay } = state;
+      return [
+        BOARD_FRAME + state.col * (cellSize + BOARD_CELL_GAP) + ax * cellSize,
+        BOARD_FRAME + state.row * (cellSize + BOARD_CELL_GAP) + ay * cellSize,
+      ];
+    }
+
+    function renderStaticTrails(trails = [], size, cellSize) {
+      const span = size * cellSize + (size - 1) * BOARD_CELL_GAP + BOARD_FRAME * 2;
+      const polylines = trails.map((trail) => {
+        const points = (trail.points || [])
+          .map((point) => boardPointForTrailPointAtSize(point, cellSize))
+          .map(([x, y]) => `${x},${y}`)
+          .join(" ");
+        if (!points) return "";
+        return `<polyline points="${points}" fill="none" stroke="${playerColorHex(trail.color)}" stroke-width="${Math.max(3, Math.round(cellSize * 0.1))}" stroke-linecap="round" stroke-linejoin="round" opacity="1"></polyline>`;
+      }).join("");
+      return `<svg class="trail-layer" viewBox="0 0 ${span} ${span}" width="${span}" height="${span}">${polylines}</svg>`;
+    }
+
+    function renderTutorialDemoBoard(board) {
+      const size = board.size || 5;
+      const cellSize = TUTORIAL_BOARD_CELL_SIZE;
+      const cells = [];
+      const deadZones = getDeadZoneSet(size);
+      
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const start = getTutorialDemoCell(board.starts, r, c);
+          const tile = getTutorialDemoCell(board.tiles, r, c);
+          const tokens = getTutorialDemoCells(board.tokens, r, c);
+          const badge = getTutorialDemoCell(board.badges, r, c);
+          const classes = ["cell", "tutorial-demo-live-cell"];
+
+          if (deadZones.has(`${r},${c}`)) classes.push("dead");
+          if (start) classes.push("start", `start-p${start.owner + 1}`);
+          if (hasTutorialDemoCell(board.valid, r, c)) classes.push("valid");
+          if (hasTutorialDemoCell(board.goals, r, c)) classes.push("tutorial-demo-cell--goal");
+          if (hasTutorialDemoCell(board.focus, r, c)) classes.push("tutorial-demo-cell--focus");
+
+          let inner = "";
+          if (tile) {
+            inner += `<div class="tile-layer">${tileSvg(tile, cellSize, {
+              showEntrances: tile.showEntrances,
+              highlightedEntrances: tile.highlightedEntrances || [],
+            })}</div>`;
+          }
+          inner += renderTokenStack(tokens, cellSize);
+          if (badge) inner += `<div class="tutorial-demo-badge">${badge.label}</div>`;
+
+          cells.push(`<div class="${classes.join(" ")}">${inner}</div>`);
+        }
+      }
+
+      return `
+        <div class="tutorial-demo-board-shell">
+          <div class="board-stack">
+            ${renderStaticTrails(board.trails, size, cellSize)}
+            <div class="board board--tutorial" style="grid-template-columns: repeat(${size}, ${cellSize}px)">${cells.join("")}</div>
+          </div>
+        </div>
+      `;
     }
 
     function onDragStart(tileType, ev) {
@@ -1736,6 +2250,10 @@
           if (cell.tile) {
             btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, BOARD_CELL_SIZE)}</div>`;
           }
+          const playersHere = app.players
+            .filter((player) => player.alive && player.hasPlacedFirstTile && player.row === r && player.col === c)
+            .map((player) => ({ color: player.color }));
+          btn.innerHTML += renderTokenStack(playersHere, BOARD_CELL_SIZE);
 
           el.board.appendChild(btn);
         }
