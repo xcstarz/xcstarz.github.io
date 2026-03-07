@@ -1592,9 +1592,10 @@
     }
 
     function renderTokenStack(tokens = [], cellSize) {
-      if (!tokens.length) return "";
-      const offsets = getTokenOffsets(tokens.length, cellSize);
-      return `<div class="token-stack">${tokens.map((token, idx) => {
+      const visibleTokens = tokens.filter((token) => token.color !== "p1");
+      if (!visibleTokens.length) return "";
+      const offsets = getTokenOffsets(visibleTokens.length, cellSize);
+      return `<div class="token-stack">${visibleTokens.map((token, idx) => {
         const [dx, dy] = offsets[idx] || [0, 0];
         return `<div class="token ${token.color}" style="transform: translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px));"></div>`;
       }).join("")}</div>`;
