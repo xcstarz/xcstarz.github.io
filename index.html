@@ -161,8 +161,8 @@
       transition: all 0.3s ease;
     }
     .lesson-tile-art {
-      width: 50px;
-      height: 50px;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -173,7 +173,16 @@
       font-size: 28px;
     }
     .lesson-tile[data-tile-type="rule"] .lesson-tile-art {
-      transform: rotateZ(45deg) rotateX(-25deg) translateY(-10px);
+      /* Rule tiles don't need 3d elevation since we counter-rotate them */
+    }
+    .lesson-tile[data-tile-type="rule"] .lesson-tile-art svg {
+      transform: rotateZ(45deg) rotateX(-25deg) scaleY(1.2174);
+      width: 50px;
+      height: 50px;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.5));
+    }
+    .lesson-tile[data-tile-type="rule"] .lesson-tile-art text {
+      transform: translateY(2px);
     }
     .lesson-tile-art svg {
       width: 50px;
