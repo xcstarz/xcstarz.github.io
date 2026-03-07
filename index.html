@@ -145,6 +145,7 @@
       width: 76px;
       height: 76px;
       flex: none;
+      padding: 0;
       border-radius: 14px;
       background: linear-gradient(145deg, #205f6a, #184953);
       border: 1px solid rgba(90, 179, 196, .35);
@@ -167,6 +168,15 @@
       z-index: 2;
       transform: translateZ(10px);
       transition: all 0.3s ease;
+      cursor: pointer;
+      appearance: none;
+    }
+    .lesson-tile:hover {
+      transform: translateZ(18px);
+    }
+    .lesson-tile:focus-visible {
+      outline: 3px solid rgba(94, 240, 218, .95);
+      outline-offset: 6px;
     }
     .lesson-tile-art {
       position: absolute;
@@ -397,6 +407,12 @@
       font-weight: 650;
       min-height: 24px;
     }
+    .tutorial-start-copy {
+      margin: 0 0 14px;
+      color: #b8ddeb;
+      font-size: 15px;
+      line-height: 1.45;
+    }
     .tutorial-actions {
       display: grid;
       grid-template-columns: 48px 1fr;
@@ -515,6 +531,16 @@
     button:hover { filter: brightness(1.08); }
     .hidden { display: none !important; }
     .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tutorial-top-notice {
+      margin: 14px 0 0;
+      padding: 12px 14px;
+      border: 1px solid rgba(94, 240, 218, .35);
+      border-radius: 12px;
+      background: rgba(12, 35, 44, .78);
+      color: #dffaf4;
+      font-size: 14px;
+      line-height: 1.45;
+    }
     .chip {
       border: 1px solid #446096;
       background: #101b35;
@@ -838,6 +864,7 @@
           </div>
 
           <div id="gameView" class="hidden">
+            <div id="tutorialTopNotice" class="tutorial-top-notice hidden"></div>
             <div class="chip-row" id="headerChips"></div>
             <div class="game">
               <div class="board-wrap card">
@@ -889,15 +916,15 @@
               <div id="tutorialDefaultVisual" class="tutorial-default-visual">
                 <div class="tutorial-grid">
                   <!-- 9 Active lessons -->
-                  <div class="lesson-tile active" data-tile-type="rule" data-tile-text="1"><div class="lesson-tile-art"></div></div>
-                  <div class="lesson-tile" data-tile-type="rule" data-tile-text="2"><div class="lesson-tile-art"></div></div>
-                  <div class="lesson-tile" data-tile-type="straightaway" data-tile-rot="0"><div class="lesson-tile-art"></div></div>
-                  <div class="lesson-tile" data-tile-type="uturn" data-tile-rot="1"><div class="lesson-tile-art"></div></div>
-                  <div class="lesson-tile" data-tile-type="centrifugal" data-tile-rot="2"><div class="lesson-tile-art"></div></div>
-                  <div class="lesson-tile" data-tile-type="diagonal" data-tile-rot="0"><div class="lesson-tile-art"></div></div>
-                  <div class="lesson-tile" data-tile-type="weave" data-tile-rot="1"><div class="lesson-tile-art"></div></div>
-                  <div class="lesson-tile" data-tile-type="jump" data-tile-rot="2"><div class="lesson-tile-art"></div></div>
-                  <div class="lesson-tile" data-tile-type="diagonalJump" data-tile-rot="3"><div class="lesson-tile-art"></div></div>
+                  <button class="lesson-tile active" data-lesson-idx="0" data-tile-type="rule" data-tile-text="1" type="button" aria-label="Start Lesson 1: Board, Bases, and Setup"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="1" data-tile-type="rule" data-tile-text="2" type="button" aria-label="Start Lesson 2: Elimination and Winning"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="2" data-tile-type="straightaway" data-tile-rot="0" type="button" aria-label="Start Lesson 3: Straightaway Tile"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="3" data-tile-type="uturn" data-tile-rot="1" type="button" aria-label="Start Lesson 4: U-Turn Tile"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="4" data-tile-type="centrifugal" data-tile-rot="2" type="button" aria-label="Start Lesson 5: Centrifugal Tile"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="5" data-tile-type="diagonal" data-tile-rot="0" type="button" aria-label="Start Lesson 6: Diagonal Tile"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="6" data-tile-type="weave" data-tile-rot="1" type="button" aria-label="Start Lesson 7: Weave Tile"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="7" data-tile-type="jump" data-tile-rot="2" type="button" aria-label="Start Lesson 8: Jump Tile"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="8" data-tile-type="diagonalJump" data-tile-rot="3" type="button" aria-label="Start Lesson 9: Diagonal Jump Tile"><div class="lesson-tile-art"></div></button>
                 </div>
               </div>
               <div id="tutorialLessonOneBoards" class="tutorial-demo-grid hidden"></div>
@@ -905,6 +932,7 @@
             <div class="tutorial-content">
               <h3 class="tutorial-title">Learn To Play</h3>
               <div id="tutorialStepText" class="tutorial-step"></div>
+              <p id="tutorialStartText" class="tutorial-start-copy"></p>
               <div class="tutorial-actions">
                 <button id="tutorialListBtn" class="tutorial-list-btn" type="button" aria-label="Lesson list">
                   <span class="list-icon" aria-hidden="true">
@@ -970,6 +998,7 @@
       eliminationQueue: [],
       winShown: false,
       overlayMode: null,
+      tutorialMode: null,
     };
 
     const el = {
@@ -1018,17 +1047,82 @@
       tutorialLessonList: document.getElementById("tutorialLessonList"),
       tutorialDefaultVisual: document.getElementById("tutorialDefaultVisual"),
       tutorialLessonOneBoards: document.getElementById("tutorialLessonOneBoards"),
+      tutorialStartText: document.getElementById("tutorialStartText"),
+      tutorialTopNotice: document.getElementById("tutorialTopNotice"),
     };
     const tutorialLessons = [
-      { title: "Tutorial: Board, Bases, and Setup", step: "Lesson 1 of 9" },
-      { title: "Elimination and Winning", step: "Lesson 2 of 9" },
-      { title: "Straightaway Tile", step: "Lesson 3 of 9" },
-      { title: "U-Turn Tile", step: "Lesson 4 of 9" },
-      { title: "Centrifugal Tile", step: "Lesson 5 of 9" },
-      { title: "Diagonal Tile", step: "Lesson 6 of 9" },
-      { title: "Weave Tile", step: "Lesson 7 of 9" },
-      { title: "Jump Tile", step: "Lesson 8 of 9" },
-      { title: "Diagonal Jump Tile", step: "Lesson 9 of 9" },
+      {
+        title: "Tutorial: Board, Bases, and Setup",
+        step: "Lesson 1 of 9",
+        selectedTile: "straightaway",
+        selectedRot: 0,
+        startCopy: "Click this lesson tile, or open the lesson list, to launch a live 7 x 7 practice board in Play mode.",
+        playNotice: "Tutorial lesson 1: scroll down to the board, click a green cell next to your base, then choose an entrance that touches your base.",
+      },
+      {
+        title: "Elimination and Winning",
+        step: "Lesson 2 of 9",
+        selectedTile: "straightaway",
+        selectedRot: 0,
+        startCopy: "Start this lesson to practice the first move on a live 7 x 7 board, then build paths toward the other base.",
+        playNotice: "Tutorial lesson 2: scroll down to the board, make your first placement on a green cell, choose an entrance, and watch how that lane points toward danger or victory.",
+      },
+      {
+        title: "Straightaway Tile",
+        step: "Lesson 3 of 9",
+        selectedTile: "straightaway",
+        selectedRot: 0,
+        startCopy: "Start this lesson to open Play mode with the straightaway tile already selected for practice.",
+        playNotice: "Tutorial lesson 3: the straightaway tile is preselected. Scroll down, place it on a green cell, then choose the entrance touching your base.",
+      },
+      {
+        title: "U-Turn Tile",
+        step: "Lesson 4 of 9",
+        selectedTile: "uturn",
+        selectedRot: 0,
+        startCopy: "Start this lesson to practice the U-Turn tile on a live 7 x 7 board.",
+        playNotice: "Tutorial lesson 4: the U-Turn tile is preselected. Scroll down, place it next to your base, then choose the entrance that feeds into the curve you want.",
+      },
+      {
+        title: "Centrifugal Tile",
+        step: "Lesson 5 of 9",
+        selectedTile: "centrifugal",
+        selectedRot: 0,
+        startCopy: "Start this lesson to practice the centrifugal tile on a live 7 x 7 board.",
+        playNotice: "Tutorial lesson 5: the centrifugal tile is preselected. Scroll down, place it on a green cell, then choose the entrance touching your base.",
+      },
+      {
+        title: "Diagonal Tile",
+        step: "Lesson 6 of 9",
+        selectedTile: "diagonal",
+        selectedRot: 0,
+        startCopy: "Start this lesson to practice the diagonal tile on a live 7 x 7 board.",
+        playNotice: "Tutorial lesson 6: the diagonal tile is preselected. Scroll down, place it by your base, then choose an entrance and follow the diagonal lane.",
+      },
+      {
+        title: "Weave Tile",
+        step: "Lesson 7 of 9",
+        selectedTile: "weave",
+        selectedRot: 0,
+        startCopy: "Start this lesson to practice the weave tile on a live 7 x 7 board.",
+        playNotice: "Tutorial lesson 7: the weave tile is preselected. Scroll down, place it next to your base, then choose an entrance to see how the weave splits lanes.",
+      },
+      {
+        title: "Jump Tile",
+        step: "Lesson 8 of 9",
+        selectedTile: "jump",
+        selectedRot: 0,
+        startCopy: "Start this lesson to practice the jump tile on a live 7 x 7 board.",
+        playNotice: "Tutorial lesson 8: the jump tile is preselected. Scroll down, place it on a green cell, then choose an entrance and trace the jump landing.",
+      },
+      {
+        title: "Diagonal Jump Tile",
+        step: "Lesson 9 of 9",
+        selectedTile: "diagonalJump",
+        selectedRot: 0,
+        startCopy: "Start this lesson to practice the diagonal jump tile on a live 7 x 7 board.",
+        playNotice: "Tutorial lesson 9: the diagonal jump tile is preselected. Scroll down, place it by your base, then choose an entrance and watch the diagonal landing.",
+      },
     ];
     const tutorialDemoState = { setup: 0, movement: 0, win: 0 };
     const tutorialBoardDemos = [
@@ -1250,6 +1344,12 @@
     function setupBindings() {
       el.tabPlayBtn.addEventListener("click", () => setTab("play"));
       el.tabTutorialBtn.addEventListener("click", () => setTab("tutorial"));
+      document.querySelectorAll(".lesson-tile").forEach((tileEl) => {
+        tileEl.addEventListener("click", () => {
+          const lessonIdx = Number(tileEl.dataset.lessonIdx || 0);
+          startTutorialLesson(lessonIdx);
+        });
+      });
       el.playerCount.addEventListener("change", () => {
         el.threePlayerCornerField.classList.toggle("hidden", el.playerCount.value !== "3");
       });
@@ -1258,6 +1358,8 @@
       });
       el.startBtn.addEventListener("click", startGame);
       el.newGameBtn.addEventListener("click", () => {
+        app.tutorialMode = null;
+        setTutorialTopNotice("");
         el.gameView.classList.add("hidden");
         el.setupView.classList.remove("hidden");
       });
@@ -1292,6 +1394,39 @@
       }
     }
 
+    function setTutorialTopNotice(message = "") {
+      if (!el.tutorialTopNotice) return;
+      el.tutorialTopNotice.textContent = message;
+      el.tutorialTopNotice.classList.toggle("hidden", !message);
+    }
+
+    function readGameOptionsFromControls() {
+      return {
+        size: Number(el.boardSize.value),
+        playerCount: Number(el.playerCount.value),
+        jumpSelection: el.jumpSelection.value,
+        poolMode: el.poolMode.value,
+        names: [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value],
+        deadCorner: Number(el.deadCornerSelect.value),
+      };
+    }
+
+    function applyGameOptionsToControls(options) {
+      el.boardSize.value = String(options.size);
+      el.playerCount.value = String(options.playerCount);
+      el.jumpSelection.value = options.jumpSelection;
+      el.poolMode.value = options.poolMode;
+      if (Array.isArray(options.names)) {
+        const nameEls = [el.p1Name, el.p2Name, el.p3Name, el.p4Name];
+        nameEls.forEach((input, idx) => {
+          if (typeof options.names[idx] === "string" && options.names[idx]) input.value = options.names[idx];
+        });
+      }
+      if (typeof options.deadCorner === "number") el.deadCornerSelect.value = String(options.deadCorner);
+      el.threePlayerCornerField.classList.toggle("hidden", el.playerCount.value !== "3");
+      el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
+    }
+
     function cycleTutorialLesson() {
       if (!tutorialLessons.length) return;
       tutorialLessonIndex = (tutorialLessonIndex + 1) % tutorialLessons.length;
@@ -1302,12 +1437,16 @@
       if (!el.tutorialStepText || !el.tutorialLessonList) return;
       if (!tutorialLessons.length) {
         el.tutorialStepText.textContent = "";
+        if (el.tutorialStartText) el.tutorialStartText.textContent = "";
         el.tutorialLessonList.innerHTML = "";
         renderTutorialVisuals();
         return;
       }
       const lesson = tutorialLessons[tutorialLessonIndex];
       el.tutorialStepText.textContent = `${lesson.step} - ${lesson.title}`;
+      if (el.tutorialStartText) {
+        el.tutorialStartText.textContent = lesson.startCopy || "Click a lesson to open a live 7 x 7 practice board in Play mode.";
+      }
       renderTutorialVisuals();
 
       el.tutorialLessonList.innerHTML = tutorialLessons.map((item, idx) =>
@@ -1316,29 +1455,20 @@
 
       el.tutorialLessonList.querySelectorAll(".tutorial-lesson-item").forEach((btn) => {
         btn.addEventListener("click", () => {
-          tutorialLessonIndex = Number(btn.dataset.lessonIdx) || 0;
+          const lessonIdx = Number(btn.dataset.lessonIdx) || 0;
+          tutorialLessonIndex = lessonIdx;
           renderTutorialCard();
           el.tutorialLessonList.classList.add("hidden");
+          startTutorialLesson(lessonIdx);
         });
       });
     }
 
     function renderTutorialVisuals() {
-      const isFirstLesson = tutorialLessons.length && tutorialLessonIndex === 0;
-      if (el.tutorialDefaultVisual) el.tutorialDefaultVisual.classList.toggle("hidden", isFirstLesson);
-      if (el.tutorialLessonOneBoards) el.tutorialLessonOneBoards.classList.toggle("hidden", !isFirstLesson);
-      if (isFirstLesson) {
-        renderTutorialLessonOneBoards();
-      }
-
       const tiles = document.querySelectorAll(".lesson-tile");
       const activeLessonIdx = tutorialLessons.length ? tutorialLessonIndex : -1;
-      if (isFirstLesson) {
-        tiles.forEach((tileEl, idx) => {
-          tileEl.classList.toggle("active", idx === activeLessonIdx);
-        });
-        return;
-      }
+      if (el.tutorialDefaultVisual) el.tutorialDefaultVisual.classList.remove("hidden");
+      if (el.tutorialLessonOneBoards) el.tutorialLessonOneBoards.classList.add("hidden");
       tiles.forEach((tileEl, idx) => {
         tileEl.classList.toggle("active", idx === activeLessonIdx);
         const tileType = tileEl.dataset.tileType || "straightaway";
@@ -1357,6 +1487,41 @@
           });
         }
       });
+    }
+
+    function startTutorialLesson(lessonIdx) {
+      const lesson = tutorialLessons[lessonIdx];
+      if (!lesson) return;
+
+      tutorialLessonIndex = lessonIdx;
+      renderTutorialCard();
+      setTab("play");
+
+      const tutorialOptions = {
+        size: 7,
+        playerCount: 2,
+        jumpSelection: "both",
+        poolMode: "separate",
+        names: [
+          el.p1Name.value || "Player 1",
+          el.p2Name.value || "Player 2",
+          el.p3Name.value || "Player 3",
+          el.p4Name.value || "Player 4",
+        ],
+        deadCorner: Number(el.deadCornerSelect.value),
+      };
+      applyGameOptionsToControls(tutorialOptions);
+      startGame({
+        ...tutorialOptions,
+        tutorialMode: {
+          lessonIdx,
+          message: lesson.playNotice || "",
+        },
+      });
+      app.selectedTile = lesson.selectedTile || "straightaway";
+      app.selectedRot = lesson.selectedRot || 0;
+      renderAll();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
     function advanceTutorialDemo(demoId) {
@@ -1582,19 +1747,19 @@
       return map[corner];
     }
 
-    function startGame() {
-      const size = Number(el.boardSize.value);
-      const playerCount = Number(el.playerCount.value);
-      const jumpSelection = el.jumpSelection.value;
-      const poolMode = el.poolMode.value;
-      const names = [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value];
+    function startGame(options = readGameOptionsFromControls()) {
+      const size = Number(options.size);
+      const playerCount = Number(options.playerCount);
+      const jumpSelection = options.jumpSelection;
+      const poolMode = options.poolMode;
+      const names = options.names || [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value];
 
       const activeCorners = [];
       let deadCorner = null;
       if (playerCount === 2) {
         activeCorners.push("TL", "BR");
       } else if (playerCount === 3) {
-        deadCorner = Number(el.deadCornerSelect.value);
+        deadCorner = Number(options.deadCorner);
         CORNERS.forEach((c, i) => { if (i !== deadCorner) activeCorners.push(c); });
       } else {
         activeCorners.push(...CORNERS);
@@ -1615,6 +1780,8 @@
       app.eliminationQueue = [];
       app.winShown = false;
       app.overlayMode = null;
+      app.tutorialMode = options.tutorialMode || null;
+      setTutorialTopNotice(app.tutorialMode?.message || "");
       el.eliminationOverlay.classList.add("hidden");
       el.winOverlay.classList.add("hidden");
       el.eliminationOverlay.classList.remove("win-overlay");
