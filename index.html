@@ -1356,7 +1356,7 @@
       el.jumpSelection.addEventListener("change", () => {
         el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
       });
-      el.startBtn.addEventListener("click", startGame);
+      el.startBtn.addEventListener("click", () => startGame());
       el.newGameBtn.addEventListener("click", () => {
         app.tutorialMode = null;
         setTutorialTopNotice("");
