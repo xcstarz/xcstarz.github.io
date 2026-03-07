@@ -1412,6 +1412,7 @@
         return;
       }
       showNextElimination();
+      showWinnerOverlayIfReady();
     }
 
     function dismissWin() {
@@ -1421,10 +1422,8 @@
     function setWinner(playerId) {
       app.gameOver = true;
       app.winner = playerId;
-      app.winShown = true;
+      app.winShown = false;
       app.pendingFirstPlacement = null;
-      app.eliminationQueue = [];
-      app.overlayMode = "win";
       el.entrySelectWrap.classList.add("hidden");
       el.winOverlay.classList.add("hidden");
       if (app.drag.active) {
@@ -1432,12 +1431,7 @@
         if (app.drag.hoveredCell) app.drag.hoveredCell.classList.remove("drag-hover");
         app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
       }
-      const winner = app.players[playerId];
-      if (winner) el.elimText.textContent = `${winner.name} Wins!`;
-      el.eliminationOverlay.classList.add("win-overlay");
-      const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
-      if (elimBox) elimBox.classList.add("win-box");
-      el.eliminationOverlay.classList.remove("hidden");
+      showWinnerOverlayIfReady();
     }
 
     function checkPositionDraw() {
@@ -1468,6 +1462,21 @@
       }
       renderAll();
       showNextElimination();
+      showWinnerOverlayIfReady();
+    }
+
+    function showWinnerOverlayIfReady() {
+      if (!app.gameOver || app.winner == null || app.winShown) return;
+      if (app.eliminationQueue.length > 0) return;
+      if (!el.eliminationOverlay.classList.contains("hidden")) return;
+      app.overlayMode = "win";
+      const winner = app.players[app.winner];
+      if (winner) el.elimText.textContent = `${winner.name} Wins!`;
+      el.eliminationOverlay.classList.add("win-overlay");
+      const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
+      if (elimBox) elimBox.classList.add("win-box");
+      el.eliminationOverlay.classList.remove("hidden");
+      app.winShown = true;
     }
 
     function entranceName(i) { return ["N0","N1","E0","E1","S0","S1","W0","W1"][i]; }
