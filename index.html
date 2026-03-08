@@ -1255,8 +1255,8 @@
         step: "Lesson 4 of 9",
         selectedTile: "uturn",
         presetId: "lesson3-straightaway-tile",
-        startCopy: "Start this lesson to practice the U-Turn tile on a live 7 x 7 board.",
-        playNotice: "Tutorial lesson 4: the U-Turn tile is preselected. Scroll down, place it next to your base, then choose the entrance that feeds into the curve you want.",
+        startCopy: "Preset: same as Lesson 3.\n\n1. The centrifugal tile performs a sharp, ninety degree turn. Place it and choose the `W0` entrance to get to `1`.\n2. The U-turn tile curves back to an adjacent entrance of the same edge entered from. Place it down.\n3. Continue placing centrifugal and U-turn tiles until you get to `2`.\n4. Place tiles until you get to `3`. Place a weave at `3`.\n5. Place straightaways until you get to `4`. Place a centrifugal tile at `4` to reach the opponent's base.\n6. Lesson complete. Proceed to the next lesson.",
+        playNotice: "1. The centrifugal tile performs a sharp, ninety degree turn. Place it and choose the `W0` entrance to get to `1`.\n2. The U-turn tile curves back to an adjacent entrance of the same edge entered from. Place it down.\n3. Continue placing centrifugal and U-turn tiles until you get to `2`.\n4. Place tiles until you get to `3`. Place a weave at `3`.\n5. Place straightaways until you get to `4`. Place a centrifugal tile at `4` to reach the opponent's base.\n6. Lesson complete. Proceed to the next lesson.",
       },
       {
         title: "Centrifugal Tile",
@@ -1449,7 +1449,9 @@
 
       const isLessonOneComplete = app.tutorialMode?.lessonIdx === 0 && app.tutorialMode?.lessonOneComplete;
       const isLessonTwoComplete = app.tutorialMode?.lessonIdx === 1 && app.gameOver;
-      const showNextLessonButton = isLessonOneComplete || isLessonTwoComplete;
+      const isLessonThreeCompleteNow = app.tutorialMode?.lessonIdx === 2 && isLessonThreeComplete();
+      const isLessonFourCompleteNow = app.tutorialMode?.lessonIdx === 3 && isLessonThreeComplete();
+      const showNextLessonButton = isLessonOneComplete || isLessonTwoComplete || isLessonThreeCompleteNow || isLessonFourCompleteNow;
       if (showNextLessonButton) {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -1500,9 +1502,8 @@
       const reachedOne = hasPlayerVisitedCell(playerOne, 0, 1);
       const reachedTwo = hasPlayerVisitedCell(playerOne, 0, 4);
       const placedAtThree = !!app.board?.[1]?.[5]?.tile;
-      const reachedFour = hasPlayerVisitedCell(playerOne, 6, 5);
 
-      if (reachedFour) {
+      if (isLessonThreeComplete()) {
         return "4. Lesson complete. Proceed to the next lesson.";
       }
       if (placedAtThree) {
@@ -1517,6 +1518,42 @@
       return "1. The straightaway is the most basic tile. Place it and choose the `W1` entrance to get to `1`.";
     }
 
+    function isLessonThreeComplete() {
+      const finalTile = app.board?.[6]?.[5]?.tile;
+      return finalTile?.type === "centrifugal";
+    }
+
+    function hasPlacedTileType(tileType) {
+      if (!tileType || !Array.isArray(app.board)) return false;
+      return app.board.some((row) => Array.isArray(row)
+        && row.some((cell) => cell?.tile?.type === tileType));
+    }
+
+    function getLessonFourTutorialMessage() {
+      const playerOne = app.players[0];
+      const reachedOne = hasPlayerVisitedCell(playerOne, 0, 1);
+      const reachedTwo = hasPlayerVisitedCell(playerOne, 0, 4);
+      const placedWeaveAtThree = app.board?.[1]?.[5]?.tile?.type === "weave";
+      const hasPlacedUTurn = hasPlacedTileType("uturn");
+
+      if (isLessonThreeComplete()) {
+        return "6. Lesson complete. Proceed to the next lesson.";
+      }
+      if (placedWeaveAtThree) {
+        return "5. Place straightaways until you get to `4`. Place a centrifugal tile at `4` to reach your opponent's base.";
+      }
+      if (reachedTwo) {
+        return "4. Place tiles until you get to `3`. Place a weave at `3`.";
+      }
+      if (hasPlacedUTurn) {
+        return "3. Continue placing centrifugal and U-turn tiles until you get to `2`.";
+      }
+      if (reachedOne) {
+        return "2. The U-turn tile curves back to an adjacent entrance of the same edge entered from. Place it down.";
+      }
+      return "1. The centrifugal tile performs a sharp, ninety degree turn. Place it and choose the `W0` entrance to get to `1`.";
+    }
+
     function isTutorialLessonOneFollowUpTurn(player = currentPlayer()) {
       return app.tutorialMode?.lessonIdx === 0 && !!player?.alive && !!player?.hasPlacedFirstTile;
     }
@@ -1526,6 +1563,7 @@
       if (app.tutorialMode.lessonIdx === 0) return getLessonOneTutorialMessage();
       if (app.tutorialMode.lessonIdx === 1) return getLessonTwoTutorialMessage();
       if (app.tutorialMode.lessonIdx === 2) return getLessonThreeTutorialMessage();
+      if (app.tutorialMode.lessonIdx === 3) return getLessonFourTutorialMessage();
       if (isTutorialLessonOneFollowUpTurn()) {
         return "Choose a tile and place it in front of your entrance. The red line shows the path you took.";
       }
