@@ -750,6 +750,24 @@
       inset: 0;
       pointer-events: none;
     }
+    .tutorial-path-marker {
+      position: absolute;
+      right: 7px;
+      top: 7px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #e71f34;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1;
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+      z-index: 5;
+    }
     .token-stack {
       position: absolute;
       inset: 0;
@@ -1225,16 +1243,18 @@
         playNotice: "1. In this case, the two players are going toward the same cell. Each player must immediately move to the end of the path. Place a centrifugal tile. A win screen should pop up.",
       },
       {
-        title: "Straightaway Tile",
+        title: "The Straightaway Tile",
         step: "Lesson 3 of 9",
         selectedTile: "straightaway",
-        startCopy: "Start this lesson to open Play mode with the straightaway tile already selected for practice.",
-        playNotice: "Tutorial lesson 3: the straightaway tile is preselected. Scroll down, place it on a green cell, then choose the entrance touching your base.",
+        presetId: "lesson3-straightaway-tile",
+        startCopy: "Preset board: second reference image.\n\n1. The straightaway is the most basic tile. Place it and choose the `W1` entrance to get to `1`.\n2. Continue placing straightaways until you get to `2`. Place a diagonal tile, a centrifugal tile, and another diagonal tile around `2` to get to `3`.\n3. Continue placing straightaways until you get to `4`. Place a centrifugal tile to reach your opponent's base.\n4. Lesson complete. Proceed to the next lesson.",
+        playNotice: "The straightaway is the most basic tile. Place it and choose the `W1` entrance to get to `1`. Player 2 is skipped every round in this lesson preset.",
       },
       {
         title: "U-Turn Tile",
         step: "Lesson 4 of 9",
         selectedTile: "uturn",
+        presetId: "lesson3-straightaway-tile",
         startCopy: "Start this lesson to practice the U-Turn tile on a live 7 x 7 board.",
         playNotice: "Tutorial lesson 4: the U-Turn tile is preselected. Scroll down, place it next to your base, then choose the entrance that feeds into the curve you want.",
       },
@@ -1242,6 +1262,7 @@
         title: "Centrifugal Tile",
         step: "Lesson 5 of 9",
         selectedTile: "centrifugal",
+        presetId: "lesson3-straightaway-tile",
         startCopy: "Start this lesson to practice the centrifugal tile on a live 7 x 7 board.",
         playNotice: "Tutorial lesson 5: the centrifugal tile is preselected. Scroll down, place it on a green cell, then choose the entrance touching your base.",
       },
@@ -1468,6 +1489,34 @@
       return "1. In this case, the two players are going toward the same cell. Each player must immediately move to the end of the path. Place a centrifugal tile. A win screen should pop up.";
     }
 
+    function hasPlayerVisitedCell(player, r, c) {
+      if (!player) return false;
+      if (player.row === r && player.col === c) return true;
+      return (player.trail || []).some((point) => point.row === r && point.col === c);
+    }
+
+    function getLessonThreeTutorialMessage() {
+      const playerOne = app.players[0];
+      const reachedOne = hasPlayerVisitedCell(playerOne, 0, 1);
+      const reachedTwo = hasPlayerVisitedCell(playerOne, 0, 4);
+      const reachedThree = hasPlayerVisitedCell(playerOne, 1, 5);
+      const reachedFour = hasPlayerVisitedCell(playerOne, 6, 5);
+
+      if (reachedFour) {
+        return "4. Lesson complete. Proceed to the next lesson.";
+      }
+      if (reachedThree) {
+        return "3. Continue placing straightaways until you get to `4`. Place a centrifugal tile to reach your opponent's base.";
+      }
+      if (reachedTwo) {
+        return "2. Place a diagonal tile, a centrifugal tile, and another diagonal tile around `2` to get to `3`.";
+      }
+      if (reachedOne) {
+        return "2. Continue placing straightaways until you get to `2`.";
+      }
+      return "1. The straightaway is the most basic tile. Place it and choose the `W1` entrance to get to `1`.";
+    }
+
     function isTutorialLessonOneFollowUpTurn(player = currentPlayer()) {
       return app.tutorialMode?.lessonIdx === 0 && !!player?.alive && !!player?.hasPlacedFirstTile;
     }
@@ -1476,6 +1525,7 @@
       if (!app.tutorialMode) return "";
       if (app.tutorialMode.lessonIdx === 0) return getLessonOneTutorialMessage();
       if (app.tutorialMode.lessonIdx === 1) return getLessonTwoTutorialMessage();
+      if (app.tutorialMode.lessonIdx === 2) return getLessonThreeTutorialMessage();
       if (isTutorialLessonOneFollowUpTurn()) {
         return "Choose a tile and place it in front of your entrance. The red line shows the path you took.";
       }
@@ -1633,7 +1683,25 @@
     function applyTutorialLessonPreset(presetId) {
       if (presetId === "lesson2-movement-and-dead-zones") {
         applyLessonTwoMovementDeadZonePreset();
+      } else if (presetId === "lesson3-straightaway-tile") {
+        applyLessonThreeStraightawayPreset();
       }
+    }
+
+    function shouldSkipPlayerTwoTutorialTurns() {
+      const lessonIdx = app.tutorialMode?.lessonIdx;
+      return lessonIdx === 2 || lessonIdx === 3 || lessonIdx === 4;
+    }
+
+    function getLessonThreePresetMarkers() {
+      const lessonIdx = app.tutorialMode?.lessonIdx;
+      if (lessonIdx !== 2 && lessonIdx !== 3 && lessonIdx !== 4) return [];
+      return [
+        { r: 0, c: 1, label: "1" },
+        { r: 0, c: 4, label: "2" },
+        { r: 1, c: 5, label: "3" },
+        { r: 6, c: 5, label: "4" },
+      ];
     }
 
     function applyLessonTwoMovementDeadZonePreset() {
@@ -1695,6 +1763,42 @@
         }
       }
       app.selectedTile = "centrifugal";
+    }
+
+    function applyLessonThreeStraightawayPreset() {
+      const playerOne = app.players[0];
+      const playerTwo = app.players[1];
+      if (!playerOne || !playerTwo) return;
+
+      // Match the lesson 3 reference preset exactly: center dead zones + two edge dead zones.
+      const extraDeadZones = [
+        { r: 0, c: 6 },
+        { r: 6, c: 0 },
+      ];
+      extraDeadZones.forEach(({ r, c }) => {
+        if (!inBounds(app.config.size, r, c)) return;
+        const cell = app.board[r][c];
+        if (!cell || cell.startOwner != null || cell.tile != null) return;
+        cell.dead = true;
+      });
+
+      playerOne.row = null;
+      playerOne.col = null;
+      playerOne.entrance = null;
+      playerOne.alive = true;
+      playerOne.hasPlacedFirstTile = false;
+      playerOne.trail = [];
+
+      playerTwo.row = null;
+      playerTwo.col = null;
+      playerTwo.entrance = null;
+      playerTwo.alive = true;
+      playerTwo.hasPlacedFirstTile = false;
+      playerTwo.trail = [];
+
+      app.currentPlayerIdx = 0;
+      app.pendingFirstPlacement = null;
+      app.selectedTile = "straightaway";
     }
 
     function renderTutorialLessonOneBoards() {
@@ -2378,13 +2482,22 @@
 
     function postTurnAdvance() {
       if (!app.gameOver) {
+        const skipPlayerTwo = shouldSkipPlayerTwoTutorialTurns();
         let idx = app.currentPlayerIdx;
+        let found = false;
         for (let i = 0; i < app.players.length; i++) {
           idx = (idx + 1) % app.players.length;
+          if (!app.players[idx].alive) continue;
+          if (skipPlayerTwo && app.players[idx].id === 1) continue;
           if (app.players[idx].alive) {
             app.currentPlayerIdx = idx;
+            found = true;
             break;
           }
+        }
+        if (!found) {
+          const anyAliveIdx = app.players.findIndex((player) => player.alive);
+          if (anyAliveIdx !== -1) app.currentPlayerIdx = anyAliveIdx;
         }
       }
       renderAll();
@@ -2531,6 +2644,9 @@
       el.board.innerHTML = "";
 
       const validSet = new Set();
+      const markerMap = new Map(
+        getLessonThreePresetMarkers().map((marker) => [key(marker.r, marker.c), marker.label])
+      );
       const p = currentPlayer();
       if (!app.gameOver && p?.alive) {
         if (!p.hasPlacedFirstTile) validFirstTurnCells(p).forEach(([r, c]) => validSet.add(key(r, c)));
@@ -2556,6 +2672,13 @@
 
           if (cell.tile) {
             btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, BOARD_CELL_SIZE)}</div>`;
+          }
+          const marker = markerMap.get(key(r, c));
+          if (marker) {
+            const markerEl = document.createElement("div");
+            markerEl.className = "tutorial-path-marker";
+            markerEl.textContent = marker;
+            btn.appendChild(markerEl);
           }
           const playersHere = app.players
             .filter((player) => player.alive && player.hasPlacedFirstTile && player.row === r && player.col === c)
