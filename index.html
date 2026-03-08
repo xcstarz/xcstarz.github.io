@@ -1678,6 +1678,9 @@
       app.pendingFirstPlacement = null;
       executeFirstTurnMovement(playerTwo, 5, 6, 5);
       playerTwo.hasPlacedFirstTile = playerTwo.alive && playerTwo.row != null && playerTwo.col != null;
+      if (playerTwo.alive && playerTwo.hasPlacedFirstTile && playerTwo.row != null && playerTwo.col != null) {
+        resolveMovement(playerTwo);
+      }
       if (playerOne.alive && playerOne.hasPlacedFirstTile && playerOne.row != null && playerOne.col != null) {
         resolveMovement(playerOne);
       }
@@ -2557,7 +2560,8 @@
           const playersHere = app.players
             .filter((player) => player.alive && player.hasPlacedFirstTile && player.row === r && player.col === c)
             .map((player) => ({ color: player.color }));
-          btn.innerHTML += renderTokenStack(playersHere, BOARD_CELL_SIZE);
+          // Keep token state in data model, but do not render gameplay token markers.
+          void playersHere;
 
           el.board.appendChild(btn);
         }
