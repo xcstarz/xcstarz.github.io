@@ -1499,13 +1499,13 @@
       const playerOne = app.players[0];
       const reachedOne = hasPlayerVisitedCell(playerOne, 0, 1);
       const reachedTwo = hasPlayerVisitedCell(playerOne, 0, 4);
-      const reachedThree = hasPlayerVisitedCell(playerOne, 1, 5);
+      const placedAtThree = !!app.board?.[1]?.[5]?.tile;
       const reachedFour = hasPlayerVisitedCell(playerOne, 6, 5);
 
       if (reachedFour) {
         return "4. Lesson complete. Proceed to the next lesson.";
       }
-      if (reachedThree) {
+      if (placedAtThree) {
         return "3. Continue placing straightaways until you get to `4`. Place a centrifugal tile to reach your opponent's base.";
       }
       if (reachedTwo) {
