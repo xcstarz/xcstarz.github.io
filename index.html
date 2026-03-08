@@ -24,11 +24,13 @@
       min-height: 100vh;
     }
     .main-shell {
+      --nav-width: 220px;
       display: grid;
-      grid-template-columns: 220px minmax(0, 1fr);
+      grid-template-columns: var(--nav-width) minmax(0, 1fr);
       min-height: 100vh;
       gap: 16px;
       padding: 16px;
+      transition: grid-template-columns .18s ease, gap .18s ease;
     }
     .app-nav {
       background: linear-gradient(180deg, #101722, #0c131e);
@@ -41,12 +43,40 @@
       position: sticky;
       top: 16px;
       height: calc(100vh - 32px);
+      overflow: hidden;
+      transition: width .18s ease, height .18s ease, padding .18s ease, gap .18s ease, border-color .18s ease, background .18s ease;
+    }
+    .app-nav-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
     }
     .app-nav-title {
       font-size: 26px;
       font-weight: 700;
       color: #f4f8ff;
       margin: 6px 8px 14px;
+      white-space: nowrap;
+      transition: opacity .16s ease, width .16s ease, margin .16s ease;
+    }
+    .app-nav-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 38px;
+      padding: 8px 10px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .app-nav-toggle-icon {
+      font-size: 16px;
+      line-height: 1;
+      font-weight: 800;
+    }
+    .app-nav-toggle-label {
+      transition: opacity .16s ease, width .16s ease;
     }
     .app-nav-btn {
       border: 1px solid #29354f;
@@ -57,6 +87,23 @@
       font-size: 14px;
       text-align: left;
       transition: background .12s ease, border-color .12s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .app-nav-btn-icon {
+      width: 18px;
+      flex: 0 0 18px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      color: #9fc0df;
+    }
+    .app-nav-btn-label {
+      transition: opacity .16s ease, width .16s ease;
     }
     .app-nav-btn:hover {
       background: #1b2639;
@@ -66,6 +113,66 @@
       background: #223450;
       border-color: #64d17b;
       box-shadow: inset 4px 0 0 #64d17b;
+    }
+    body.menu-collapsed .main-shell {
+      --nav-width: 0px;
+      gap: 0;
+    }
+    body.menu-collapsed .app-nav {
+      width: 0;
+      min-width: 0;
+      height: 0;
+      min-height: 0;
+      padding: 0;
+      gap: 0;
+      border-color: transparent;
+      background: transparent;
+      overflow: visible;
+    }
+    body.menu-collapsed .app-nav-header {
+      position: fixed;
+      left: 0;
+      top: 24px;
+      display: inline-flex;
+      justify-content: flex-start;
+      gap: 0;
+      z-index: 20;
+      transform: translateX(-1px);
+    }
+    body.menu-collapsed .app-nav-title {
+      display: none;
+    }
+    body.menu-collapsed .app-nav-title,
+    body.menu-collapsed .app-nav-toggle-label,
+    body.menu-collapsed .app-nav-btn-label {
+      opacity: 0;
+      width: 0;
+      max-width: 0;
+      margin: 0;
+      pointer-events: none;
+    }
+    body.menu-collapsed .app-nav-btn {
+      opacity: 0;
+      width: 0;
+      min-height: 0;
+      max-height: 0;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      pointer-events: none;
+    }
+    body.menu-collapsed .app-nav-toggle {
+      position: relative;
+      justify-content: center;
+      width: 42px;
+      min-width: 42px;
+      padding: 8px 0;
+      border-left: 0;
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+      border-top-right-radius: 10px;
+      border-bottom-right-radius: 10px;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, .3);
     }
     .tab-panel { min-width: 0; }
     .tutorial-panel {
@@ -786,10 +893,22 @@
 </head>
 <body>
   <div class="main-shell">
-    <aside class="app-nav">
-      <div class="app-nav-title">Menu</div>
-      <button id="tabPlayBtn" class="app-nav-btn active" type="button">Play</button>
-      <button id="tabTutorialBtn" class="app-nav-btn" type="button">Tutorial</button>
+    <aside id="appNav" class="app-nav">
+      <div class="app-nav-header">
+        <div class="app-nav-title">Menu</div>
+        <button id="menuToggleBtn" class="app-nav-toggle" type="button" aria-controls="appNav" aria-expanded="true" aria-label="Retract menu">
+          <span id="menuToggleIcon" class="app-nav-toggle-icon" aria-hidden="true">&lt;</span>
+          <span id="menuToggleLabel" class="app-nav-toggle-label">Hide</span>
+        </button>
+      </div>
+      <button id="tabPlayBtn" class="app-nav-btn active" type="button" aria-label="Play">
+        <span class="app-nav-btn-icon" aria-hidden="true">P</span>
+        <span class="app-nav-btn-label">Play</span>
+      </button>
+      <button id="tabTutorialBtn" class="app-nav-btn" type="button" aria-label="Tutorial">
+        <span class="app-nav-btn-icon" aria-hidden="true">T</span>
+        <span class="app-nav-btn-label">Tutorial</span>
+      </button>
     </aside>
     <div class="tab-panel-wrap">
       <div id="playTabPanel" class="tab-panel">
@@ -962,6 +1081,7 @@
     const TUTORIAL_BOARD_CELL_SIZE = 40;
     const BOARD_CELL_GAP = 0;
     const BOARD_FRAME = 2; // 1px border + 1px padding on each side
+    const MENU_STATE_KEY = "tilePathMenuCollapsed";
 
     const BASE_TILE_DEFS = {
       straightaway: [[0,5],[1,4],[2,7],[3,6]],
@@ -999,6 +1119,7 @@
       winShown: false,
       overlayMode: null,
       tutorialMode: null,
+      menuCollapsed: false,
     };
 
     const el = {
@@ -1036,6 +1157,10 @@
       winOverlay: document.getElementById("winOverlay"),
       winText: document.getElementById("winText"),
       winOkBtn: document.getElementById("winOkBtn"),
+      appNav: document.getElementById("appNav"),
+      menuToggleBtn: document.getElementById("menuToggleBtn"),
+      menuToggleIcon: document.getElementById("menuToggleIcon"),
+      menuToggleLabel: document.getElementById("menuToggleLabel"),
       tabPlayBtn: document.getElementById("tabPlayBtn"),
       tabTutorialBtn: document.getElementById("tabTutorialBtn"),
       playTabPanel: document.getElementById("playTabPanel"),
@@ -1309,6 +1434,22 @@
       el.tabTutorialBtn.classList.toggle("active", !isPlay);
     }
 
+    function setMenuCollapsed(collapsed) {
+      app.menuCollapsed = !!collapsed;
+      document.body.classList.toggle("menu-collapsed", app.menuCollapsed);
+      if (el.menuToggleBtn) {
+        el.menuToggleBtn.setAttribute("aria-expanded", String(!app.menuCollapsed));
+        el.menuToggleBtn.setAttribute("aria-label", app.menuCollapsed ? "Expand menu" : "Retract menu");
+      }
+      if (el.menuToggleIcon) el.menuToggleIcon.textContent = app.menuCollapsed ? ">" : "<";
+      if (el.menuToggleLabel) el.menuToggleLabel.textContent = app.menuCollapsed ? "Show" : "Hide";
+      try {
+        localStorage.setItem(MENU_STATE_KEY, app.menuCollapsed ? "1" : "0");
+      } catch (err) {
+        // Ignore storage issues, such as restrictive browser privacy settings.
+      }
+    }
+
     function key(r, c) { return `${r},${c}`; }
     function inBounds(size, r, c) { return r >= 0 && c >= 0 && r < size && c < size; }
     function edgeDir(i) { if (i <= 1) return "N"; if (i <= 3) return "E"; if (i <= 5) return "S"; return "W"; }
@@ -1342,6 +1483,9 @@
     }
 
     function setupBindings() {
+      if (el.menuToggleBtn) {
+        el.menuToggleBtn.addEventListener("click", () => setMenuCollapsed(!app.menuCollapsed));
+      }
       el.tabPlayBtn.addEventListener("click", () => setTab("play"));
       el.tabTutorialBtn.addEventListener("click", () => setTab("tutorial"));
       document.querySelectorAll(".lesson-tile").forEach((tileEl) => {
@@ -2582,6 +2726,11 @@
     setupBindings();
     renderTutorialCard();
     el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
+    try {
+      setMenuCollapsed(localStorage.getItem(MENU_STATE_KEY) === "1");
+    } catch (err) {
+      setMenuCollapsed(false);
+    }
   </script>
 </body>
 </html>
