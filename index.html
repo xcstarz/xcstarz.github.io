@@ -195,6 +195,12 @@
       background: linear-gradient(180deg, #1a232e 0%, #0f212f 72%, #0f4d60 100%);
       box-shadow: 0 20px 44px rgba(0, 0, 0, .35);
     }
+    .tutorial-shell.tutorial-intro .tutorial-content {
+      display: none;
+    }
+    .tutorial-shell.tutorial-embedded-live .tutorial-content {
+      display: none;
+    }
     .tutorial-board {
       order: 1;
       position: relative;
@@ -299,9 +305,6 @@
       font-weight: bold;
       color: #d8edf6;
       font-size: 28px;
-    }
-    .lesson-tile[data-tile-type="rule"] .lesson-tile-art {
-      /* Rule tiles don't need 3d elevation since we counter-rotate them */
     }
     .lesson-tile[data-tile-type="rule"] .lesson-tile-art svg {
       transform: rotateZ(45deg) rotateX(-25deg) scaleY(1.2174);
@@ -506,46 +509,8 @@
       justify-content: center;
       padding: 0 24px;
     }
-    .tutorial-lesson-one-shell {
-      width: min(100%, 560px);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .tutorial-lesson-one-board-wrap {
-      padding: 12px;
-      border-radius: 14px;
-      overflow: auto;
-    }
-    .tutorial-lesson-one-board-shell {
-      display: flex;
-      justify-content: center;
-      overflow-x: auto;
-      padding: 2px 0 4px;
-    }
-    .tutorial-lesson-one-board-shell .board-stack {
-      border-radius: 10px;
-      overflow: hidden;
-    }
-    .tutorial-lesson-one-controls {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .tutorial-lesson-one-progress {
-      color: #d8ebf7;
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-    }
-    .board.board--tutorial-live .cell {
-      cursor: default;
-    }
-    .board.board--tutorial-live {
-      border-radius: 10px;
+    .tutorial-lesson-one-stage .game {
+      margin-top: 0;
     }
     .tutorial-content {
       order: 0;
@@ -690,6 +655,9 @@
     button:hover { filter: brightness(1.08); }
     .hidden { display: none !important; }
     .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tutorial-top-notice:not(.hidden) + .chip-row {
+      margin-top: 10px;
+    }
     .tutorial-top-notice {
       margin: 14px 0 0;
       padding: 12px 14px;
@@ -700,6 +668,16 @@
       font-size: 14px;
       line-height: 1.45;
       white-space: pre-line;
+    }
+    .tutorial-top-notice-copy {
+      white-space: pre-line;
+    }
+    .tutorial-top-notice-action {
+      margin-top: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 120px;
     }
     .chip {
       border: 1px solid #446096;
@@ -844,8 +822,8 @@
       transform: translate(-50%, -50%);
     }
     .cell.drag-hover { outline: 3px solid #7eb4ff; outline-offset: -3px; }
-    .rot-row, .entry-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .rot-btn, .entry-btn { padding: 4px 6px; font-size: 11px; }
+    .entry-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .entry-btn { padding: 4px 6px; font-size: 11px; }
     .selected-tile-preview {
       margin-top: 10px;
       padding: 10px;
@@ -1035,46 +1013,44 @@
             </div>
           </div>
 
-          <div id="gameView" class="hidden">
-            <div id="tutorialTopNotice" class="tutorial-top-notice hidden"></div>
-            <div class="chip-row" id="headerChips"></div>
-            <div class="game">
-              <div class="board-wrap card">
-                <div class="board-stack">
-                  <svg id="trailLayer" class="trail-layer"></svg>
-                  <div id="board" class="board"></div>
-                </div>
-              </div>
-              <div class="game-sidebar card">
-                <div class="panel">
-                  <h3>Game Status</h3>
-                  <div id="statusText" class="status"></div>
-                  <div id="winnerText" class="winner hidden"></div>
-                </div>
-                <div class="panel">
-                  <h3>Tile Selection</h3>
-                  <div id="tileGrid" class="tile-grid"></div>
-                  <div style="margin-top:8px;">
-                    <div style="font-size:12px;color:#c5d5f9;margin-bottom:6px;">Rotation</div>
-                    <div id="rotRow" class="rot-row"></div>
-                  </div>
-                  <div class="selected-tile-preview" id="selectedTilePreview"></div>
-                  <div class="selected-tile-note" id="selectedTileNote">Dots show tile entrances.</div>
-                  <div id="entrySelectWrap" class="hidden" style="margin-top:8px;">
-                    <div style="font-size:12px;color:#ffdba8;margin-bottom:6px;">Step 2: choose the entry on the side touching your base</div>
-                    <div id="entryRow" class="entry-row"></div>
+          <div id="playGameHost">
+            <div id="gameView" class="hidden">
+              <div id="tutorialTopNotice" class="tutorial-top-notice hidden"></div>
+              <div class="chip-row" id="headerChips"></div>
+              <div class="game">
+                <div class="board-wrap card">
+                  <div class="board-stack">
+                    <svg id="trailLayer" class="trail-layer"></svg>
+                    <div id="board" class="board"></div>
                   </div>
                 </div>
-                <div class="panel">
-                  <h3>Players</h3>
-                  <div id="playersText" class="status"></div>
-                </div>
-                <div class="panel">
-                  <h3>Action Log</h3>
-                  <div id="log" class="log"></div>
-                </div>
-                <div style="display:flex; gap:8px;">
-                  <button id="newGameBtn">New Game</button>
+                <div class="game-sidebar card">
+                  <div class="panel">
+                    <h3>Game Status</h3>
+                    <div id="statusText" class="status"></div>
+                    <div id="winnerText" class="winner hidden"></div>
+                  </div>
+                  <div class="panel">
+                    <h3>Tile Selection</h3>
+                    <div id="tileGrid" class="tile-grid"></div>
+                    <div class="selected-tile-preview" id="selectedTilePreview"></div>
+                    <div class="selected-tile-note" id="selectedTileNote">Dots show tile entrances.</div>
+                    <div id="entrySelectWrap" class="hidden" style="margin-top:8px;">
+                      <div style="font-size:12px;color:#ffdba8;margin-bottom:6px;">Step 2: choose the entry on the side touching your base</div>
+                      <div id="entryRow" class="entry-row"></div>
+                    </div>
+                  </div>
+                  <div class="panel">
+                    <h3>Players</h3>
+                    <div id="playersText" class="status"></div>
+                  </div>
+                  <div class="panel">
+                    <h3>Action Log</h3>
+                    <div id="log" class="log"></div>
+                  </div>
+                  <div style="display:flex; gap:8px;">
+                    <button id="newGameBtn">New Game</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1088,8 +1064,8 @@
               <div id="tutorialDefaultVisual" class="tutorial-default-visual">
                 <div class="tutorial-grid">
                   <!-- 9 Active lessons -->
-                  <button class="lesson-tile active" data-lesson-idx="0" data-tile-type="rule" data-tile-text="1" type="button" aria-label="Tutorial Lesson 1: The Basics"><div class="lesson-tile-art"></div></button>
-                  <button class="lesson-tile" data-lesson-idx="1" data-tile-type="rule" data-tile-text="2" type="button" aria-label="Start Lesson 2: Elimination and Winning"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="0" data-tile-type="rule" data-tile-text="1" type="button" aria-label="Tutorial Lesson 1: The Basics"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="1" data-tile-type="rule" data-tile-text="2" type="button" aria-label="Tutorial Lesson 2: Movement and Dead Zones"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="2" data-tile-type="straightaway" data-tile-rot="0" type="button" aria-label="Start Lesson 3: Straightaway Tile"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="3" data-tile-type="uturn" data-tile-rot="1" type="button" aria-label="Start Lesson 4: U-Turn Tile"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="4" data-tile-type="centrifugal" data-tile-rot="2" type="button" aria-label="Start Lesson 5: Centrifugal Tile"><div class="lesson-tile-art"></div></button>
@@ -1162,7 +1138,6 @@
       players: [],
       currentPlayerIdx: 0,
       selectedTile: "straightaway",
-      selectedRot: 0,
       gameOver: false,
       winner: null,
       pendingFirstPlacement: null,
@@ -1177,6 +1152,7 @@
 
     const el = {
       setupView: document.getElementById("setupView"),
+      playGameHost: document.getElementById("playGameHost"),
       gameView: document.getElementById("gameView"),
       board: document.getElementById("board"),
       trailLayer: document.getElementById("trailLayer"),
@@ -1184,7 +1160,6 @@
       winnerText: document.getElementById("winnerText"),
       playersText: document.getElementById("playersText"),
       tileGrid: document.getElementById("tileGrid"),
-      rotRow: document.getElementById("rotRow"),
       selectedTilePreview: document.getElementById("selectedTilePreview"),
       selectedTileNote: document.getElementById("selectedTileNote"),
       entrySelectWrap: document.getElementById("entrySelectWrap"),
@@ -1227,32 +1202,31 @@
       tutorialLessonOneBoards: document.getElementById("tutorialLessonOneBoards"),
       tutorialStartText: document.getElementById("tutorialStartText"),
       tutorialTopNotice: document.getElementById("tutorialTopNotice"),
+      tutorialShell: document.querySelector(".tutorial-shell"),
     };
     const tutorialLessons = [
       {
         title: "Tutorial Lesson 1: The Basics",
         step: "Lesson 1 of 9",
         selectedTile: "straightaway",
-        selectedRot: 0,
         tutorialOptions: {
           jumpSelection: "none",
         },
-        startCopy: "1. Select a tile by clicking on it and place it on a green cell.\n2. Scroll down and select an entrance.\n3. The tile you selected will appear on the green cell you chose and a line will appear on the tile. The line shows the path you took, and the end of the line is where you are. If a win screen appears, restart this lesson. It is now Player 2's turn. Repeat step 1 for Player 2.\n4. If a win screen appears, restart this lesson. To win, you have to eliminate everyone on the board or reach your opponent's base. Proceed by placing another tile on a green cell.\n5. Lesson complete. Proceed to the next lesson.",
+        startCopy: "1. Select a tile by clicking on it and place it on a green cell.\n2. Scroll down and select an entrance.\n3. The tile you selected will appear on the green cell you chose and a line will appear on the tile. The line shows the path you took and the end of the line is where you are. If a win screen appears, restart this lesson. It is now Player 2's turn. Repeat steps 1 and 2 for Player 2.\n4. If a win screen appears, restart this lesson. To win, you have to eliminate everyone on the board or reach your opponent's base. Proceed by placing another tile on a green cell.\n5. Lesson complete. Proceed to the next lesson.",
         playNotice: "1. Select a tile by clicking on it and place it on a green cell.\n2. Scroll down and select an entrance.",
       },
       {
-        title: "Elimination and Winning",
+        title: "Tutorial Lesson 2: Movement and Dead Zones",
         step: "Lesson 2 of 9",
-        selectedTile: "straightaway",
-        selectedRot: 0,
-        startCopy: "Start this lesson to practice the first move on a live 7 x 7 board, then build paths toward the other base.",
-        playNotice: "Tutorial lesson 2: scroll down to the board, make your first placement on a green cell, choose an entrance, and watch how that lane points toward danger or victory.",
+        selectedTile: "centrifugal",
+        presetId: "lesson2-movement-and-dead-zones",
+        startCopy: "Preset board: first reference image.\n\n1. In this case, the two players are going toward the same cell. Each player must immediately move to the end of the path. Place a centrifugal tile. A win screen should pop up.\n2. Player 2 was forced to follow the existing path into a dead zone, marked by an `X`. No matter whose turn it is, everyone touching the placed cell is affected by it. Lesson complete. Proceed to the next lesson.",
+        playNotice: "1. In this case, the two players are going toward the same cell. Each player must immediately move to the end of the path. Place a centrifugal tile. A win screen should pop up.",
       },
       {
         title: "Straightaway Tile",
         step: "Lesson 3 of 9",
         selectedTile: "straightaway",
-        selectedRot: 0,
         startCopy: "Start this lesson to open Play mode with the straightaway tile already selected for practice.",
         playNotice: "Tutorial lesson 3: the straightaway tile is preselected. Scroll down, place it on a green cell, then choose the entrance touching your base.",
       },
@@ -1260,7 +1234,6 @@
         title: "U-Turn Tile",
         step: "Lesson 4 of 9",
         selectedTile: "uturn",
-        selectedRot: 0,
         startCopy: "Start this lesson to practice the U-Turn tile on a live 7 x 7 board.",
         playNotice: "Tutorial lesson 4: the U-Turn tile is preselected. Scroll down, place it next to your base, then choose the entrance that feeds into the curve you want.",
       },
@@ -1268,7 +1241,6 @@
         title: "Centrifugal Tile",
         step: "Lesson 5 of 9",
         selectedTile: "centrifugal",
-        selectedRot: 0,
         startCopy: "Start this lesson to practice the centrifugal tile on a live 7 x 7 board.",
         playNotice: "Tutorial lesson 5: the centrifugal tile is preselected. Scroll down, place it on a green cell, then choose the entrance touching your base.",
       },
@@ -1276,7 +1248,6 @@
         title: "Diagonal Tile",
         step: "Lesson 6 of 9",
         selectedTile: "diagonal",
-        selectedRot: 0,
         startCopy: "Start this lesson to practice the diagonal tile on a live 7 x 7 board.",
         playNotice: "Tutorial lesson 6: the diagonal tile is preselected. Scroll down, place it by your base, then choose an entrance and follow the diagonal lane.",
       },
@@ -1284,7 +1255,6 @@
         title: "Weave Tile",
         step: "Lesson 7 of 9",
         selectedTile: "weave",
-        selectedRot: 0,
         startCopy: "Start this lesson to practice the weave tile on a live 7 x 7 board.",
         playNotice: "Tutorial lesson 7: the weave tile is preselected. Scroll down, place it next to your base, then choose an entrance to see how the weave splits lanes.",
       },
@@ -1292,7 +1262,6 @@
         title: "Jump Tile",
         step: "Lesson 8 of 9",
         selectedTile: "jump",
-        selectedRot: 0,
         startCopy: "Start this lesson to practice the jump tile on a live 7 x 7 board.",
         playNotice: "Tutorial lesson 8: the jump tile is preselected. Scroll down, place it on a green cell, then choose an entrance and trace the jump landing.",
       },
@@ -1300,113 +1269,36 @@
         title: "Diagonal Jump Tile",
         step: "Lesson 9 of 9",
         selectedTile: "diagonalJump",
-        selectedRot: 0,
         startCopy: "Start this lesson to practice the diagonal jump tile on a live 7 x 7 board.",
         playNotice: "Tutorial lesson 9: the diagonal jump tile is preselected. Scroll down, place it by your base, then choose an entrance and watch the diagonal landing.",
       },
     ];
-    let tutorialLessonOneStepIndex = 0;
-    const tutorialLessonOneSteps = [
-      {
-        board: {
-          size: 7,
-          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-          tokens: [{ r: 0, c: 0, color: "p1" }, { r: 6, c: 6, color: "p2" }],
-          valid: [{ r: 0, c: 1 }, { r: 1, c: 0 }],
-        },
-      },
-      {
-        board: {
-          size: 7,
-          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-          tokens: [{ r: 0, c: 0, color: "p1" }, { r: 6, c: 6, color: "p2" }],
-          valid: [{ r: 0, c: 1 }],
-          focus: [{ r: 0, c: 1 }],
-          tiles: [{ r: 0, c: 1, type: "straightaway", rot: 0, showEntrances: true, highlightedEntrances: [6, 7] }],
-        },
-      },
-      {
-        board: {
-          size: 7,
-          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-          tokens: [{ r: 6, c: 6, color: "p2" }, { r: 0, c: 2, color: "p1" }],
-          valid: [{ r: 5, c: 6 }, { r: 6, c: 5 }],
-          focus: [{ r: 0, c: 1 }, { r: 0, c: 2 }],
-          tiles: [{ r: 0, c: 1, type: "straightaway", rot: 0 }],
-          trails: [
-            {
-              color: "p1",
-              points: [
-                { row: 0, col: 1, ax: 0, ay: 0.3 },
-                { row: 0, col: 1, ax: 1, ay: 0.3 },
-                { row: 0, col: 2, ax: 0, ay: 0.3 },
-              ],
-            },
-          ],
-        },
-      },
-      {
-        board: {
-          size: 7,
-          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-          valid: [{ r: 0, c: 2 }],
-          focus: [{ r: 0, c: 2 }],
-          tiles: [
-            { r: 0, c: 1, type: "straightaway", rot: 0 },
-            { r: 6, c: 5, type: "straightaway", rot: 0 },
-          ],
-          tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
-          trails: [
-            {
-              color: "p1",
-              points: [
-                { row: 0, col: 1, ax: 0, ay: 0.3 },
-                { row: 0, col: 1, ax: 1, ay: 0.3 },
-                { row: 0, col: 2, ax: 0, ay: 0.3 },
-              ],
-            },
-            {
-              color: "p2",
-              points: [
-                { row: 6, col: 5, ax: 1, ay: 0.3 },
-                { row: 6, col: 5, ax: 0, ay: 0.3 },
-                { row: 6, col: 4, ax: 1, ay: 0.3 },
-              ],
-            },
-          ],
-        },
-      },
-      {
-        board: {
-          size: 7,
-          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-          tiles: [
-            { r: 0, c: 1, type: "straightaway", rot: 0 },
-            { r: 6, c: 5, type: "straightaway", rot: 0 },
-          ],
-          tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
-          trails: [
-            {
-              color: "p1",
-              points: [
-                { row: 0, col: 1, ax: 0, ay: 0.3 },
-                { row: 0, col: 1, ax: 1, ay: 0.3 },
-                { row: 0, col: 2, ax: 0, ay: 0.3 },
-              ],
-            },
-            {
-              color: "p2",
-              points: [
-                { row: 6, col: 5, ax: 1, ay: 0.3 },
-                { row: 6, col: 5, ax: 0, ay: 0.3 },
-                { row: 6, col: 4, ax: 1, ay: 0.3 },
-              ],
-            },
-          ],
-        },
-      },
-    ];
-    let tutorialLessonIndex = 0;
+    let tutorialLessonIndex = -1;
+
+    function hasSelectedTutorialLesson() {
+      return Number.isInteger(tutorialLessonIndex)
+        && tutorialLessonIndex >= 0
+        && tutorialLessonIndex < tutorialLessons.length;
+    }
+
+    function hasActiveEmbeddedTutorialGame() {
+      return (app.tutorialMode?.lessonIdx === 0 || app.tutorialMode?.lessonIdx === 1)
+        && !el.gameView.classList.contains("hidden");
+    }
+
+    function mountGameView(target) {
+      if (!target || !el.gameView || el.gameView.parentElement === target) return;
+      target.appendChild(el.gameView);
+    }
+
+    function syncGameViewHost() {
+      const useTutorialHost = !el.tutorialTabPanel.classList.contains("hidden")
+        && (tutorialLessonIndex === 0 || tutorialLessonIndex === 1)
+        && hasActiveEmbeddedTutorialGame();
+      mountGameView(useTutorialHost ? el.tutorialLessonOneBoards : el.playGameHost);
+      el.gameView.classList.toggle("tutorial-live-view", useTutorialHost);
+      if (el.tutorialShell) el.tutorialShell.classList.toggle("tutorial-embedded-live", useTutorialHost);
+    }
 
     function setTab(tabName) {
       const isPlay = tabName === "play";
@@ -1414,6 +1306,7 @@
       el.tutorialTabPanel.classList.toggle("hidden", isPlay);
       el.tabPlayBtn.classList.toggle("active", isPlay);
       el.tabTutorialBtn.classList.toggle("active", !isPlay);
+      syncGameViewHost();
     }
 
     function setMenuCollapsed(collapsed) {
@@ -1451,11 +1344,17 @@
       const map = {0:5,1:4,2:7,3:6,4:1,5:0,6:3,7:2};
       return map[i];
     }
-    function rotateIdx(i, rot) { return (i + rot * 2) % 8; }
-    function unrotateIdx(i, rot) { return (i - rot * 2 + 16) % 8; }
-    function rotateDiagDirection(dir, rot) {
+    function rotateIdx(i, rot = 0) {
+      return (i + ((rot % 4 + 4) % 4) * 2) % 8;
+    }
+    function unrotateIdx(i, rot = 0) {
+      return (i - ((rot % 4 + 4) % 4) * 2 + 16) % 8;
+    }
+    function rotateDiagDirection(dir, rot = 0) {
+      if (!dir) return null;
       const arr = ["NE","SE","SW","NW"];
-      return arr[(arr.indexOf(dir) + rot) % 4];
+      const normalized = (rot % 4 + 4) % 4;
+      return arr[(arr.indexOf(dir) + normalized) % 4];
     }
     function getEntrancePoint(i) {
       const pts = {
@@ -1486,8 +1385,10 @@
       el.newGameBtn.addEventListener("click", () => {
         app.tutorialMode = null;
         setTutorialTopNotice("");
+        syncGameViewHost();
         el.gameView.classList.add("hidden");
         el.setupView.classList.remove("hidden");
+        setTab("play");
       });
 
       el.elimOkBtn.addEventListener("click", dismissElimination);
@@ -1508,37 +1409,62 @@
           el.tutorialLessonList.classList.toggle("hidden");
         });
       }
-      if (el.tutorialLessonOneBoards) {
-        el.tutorialLessonOneBoards.addEventListener("click", (ev) => {
-          const actionBtn = ev.target.closest("[data-lesson-one-action]");
-          if (!actionBtn) return;
-          const action = actionBtn.dataset.lessonOneAction;
-          if (action === "reset") resetTutorialLessonOneBoard();
-          else if (action === "prev") stepTutorialLessonOneBoard(-1);
-          else if (action === "next") stepTutorialLessonOneBoard(1);
-        });
-      }
     }
 
     function setTutorialTopNotice(message = "") {
       if (!el.tutorialTopNotice) return;
-      el.tutorialTopNotice.textContent = message;
-      el.tutorialTopNotice.classList.toggle("hidden", !message);
+      if (!message) {
+        el.tutorialTopNotice.innerHTML = "";
+        el.tutorialTopNotice.classList.add("hidden");
+        return;
+      }
+      el.tutorialTopNotice.classList.remove("hidden");
+      el.tutorialTopNotice.innerHTML = "";
+      const copy = document.createElement("div");
+      copy.className = "tutorial-top-notice-copy";
+      copy.textContent = message;
+      el.tutorialTopNotice.appendChild(copy);
+
+      const isLessonOneComplete = app.tutorialMode?.lessonIdx === 0 && app.tutorialMode?.lessonOneComplete;
+      const isLessonTwoComplete = app.tutorialMode?.lessonIdx === 1 && app.gameOver;
+      const showNextLessonButton = isLessonOneComplete || isLessonTwoComplete;
+      if (showNextLessonButton) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "tutorial-top-notice-action";
+        btn.textContent = "Next Lesson";
+        btn.addEventListener("click", () => {
+          if (!tutorialLessons.length) return;
+          const nextIdx = (app.tutorialMode.lessonIdx + 1) % tutorialLessons.length;
+          startTutorialLesson(nextIdx);
+        });
+        el.tutorialTopNotice.appendChild(btn);
+      }
     }
 
     function getLessonOneTutorialMessage() {
       const firstPlayer = app.players[0];
       const secondPlayer = app.players[1];
-      if (app.gameOver) {
-        return "4. If a win screen appears, restart this lesson. To win, you have to eliminate everyone on the board or reach your opponent's base. Proceed by placing another tile on a green cell.";
+      if (app.tutorialMode?.lessonOneComplete) {
+        return "5. Lesson complete. Proceed to the next lesson.";
       }
       if (!firstPlayer?.hasPlacedFirstTile) {
-        return tutorialLessons[0]?.playNotice || "";
+        if (app.pendingFirstPlacement) {
+          return "2. Scroll down and select an entrance.";
+        }
+        return "1. Select a tile by clicking on it and place it on a green cell.";
       }
       if (!secondPlayer?.hasPlacedFirstTile) {
-        return "3. The tile you selected will appear on the green cell you chose and a line will appear on the tile. The line shows the path you took, and the end of the line is where you are. If a win screen appears, restart this lesson. It is now Player 2's turn. Repeat step 1 for Player 2.";
+        return "3. The tile you selected will appear on the green cell you chose and a line will appear on the tile. The line shows the path you took and the end of the line is where you are. If a win screen appears, restart this lesson. It is now Player 2's turn. Repeat steps 1 and 2 for Player 2.";
       }
       return "4. If a win screen appears, restart this lesson. To win, you have to eliminate everyone on the board or reach your opponent's base. Proceed by placing another tile on a green cell.";
+    }
+
+    function getLessonTwoTutorialMessage() {
+      if (app.gameOver) {
+        return "2. Player 2 was forced to follow the existing path into a dead zone, marked by an `X`. No matter whose turn it is, everyone touching the placed cell is affected by it. Lesson complete. Proceed to the next lesson.";
+      }
+      return "1. In this case, the two players are going toward the same cell. Each player must immediately move to the end of the path. Place a centrifugal tile. A win screen should pop up.";
     }
 
     function isTutorialLessonOneFollowUpTurn(player = currentPlayer()) {
@@ -1548,6 +1474,7 @@
     function getTutorialTopNoticeMessage() {
       if (!app.tutorialMode) return "";
       if (app.tutorialMode.lessonIdx === 0) return getLessonOneTutorialMessage();
+      if (app.tutorialMode.lessonIdx === 1) return getLessonTwoTutorialMessage();
       if (isTutorialLessonOneFollowUpTurn()) {
         return "Choose a tile and place it in front of your entrance. The red line shows the path you took.";
       }
@@ -1584,7 +1511,11 @@
 
     function cycleTutorialLesson() {
       if (!tutorialLessons.length) return;
-      tutorialLessonIndex = (tutorialLessonIndex + 1) % tutorialLessons.length;
+      if (!hasSelectedTutorialLesson()) {
+        tutorialLessonIndex = 0;
+      } else {
+        tutorialLessonIndex = (tutorialLessonIndex + 1) % tutorialLessons.length;
+      }
       renderTutorialCard();
     }
 
@@ -1597,12 +1528,18 @@
         renderTutorialVisuals();
         return;
       }
-      const lesson = tutorialLessons[tutorialLessonIndex];
-      el.tutorialStepText.textContent = tutorialLessonIndex === 0
-        ? lesson.title
-        : `${lesson.step} - ${lesson.title}`;
-      if (el.tutorialStartText) {
-        el.tutorialStartText.textContent = lesson.startCopy || "Click a lesson to open a live 7 x 7 practice board in Play mode.";
+      if (el.tutorialShell) el.tutorialShell.classList.toggle("tutorial-intro", !hasSelectedTutorialLesson());
+      if (hasSelectedTutorialLesson()) {
+        const lesson = tutorialLessons[tutorialLessonIndex];
+        el.tutorialStepText.textContent = tutorialLessonIndex === 0
+          ? lesson.title
+          : `${lesson.step} - ${lesson.title}`;
+        if (el.tutorialStartText) {
+          el.tutorialStartText.textContent = lesson.startCopy || "Click a lesson to open a live 7 x 7 practice board in Play mode.";
+        }
+      } else {
+        el.tutorialStepText.textContent = "";
+        if (el.tutorialStartText) el.tutorialStartText.textContent = "";
       }
       renderTutorialVisuals();
 
@@ -1623,12 +1560,14 @@
 
     function renderTutorialVisuals() {
       const tiles = document.querySelectorAll(".lesson-tile");
-      const activeLessonIdx = tutorialLessons.length ? tutorialLessonIndex : -1;
-      const showLessonOneBoards = activeLessonIdx === 0;
-      if (el.tutorialDefaultVisual) el.tutorialDefaultVisual.classList.toggle("hidden", showLessonOneBoards);
+      const activeLessonIdx = tutorialLessons.length
+        ? (hasSelectedTutorialLesson() ? tutorialLessonIndex : 0)
+        : -1;
+      const showEmbeddedLessonLiveView = (activeLessonIdx === 0 || activeLessonIdx === 1) && hasActiveEmbeddedTutorialGame();
+      if (el.tutorialDefaultVisual) el.tutorialDefaultVisual.classList.toggle("hidden", showEmbeddedLessonLiveView);
       if (el.tutorialLessonOneBoards) {
-        el.tutorialLessonOneBoards.classList.toggle("hidden", !showLessonOneBoards);
-        if (showLessonOneBoards) renderTutorialLessonOneBoards();
+        el.tutorialLessonOneBoards.classList.toggle("hidden", !showEmbeddedLessonLiveView);
+        if (showEmbeddedLessonLiveView) renderTutorialLessonOneBoards();
       }
       tiles.forEach((tileEl, idx) => {
         tileEl.classList.toggle("active", idx === activeLessonIdx);
@@ -1655,9 +1594,9 @@
       if (!lesson) return;
 
       tutorialLessonIndex = lessonIdx;
-      if (lessonIdx === 0) tutorialLessonOneStepIndex = 0;
       renderTutorialCard();
-      setTab("play");
+      const shouldUseEmbeddedTutorialView = lessonIdx === 0 || lessonIdx === 1;
+      setTab(shouldUseEmbeddedTutorialView ? "tutorial" : "play");
 
       const tutorialOptions = {
         size: 7,
@@ -1679,49 +1618,88 @@
         tutorialMode: {
           lessonIdx,
           message: lesson.playNotice || "",
+          lessonOneComplete: lessonIdx === 0 ? false : undefined,
         },
       });
+      applyTutorialLessonPreset(lesson.presetId);
+      syncGameViewHost();
       app.selectedTile = lesson.selectedTile || "straightaway";
-      app.selectedRot = lesson.selectedRot || 0;
+      setTutorialTopNotice(getTutorialTopNoticeMessage());
       renderAll();
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    function stepTutorialLessonOneBoard(direction) {
-      const count = tutorialLessonOneSteps.length;
-      if (!count) return;
-      tutorialLessonOneStepIndex = (tutorialLessonOneStepIndex + direction + count) % count;
-      renderTutorialLessonOneBoards();
+    function applyTutorialLessonPreset(presetId) {
+      if (presetId === "lesson2-movement-and-dead-zones") {
+        applyLessonTwoMovementDeadZonePreset();
+      }
     }
 
-    function resetTutorialLessonOneBoard() {
-      tutorialLessonOneStepIndex = 0;
-      renderTutorialLessonOneBoards();
+    function applyLessonTwoMovementDeadZonePreset() {
+      const playerOne = app.players[0];
+      const playerTwo = app.players[1];
+      if (!playerOne || !playerTwo) return;
+
+      const presetTiles = [
+        { r: 0, c: 1, type: "straightaway", rot: 0 },
+        { r: 0, c: 2, type: "diagonal", rot: 1 },
+        { r: 1, c: 2, type: "centrifugal", rot: 0 },
+        { r: 1, c: 3, type: "straightaway", rot: 1 },
+        { r: 1, c: 4, type: "straightaway", rot: 1 },
+        { r: 2, c: 5, type: "weave", rot: 0 },
+        { r: 3, c: 5, type: "straightaway", rot: 0 },
+        { r: 4, c: 5, type: "weave", rot: 0 },
+        { r: 5, c: 5, type: "diagonal", rot: 0 },
+        { r: 5, c: 6, type: "centrifugal", rot: 2 },
+      ];
+      presetTiles.forEach((tile) => {
+        if (!inBounds(app.config.size, tile.r, tile.c)) return;
+        const cell = app.board[tile.r][tile.c];
+        if (!cell || cell.dead || cell.startOwner != null) return;
+        cell.tile = { type: tile.type, rot: tile.rot };
+      });
+
+      playerOne.row = 0;
+      playerOne.col = 1;
+      playerOne.entrance = 7;
+      playerOne.alive = true;
+      playerOne.hasPlacedFirstTile = true;
+      playerOne.trail = [];
+
+      playerTwo.row = null;
+      playerTwo.col = null;
+      playerTwo.entrance = null;
+      playerTwo.alive = true;
+      playerTwo.hasPlacedFirstTile = false;
+      playerTwo.trail = [];
+
+      app.currentPlayerIdx = 0;
+      app.pendingFirstPlacement = null;
+      executeFirstTurnMovement(playerTwo, 5, 6, 5);
+      playerTwo.hasPlacedFirstTile = playerTwo.alive && playerTwo.row != null && playerTwo.col != null;
+      if (playerOne.alive && playerOne.hasPlacedFirstTile && playerOne.row != null && playerOne.col != null) {
+        resolveMovement(playerOne);
+      }
+      if (!app.gameOver) {
+        const current = app.players[app.currentPlayerIdx];
+        const currentCanPlace = !!current?.alive && !!current?.hasPlacedFirstTile && !!validSubsequentCell(current);
+        if (!currentCanPlace) {
+          const placeableIdx = app.players.findIndex((player) =>
+            player.alive && player.hasPlacedFirstTile && !!validSubsequentCell(player)
+          );
+          if (placeableIdx !== -1) app.currentPlayerIdx = placeableIdx;
+        }
+      }
+      app.selectedTile = "centrifugal";
     }
 
     function renderTutorialLessonOneBoards() {
       if (!el.tutorialLessonOneBoards) return;
-      const step = tutorialLessonOneSteps[tutorialLessonOneStepIndex] || tutorialLessonOneSteps[0];
-      const totalSteps = tutorialLessonOneSteps.length;
-      el.tutorialLessonOneBoards.innerHTML = `
-        <section class="tutorial-lesson-one-shell">
-          <div class="tutorial-lesson-one-board-wrap board-wrap card">
-            ${renderTutorialDemoBoard(step.board, {
-              cellSize: BOARD_CELL_SIZE,
-              boardClass: "board--tutorial-live",
-              shellClass: "tutorial-lesson-one-board-shell",
-            })}
-          </div>
-          <div class="tutorial-lesson-one-controls">
-            <span class="tutorial-lesson-one-progress">Board View ${tutorialLessonOneStepIndex + 1}/${totalSteps}</span>
-            <div class="tutorial-demo-buttons">
-              <button class="tutorial-demo-btn tutorial-demo-btn--ghost" type="button" data-lesson-one-action="prev">Back</button>
-              <button class="tutorial-demo-btn" type="button" data-lesson-one-action="next">${tutorialLessonOneStepIndex === totalSteps - 1 ? "Replay" : "Next"}</button>
-              <button class="tutorial-demo-btn tutorial-demo-btn--ghost" type="button" data-lesson-one-action="reset">Reset</button>
-            </div>
-          </div>
-        </section>
-      `;
+      if (!hasActiveEmbeddedTutorialGame()) return;
+      if (!el.tutorialLessonOneBoards.contains(el.gameView)) {
+        el.tutorialLessonOneBoards.innerHTML = "";
+        mountGameView(el.tutorialLessonOneBoards);
+      }
     }
 
     function hasTutorialDemoCell(items = [], r, c) {
@@ -1834,7 +1812,7 @@
       app.selectedTile = tileType;
       const ghost = document.createElement("div");
       ghost.className = "drag-ghost";
-      ghost.innerHTML = tileSvg({ type: tileType, rot: app.selectedRot }, 48);
+      ghost.innerHTML = tileSvg({ type: tileType, rot: 0 }, 48);
       document.body.appendChild(ghost);
       const x = ev.clientX, y = ev.clientY;
       ghost.style.left = x + "px";
@@ -1935,7 +1913,6 @@
       app.players = [];
       app.currentPlayerIdx = 0;
       app.selectedTile = "straightaway";
-      app.selectedRot = 0;
       app.pendingFirstPlacement = null;
       app.logs = [];
       app.gameOver = false;
@@ -2007,12 +1984,13 @@
 
     function currentPlayer() { return app.players[app.currentPlayerIdx]; }
 
-    function getRotatedPairs(tileType, rot) {
-      return BASE_TILE_DEFS[tileType].map(([a, b]) => [rotateIdx(a, rot), rotateIdx(b, rot)]);
+    function getRotatedPairs(tileType, rot = 0) {
+      const normalizedRot = (rot % 4 + 4) % 4;
+      return BASE_TILE_DEFS[tileType].map(([a, b]) => [rotateIdx(a, normalizedRot), rotateIdx(b, normalizedRot)]);
     }
 
     function getExitEntrance(tile, entry) {
-      const pairs = getRotatedPairs(tile.type, tile.rot);
+      const pairs = getRotatedPairs(tile.type, tile.rot || 0);
       for (const [a, b] of pairs) {
         if (a === entry) return b;
         if (b === entry) return a;
@@ -2100,7 +2078,7 @@
         log(`${p.name} first move: now choose one of the entry points touching your base.`);
         renderEntryChoices(entries, (entry) => {
           if (app.gameOver) return;
-          placeTile(r, c, tileType, app.selectedRot);
+          placeTile(r, c, tileType);
           consumeTile(p, tileType);
           executeFirstTurnMovement(p, r, c, entry);
           p.hasPlacedFirstTile = true;
@@ -2108,13 +2086,17 @@
           el.entrySelectWrap.classList.add("hidden");
           postTurnAdvance();
         });
+        renderAll();
         return;
       }
 
       const valid = validSubsequentCell(p);
       if (!valid || valid[0] !== r || valid[1] !== c) return;
 
-      placeTile(r, c, tileType, app.selectedRot);
+      placeTile(r, c, tileType);
+      if (app.tutorialMode?.lessonIdx === 0 && p.id === 0 && p.hasPlacedFirstTile) {
+        app.tutorialMode.lessonOneComplete = true;
+      }
       consumeTile(p, tileType);
       resolveAfterPlacement(r, c);
       postTurnAdvance();
@@ -2124,9 +2106,9 @@
       attemptPlaceAtCell(r, c, app.selectedTile);
     }
 
-    function placeTile(r, c, type, rot) {
-      app.board[r][c].tile = { type, rot };
-      log(`${currentPlayer().name} placed ${TILE_LABELS[type]} (${rot * 90}°) at (${r},${c}).`);
+    function placeTile(r, c, type) {
+      app.board[r][c].tile = { type, rot: 0 };
+      log(`${currentPlayer().name} placed ${TILE_LABELS[type]} at (${r},${c}).`);
     }
 
     function appendTrailPoint(player, point) {
@@ -2187,7 +2169,7 @@
       let curR = tileR, curC = tileC, curEntry = entry;
       const tile = app.board[curR][curC].tile;
       const exit = getExitEntrance(tile, curEntry);
-      const next = jumpOrAdjacent(curR, curC, curEntry, exit, tile.type, tile.rot);
+      const next = jumpOrAdjacent(curR, curC, curEntry, exit, tile.type, tile.rot || 0);
       player.trail = [];
       if (next.eliminated || next.win) appendExitOnlyPath(player, curR, curC, curEntry, exit, tile.type);
       else appendMovementPath(player, curR, curC, curEntry, exit, next.row, next.col, next.entrance, tile.type);
@@ -2237,7 +2219,7 @@
         if (!cell.tile) return;
 
         const exit = getExitEntrance(cell.tile, player.entrance);
-        const next = jumpOrAdjacent(player.row, player.col, player.entrance, exit, cell.tile.type, cell.tile.rot, player);
+        const next = jumpOrAdjacent(player.row, player.col, player.entrance, exit, cell.tile.type, cell.tile.rot || 0, player);
         if (next.eliminated || next.win) appendExitOnlyPath(player, player.row, player.col, player.entrance, exit, cell.tile.type);
         else appendMovementPath(player, player.row, player.col, player.entrance, exit, next.row, next.col, next.entrance, cell.tile.type);
 
@@ -2258,7 +2240,7 @@
       }
     }
 
-    function jumpOrAdjacent(row, col, entry, exit, tileType, rot, playerRef = currentPlayer()) {
+    function jumpOrAdjacent(row, col, entry, exit, tileType, rot = 0, playerRef = currentPlayer()) {
       const player = playerRef;
       const result = { eliminated: false, win: false, row: null, col: null, entrance: null };
       if (typeof exit !== "number") {
@@ -2297,14 +2279,14 @@
       return result;
     }
 
-    function getDiagonalDirection(entry, exit, rot) {
-      const ue = unrotateIdx(entry, rot);
-      const ux = unrotateIdx(exit, rot);
+    function getDiagonalDirection(entry, exit, rot = 0) {
+      const unrotatedEntry = unrotateIdx(entry, rot);
+      const unrotatedExit = unrotateIdx(exit, rot);
       const map = {
         "0-3":"SE","3-0":"NW","1-6":"SW","6-1":"NE",
         "5-2":"NE","2-5":"SW","4-7":"NW","7-4":"SE",
       };
-      return rotateDiagDirection(map[`${ue}-${ux}`], rot);
+      return rotateDiagDirection(map[`${unrotatedEntry}-${unrotatedExit}`], rot);
     }
 
     function isFatal(r, c, player) {
@@ -2462,7 +2444,7 @@
 
     function renderSelectedTilePreview() {
       const p = currentPlayer();
-      const tile = { type: app.selectedTile, rot: app.selectedRot };
+      const tile = { type: app.selectedTile, rot: 0 };
       let highlightedEntrances = [];
       if (!app.gameOver && p?.alive && !p.hasPlacedFirstTile && app.pendingFirstPlacement) {
         highlightedEntrances = getFirstTurnEntryChoices(
@@ -2537,15 +2519,6 @@
         el.tileGrid.appendChild(b);
       });
 
-      el.rotRow.innerHTML = "";
-      [0,1,2,3].forEach(rot => {
-        const b = document.createElement("button");
-        b.className = "rot-btn";
-        if (app.selectedRot === rot) b.style.outline = "2px solid #8ab8ff";
-        b.textContent = `${rot * 90}°`;
-        b.onclick = () => { app.selectedRot = rot; renderAll(); };
-        el.rotRow.appendChild(b);
-      });
     }
 
     function renderBoard() {
@@ -2697,7 +2670,7 @@
     }
 
     function tileSvg(tile, size, options = {}) {
-      const pairs = getRotatedPairs(tile.type, tile.rot);
+      const pairs = getRotatedPairs(tile.type, tile.rot || 0);
       const showEntrances = !!options.showEntrances;
       const showEntranceLabels = !!options.showEntranceLabels;
       const highlightedEntrances = new Set(options.highlightedEntrances || []);
