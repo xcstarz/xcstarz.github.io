@@ -519,6 +519,7 @@
       color: #b8ddeb;
       font-size: 15px;
       line-height: 1.45;
+      white-space: pre-line;
     }
     .tutorial-actions {
       display: grid;
@@ -647,6 +648,7 @@
       color: #dffaf4;
       font-size: 14px;
       line-height: 1.45;
+      white-space: pre-line;
     }
     .chip {
       border: 1px solid #446096;
@@ -1035,7 +1037,7 @@
               <div id="tutorialDefaultVisual" class="tutorial-default-visual">
                 <div class="tutorial-grid">
                   <!-- 9 Active lessons -->
-                  <button class="lesson-tile active" data-lesson-idx="0" data-tile-type="rule" data-tile-text="1" type="button" aria-label="Start Lesson 1: Board, Bases, and Setup"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile active" data-lesson-idx="0" data-tile-type="rule" data-tile-text="1" type="button" aria-label="Start Lesson 1: Tutorial Lesson 1: The Basics"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="1" data-tile-type="rule" data-tile-text="2" type="button" aria-label="Start Lesson 2: Elimination and Winning"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="2" data-tile-type="straightaway" data-tile-rot="0" type="button" aria-label="Start Lesson 3: Straightaway Tile"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="3" data-tile-type="uturn" data-tile-rot="1" type="button" aria-label="Start Lesson 4: U-Turn Tile"><div class="lesson-tile-art"></div></button>
@@ -1177,12 +1179,15 @@
     };
     const tutorialLessons = [
       {
-        title: "Tutorial: Board, Bases, and Setup",
+        title: "Tutorial Lesson 1: The Basics",
         step: "Lesson 1 of 9",
         selectedTile: "straightaway",
         selectedRot: 0,
-        startCopy: "Click this lesson tile, or open the lesson list, to launch a live 7 x 7 practice board in Play mode.",
-        playNotice: "Tutorial lesson 1: scroll down to the board, click a green cell next to your base, then choose an entrance that touches your base.",
+        tutorialOptions: {
+          jumpSelection: "none",
+        },
+        startCopy: "1. Select a tile by clicking on it and place it on a green cell.\n2. Scroll down and select an entrance.\n3. The tile you selected will appear on the green cell you chose and a line will appear on the tile. The line shows the path you took, and the end of the line is where you are. If a win screen appears, restart this lesson. It is now Player 2's turn. Repeat step 1 for Player 2.\n4. If a win screen appears, restart this lesson. To win, you have to eliminate everyone on the board or reach your opponent's base. Proceed by placing another tile on a green cell.\n5. Lesson complete. Proceed to the next lesson.",
+        playNotice: "1. Select a tile by clicking on it and place it on a green cell.\n2. Scroll down and select an entrance.",
       },
       {
         title: "Elimination and Winning",
@@ -1253,25 +1258,27 @@
     const tutorialBoardDemos = [
       {
         id: "setup",
-        title: "Game setup",
+        title: "7 x 7 board setup",
         steps: [
           {
-            copy: "Players begin in their own corner bases before any path tiles are placed.",
+            copy: "Lesson 1 uses the small 7 x 7 board. In 2-player mode, the players start on opposite diagonal corner bases.",
             board: {
               size: 7,
               starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              tokens: [{ r: 0, c: 0, color: "p1" }, { r: 6, c: 6, color: "p2" }],
             },
           },
           {
-            copy: "On your first turn, the tile has to go in a green cell that touches your base.",
+            copy: "Select a tile and place it on a green cell next to your base. On 7 x 7, each player has two first-move options.",
             board: {
               size: 7,
               starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              tokens: [{ r: 0, c: 0, color: "p1" }, { r: 6, c: 6, color: "p2" }],
               valid: [{ r: 0, c: 1 }, { r: 1, c: 0 }],
             },
           },
           {
-            copy: "After placing that first tile, choose one of the highlighted entry dots that connects back to your base.",
+            copy: "After placing the tile, choose one of the entrances on the side touching your base.",
             board: {
               size: 7,
               starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
@@ -1284,103 +1291,87 @@
       },
       {
         id: "movement",
-        title: "Movement",
+        title: "Trail and turn handoff",
         steps: [
           {
-            copy: "Pawns can end up waiting on the same blank cell, each on a different entrance.",
+            copy: "The red line shows the path you took through the tile, and the endpoint shows where you are waiting.",
             board: {
               size: 7,
-              starts: [
-                { r: 0, c: 0, owner: 0 },
-                { r: 0, c: 6, owner: 1 },
-                { r: 6, c: 6, owner: 2 },
-                { r: 6, c: 0, owner: 3 },
-              ],
-              focus: [{ r: 3, c: 3 }],
-              tokens: [
-                { r: 3, c: 3, color: "p1" },
-                { r: 3, c: 3, color: "p2" },
-                { r: 3, c: 3, color: "p3" },
-                { r: 3, c: 3, color: "p4" },
-              ],
-            },
-          },
-          {
-            copy: "When a tile is placed there, every pawn on that cell follows its own lane immediately.",
-            board: {
-              size: 7,
-              starts: [
-                { r: 0, c: 0, owner: 0 },
-                { r: 0, c: 6, owner: 1 },
-                { r: 6, c: 6, owner: 2 },
-                { r: 6, c: 0, owner: 3 },
-              ],
-              focus: [
-                { r: 3, c: 3 },
-                { r: 2, c: 3 },
-                { r: 3, c: 2 },
-                { r: 3, c: 4 },
-                { r: 4, c: 3 },
-              ],
-              tiles: [{ r: 3, c: 3, type: "straightaway", rot: 0, showEntrances: true }],
-              tokens: [
-                { r: 4, c: 3, color: "p1" },
-                { r: 3, c: 2, color: "p2" },
-                { r: 2, c: 3, color: "p3" },
-                { r: 3, c: 4, color: "p4" },
-              ],
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              focus: [{ r: 0, c: 1 }, { r: 0, c: 2 }],
+              tiles: [{ r: 0, c: 1, type: "straightaway", rot: 0 }],
+              tokens: [{ r: 0, c: 2, color: "p1" }],
               trails: [
                 {
                   color: "p1",
                   points: [
-                    { row: 3, col: 3, ax: 0.3, ay: 0 },
-                    { row: 3, col: 3, ax: 0.3, ay: 1 },
-                    { row: 4, col: 3, ax: 0.3, ay: 0 },
+                    { row: 0, col: 1, ax: 0, ay: 0.3 },
+                    { row: 0, col: 1, ax: 1, ay: 0.3 },
+                    { row: 0, col: 2, ax: 0, ay: 0.3 },
+                  ],
+                },
+              ],
+            },
+          },
+          {
+            copy: "If no win screen appears, it is now Player 2's turn. Repeat the same first move from the opposite base.",
+            board: {
+              size: 7,
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              tiles: [
+                { r: 0, c: 1, type: "straightaway", rot: 0 },
+                { r: 6, c: 5, type: "straightaway", rot: 0 },
+              ],
+              tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
+              trails: [
+                {
+                  color: "p1",
+                  points: [
+                    { row: 0, col: 1, ax: 0, ay: 0.3 },
+                    { row: 0, col: 1, ax: 1, ay: 0.3 },
+                    { row: 0, col: 2, ax: 0, ay: 0.3 },
                   ],
                 },
                 {
                   color: "p2",
                   points: [
-                    { row: 3, col: 3, ax: 1, ay: 0.3 },
-                    { row: 3, col: 3, ax: 0, ay: 0.3 },
-                    { row: 3, col: 2, ax: 1, ay: 0.3 },
-                  ],
-                },
-                {
-                  color: "p3",
-                  points: [
-                    { row: 3, col: 3, ax: 0.7, ay: 1 },
-                    { row: 3, col: 3, ax: 0.7, ay: 0 },
-                    { row: 2, col: 3, ax: 0.7, ay: 1 },
-                  ],
-                },
-                {
-                  color: "p4",
-                  points: [
-                    { row: 3, col: 3, ax: 0, ay: 0.7 },
-                    { row: 3, col: 3, ax: 1, ay: 0.7 },
-                    { row: 3, col: 4, ax: 0, ay: 0.7 },
+                    { row: 6, col: 5, ax: 1, ay: 0.3 },
+                    { row: 6, col: 5, ax: 0, ay: 0.3 },
+                    { row: 6, col: 4, ax: 1, ay: 0.3 },
                   ],
                 },
               ],
             },
           },
           {
-            copy: "If the next cells are blank, they all stop there and wait for the following placement.",
+            copy: "After both first moves, keep placing the next tile on the blank cell in front of your entrance.",
             board: {
               size: 7,
-              starts: [
-                { r: 0, c: 0, owner: 0 },
-                { r: 0, c: 6, owner: 1 },
-                { r: 6, c: 6, owner: 2 },
-                { r: 6, c: 0, owner: 3 },
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              valid: [{ r: 0, c: 2 }],
+              focus: [{ r: 0, c: 2 }],
+              tiles: [
+                { r: 0, c: 1, type: "straightaway", rot: 0 },
+                { r: 6, c: 5, type: "straightaway", rot: 0 },
               ],
-              tiles: [{ r: 3, c: 3, type: "straightaway", rot: 0 }],
-              tokens: [
-                { r: 4, c: 3, color: "p1" },
-                { r: 3, c: 2, color: "p2" },
-                { r: 2, c: 3, color: "p3" },
-                { r: 3, c: 4, color: "p4" },
+              tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
+              trails: [
+                {
+                  color: "p1",
+                  points: [
+                    { row: 0, col: 1, ax: 0, ay: 0.3 },
+                    { row: 0, col: 1, ax: 1, ay: 0.3 },
+                    { row: 0, col: 2, ax: 0, ay: 0.3 },
+                  ],
+                },
+                {
+                  color: "p2",
+                  points: [
+                    { row: 6, col: 5, ax: 1, ay: 0.3 },
+                    { row: 6, col: 5, ax: 0, ay: 0.3 },
+                    { row: 6, col: 4, ax: 1, ay: 0.3 },
+                  ],
+                },
               ],
             },
           },
@@ -1388,30 +1379,20 @@
       },
       {
         id: "win",
-        title: "How to win",
+        title: "How Lesson 1 ends",
         steps: [
           {
-            copy: "Reach any opponent base cell to win instantly, even if that happens during movement.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              goals: [{ r: 6, c: 6 }],
-              tokens: [{ r: 6, c: 5, color: "p1" }],
-            },
-          },
-          {
-            copy: "Here, one straight tile points the pawn directly into the blue player's base.",
+            copy: "To win, eliminate everyone on the board or reach your opponent's base.",
             board: {
               size: 7,
               starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
               goals: [{ r: 6, c: 6 }],
               focus: [{ r: 6, c: 5 }, { r: 6, c: 6 }],
-              tiles: [{ r: 6, c: 5, type: "straightaway", rot: 0, showEntrances: true }],
               tokens: [{ r: 6, c: 5, color: "p1" }],
             },
           },
           {
-            copy: "Once the pawn crosses into that enemy base, the game ends right away.",
+            copy: "If a win screen appears during Lesson 1, restart the lesson and try the basics again.",
             board: {
               size: 7,
               starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
@@ -1419,6 +1400,39 @@
               tiles: [{ r: 6, c: 5, type: "straightaway", rot: 0 }],
               tokens: [{ r: 6, c: 6, color: "p1" }],
               badges: [{ r: 6, c: 6, label: "WIN" }],
+            },
+          },
+          {
+            copy: "If no win screen appears, place another tile on the green cell in front of your entrance. Then proceed to the next lesson.",
+            board: {
+              size: 7,
+              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+              valid: [{ r: 0, c: 2 }],
+              focus: [{ r: 0, c: 2 }],
+              tiles: [
+                { r: 0, c: 1, type: "straightaway", rot: 0 },
+                { r: 6, c: 5, type: "straightaway", rot: 0 },
+              ],
+              tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
+              badges: [{ r: 0, c: 2, label: "NEXT" }],
+              trails: [
+                {
+                  color: "p1",
+                  points: [
+                    { row: 0, col: 1, ax: 0, ay: 0.3 },
+                    { row: 0, col: 1, ax: 1, ay: 0.3 },
+                    { row: 0, col: 2, ax: 0, ay: 0.3 },
+                  ],
+                },
+                {
+                  color: "p2",
+                  points: [
+                    { row: 6, col: 5, ax: 1, ay: 0.3 },
+                    { row: 6, col: 5, ax: 0, ay: 0.3 },
+                    { row: 6, col: 4, ax: 1, ay: 0.3 },
+                  ],
+                },
+              ],
             },
           },
         ],
@@ -1544,12 +1558,28 @@
       el.tutorialTopNotice.classList.toggle("hidden", !message);
     }
 
+    function getLessonOneTutorialMessage() {
+      const firstPlayer = app.players[0];
+      const secondPlayer = app.players[1];
+      if (app.gameOver) {
+        return "4. If a win screen appears, restart this lesson. To win, you have to eliminate everyone on the board or reach your opponent's base. Proceed by placing another tile on a green cell.";
+      }
+      if (!firstPlayer?.hasPlacedFirstTile) {
+        return tutorialLessons[0]?.playNotice || "";
+      }
+      if (!secondPlayer?.hasPlacedFirstTile) {
+        return "3. The tile you selected will appear on the green cell you chose and a line will appear on the tile. The line shows the path you took, and the end of the line is where you are. If a win screen appears, restart this lesson. It is now Player 2's turn. Repeat step 1 for Player 2.";
+      }
+      return "4. If a win screen appears, restart this lesson. To win, you have to eliminate everyone on the board or reach your opponent's base. Proceed by placing another tile on a green cell.";
+    }
+
     function isTutorialLessonOneFollowUpTurn(player = currentPlayer()) {
       return app.tutorialMode?.lessonIdx === 0 && !!player?.alive && !!player?.hasPlacedFirstTile;
     }
 
     function getTutorialTopNoticeMessage() {
       if (!app.tutorialMode) return "";
+      if (app.tutorialMode.lessonIdx === 0) return getLessonOneTutorialMessage();
       if (isTutorialLessonOneFollowUpTurn()) {
         return "Choose a tile and place it in front of your entrance. The red line shows the path you took.";
       }
@@ -1600,7 +1630,9 @@
         return;
       }
       const lesson = tutorialLessons[tutorialLessonIndex];
-      el.tutorialStepText.textContent = `${lesson.step} - ${lesson.title}`;
+      el.tutorialStepText.textContent = tutorialLessonIndex === 0
+        ? lesson.title
+        : `${lesson.step} - ${lesson.title}`;
       if (el.tutorialStartText) {
         el.tutorialStartText.textContent = lesson.startCopy || "Click a lesson to open a live 7 x 7 practice board in Play mode.";
       }
@@ -1624,8 +1656,12 @@
     function renderTutorialVisuals() {
       const tiles = document.querySelectorAll(".lesson-tile");
       const activeLessonIdx = tutorialLessons.length ? tutorialLessonIndex : -1;
-      if (el.tutorialDefaultVisual) el.tutorialDefaultVisual.classList.remove("hidden");
-      if (el.tutorialLessonOneBoards) el.tutorialLessonOneBoards.classList.add("hidden");
+      const showLessonOneBoards = activeLessonIdx === 0;
+      if (el.tutorialDefaultVisual) el.tutorialDefaultVisual.classList.toggle("hidden", showLessonOneBoards);
+      if (el.tutorialLessonOneBoards) {
+        el.tutorialLessonOneBoards.classList.toggle("hidden", !showLessonOneBoards);
+        if (showLessonOneBoards) renderTutorialLessonOneBoards();
+      }
       tiles.forEach((tileEl, idx) => {
         tileEl.classList.toggle("active", idx === activeLessonIdx);
         const tileType = tileEl.dataset.tileType || "straightaway";
@@ -1666,6 +1702,7 @@
           el.p4Name.value || "Player 4",
         ],
         deadCorner: Number(el.deadCornerSelect.value),
+        ...(lesson.tutorialOptions || {}),
       };
       applyGameOptionsToControls(tutorialOptions);
       startGame({
@@ -1749,7 +1786,14 @@
     }
 
     function renderTokenStack(tokens = [], cellSize) {
-      return "";
+      if (!tokens.length) return "";
+      const offsets = getTokenOffsets(tokens.length, cellSize);
+      const tokenSize = Math.max(14, Math.round(cellSize * 0.36));
+      const borderWidth = Math.max(2, Math.round(tokenSize * 0.1));
+      return `<div class="token-stack">${tokens.map((token, idx) => {
+        const [dx, dy] = offsets[idx] || [0, 0];
+        return `<div class="token ${token.color}" style="width:${tokenSize}px;height:${tokenSize}px;border-width:${borderWidth}px;transform:translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px));"></div>`;
+      }).join("")}</div>`;
     }
 
     function boardPointForTrailPointAtSize(state, cellSize) {
