@@ -2309,7 +2309,6 @@
 
     function eliminatePlayer(player, msg) {
       player.alive = false;
-      player.trail = [];
       log(msg);
       app.eliminationQueue.push(player);
       if (!app.gameOver) {
@@ -2597,7 +2596,7 @@
       el.trailLayer.innerHTML = "";
 
       app.players.forEach(p => {
-        if (!p.alive || !p.hasPlacedFirstTile || p.trail.length < 2) return;
+        if (!p.hasPlacedFirstTile || p.trail.length < 2) return;
         const points = p.trail.map(boardPointForTrailPoint).map(([x, y]) => `${x},${y}`).join(" ");
         const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
         polyline.setAttribute("points", points);
