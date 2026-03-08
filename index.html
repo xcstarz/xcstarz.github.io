@@ -187,6 +187,8 @@
       width: 100%;
       max-width: 1000px;
       margin: 0 auto;
+      display: flex;
+      flex-direction: column;
       border-radius: 16px;
       overflow: hidden;
       border: 1px solid #2a3b62;
@@ -194,15 +196,16 @@
       box-shadow: 0 20px 44px rgba(0, 0, 0, .35);
     }
     .tutorial-board {
+      order: 1;
       position: relative;
       min-height: 320px;
-      padding: 40px 0;
+      padding: 20px 0 28px;
       overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 40px;
+      gap: 24px;
       background:
         radial-gradient(120% 100% at 30% -5%, rgba(80, 95, 116, .18), transparent 42%),
         linear-gradient(180deg, rgba(255, 255, 255, .03), transparent 42%);
@@ -497,8 +500,48 @@
       background: #101b31;
       border-color: #355173;
     }
+    .tutorial-lesson-one-stage {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      padding: 0 24px;
+    }
+    .tutorial-lesson-one-shell {
+      width: min(100%, 560px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .tutorial-lesson-one-board-wrap {
+      padding: 12px;
+      overflow: auto;
+    }
+    .tutorial-lesson-one-board-shell {
+      display: flex;
+      justify-content: center;
+      overflow-x: auto;
+      padding: 2px 0 4px;
+    }
+    .tutorial-lesson-one-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .tutorial-lesson-one-progress {
+      color: #d8ebf7;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .board.board--tutorial-live .cell {
+      cursor: default;
+    }
     .tutorial-content {
-      padding: 18px 24px 24px;
+      order: 0;
+      padding: 24px 24px 18px;
       background: linear-gradient(180deg, rgba(16, 31, 41, .25), rgba(7, 23, 34, .7));
     }
     .tutorial-title {
@@ -1037,7 +1080,7 @@
               <div id="tutorialDefaultVisual" class="tutorial-default-visual">
                 <div class="tutorial-grid">
                   <!-- 9 Active lessons -->
-                  <button class="lesson-tile active" data-lesson-idx="0" data-tile-type="rule" data-tile-text="1" type="button" aria-label="Start Lesson 1: Tutorial Lesson 1: The Basics"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile active" data-lesson-idx="0" data-tile-type="rule" data-tile-text="1" type="button" aria-label="Tutorial Lesson 1: The Basics"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="1" data-tile-type="rule" data-tile-text="2" type="button" aria-label="Start Lesson 2: Elimination and Winning"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="2" data-tile-type="straightaway" data-tile-rot="0" type="button" aria-label="Start Lesson 3: Straightaway Tile"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="3" data-tile-type="uturn" data-tile-rot="1" type="button" aria-label="Start Lesson 4: U-Turn Tile"><div class="lesson-tile-art"></div></button>
@@ -1048,7 +1091,7 @@
                   <button class="lesson-tile" data-lesson-idx="8" data-tile-type="diagonalJump" data-tile-rot="3" type="button" aria-label="Start Lesson 9: Diagonal Jump Tile"><div class="lesson-tile-art"></div></button>
                 </div>
               </div>
-              <div id="tutorialLessonOneBoards" class="tutorial-demo-grid hidden"></div>
+              <div id="tutorialLessonOneBoards" class="tutorial-lesson-one-stage hidden"></div>
             </div>
             <div class="tutorial-content">
               <h3 class="tutorial-title">Learn To Play</h3>
@@ -1254,188 +1297,105 @@
         playNotice: "Tutorial lesson 9: the diagonal jump tile is preselected. Scroll down, place it by your base, then choose an entrance and watch the diagonal landing.",
       },
     ];
-    const tutorialDemoState = { setup: 0, movement: 0, win: 0 };
-    const tutorialBoardDemos = [
+    let tutorialLessonOneStepIndex = 0;
+    const tutorialLessonOneSteps = [
       {
-        id: "setup",
-        title: "7 x 7 board setup",
-        steps: [
-          {
-            copy: "Lesson 1 uses the small 7 x 7 board. In 2-player mode, the players start on opposite diagonal corner bases.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              tokens: [{ r: 0, c: 0, color: "p1" }, { r: 6, c: 6, color: "p2" }],
-            },
-          },
-          {
-            copy: "Select a tile and place it on a green cell next to your base. On 7 x 7, each player has two first-move options.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              tokens: [{ r: 0, c: 0, color: "p1" }, { r: 6, c: 6, color: "p2" }],
-              valid: [{ r: 0, c: 1 }, { r: 1, c: 0 }],
-            },
-          },
-          {
-            copy: "After placing the tile, choose one of the entrances on the side touching your base.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              valid: [{ r: 0, c: 1 }],
-              focus: [{ r: 0, c: 1 }],
-              tiles: [{ r: 0, c: 1, type: "straightaway", rot: 0, showEntrances: true, highlightedEntrances: [6, 7] }],
-            },
-          },
-        ],
+        board: {
+          size: 7,
+          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+          tokens: [{ r: 0, c: 0, color: "p1" }, { r: 6, c: 6, color: "p2" }],
+          valid: [{ r: 0, c: 1 }, { r: 1, c: 0 }],
+        },
       },
       {
-        id: "movement",
-        title: "Trail and turn handoff",
-        steps: [
-          {
-            copy: "The red line shows the path you took through the tile, and the endpoint shows where you are waiting.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              focus: [{ r: 0, c: 1 }, { r: 0, c: 2 }],
-              tiles: [{ r: 0, c: 1, type: "straightaway", rot: 0 }],
-              tokens: [{ r: 0, c: 2, color: "p1" }],
-              trails: [
-                {
-                  color: "p1",
-                  points: [
-                    { row: 0, col: 1, ax: 0, ay: 0.3 },
-                    { row: 0, col: 1, ax: 1, ay: 0.3 },
-                    { row: 0, col: 2, ax: 0, ay: 0.3 },
-                  ],
-                },
-              ],
-            },
-          },
-          {
-            copy: "If no win screen appears, it is now Player 2's turn. Repeat the same first move from the opposite base.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              tiles: [
-                { r: 0, c: 1, type: "straightaway", rot: 0 },
-                { r: 6, c: 5, type: "straightaway", rot: 0 },
-              ],
-              tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
-              trails: [
-                {
-                  color: "p1",
-                  points: [
-                    { row: 0, col: 1, ax: 0, ay: 0.3 },
-                    { row: 0, col: 1, ax: 1, ay: 0.3 },
-                    { row: 0, col: 2, ax: 0, ay: 0.3 },
-                  ],
-                },
-                {
-                  color: "p2",
-                  points: [
-                    { row: 6, col: 5, ax: 1, ay: 0.3 },
-                    { row: 6, col: 5, ax: 0, ay: 0.3 },
-                    { row: 6, col: 4, ax: 1, ay: 0.3 },
-                  ],
-                },
-              ],
-            },
-          },
-          {
-            copy: "After both first moves, keep placing the next tile on the blank cell in front of your entrance.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              valid: [{ r: 0, c: 2 }],
-              focus: [{ r: 0, c: 2 }],
-              tiles: [
-                { r: 0, c: 1, type: "straightaway", rot: 0 },
-                { r: 6, c: 5, type: "straightaway", rot: 0 },
-              ],
-              tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
-              trails: [
-                {
-                  color: "p1",
-                  points: [
-                    { row: 0, col: 1, ax: 0, ay: 0.3 },
-                    { row: 0, col: 1, ax: 1, ay: 0.3 },
-                    { row: 0, col: 2, ax: 0, ay: 0.3 },
-                  ],
-                },
-                {
-                  color: "p2",
-                  points: [
-                    { row: 6, col: 5, ax: 1, ay: 0.3 },
-                    { row: 6, col: 5, ax: 0, ay: 0.3 },
-                    { row: 6, col: 4, ax: 1, ay: 0.3 },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
+        board: {
+          size: 7,
+          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+          tokens: [{ r: 0, c: 0, color: "p1" }, { r: 6, c: 6, color: "p2" }],
+          valid: [{ r: 0, c: 1 }],
+          focus: [{ r: 0, c: 1 }],
+          tiles: [{ r: 0, c: 1, type: "straightaway", rot: 0, showEntrances: true, highlightedEntrances: [6, 7] }],
+        },
       },
       {
-        id: "win",
-        title: "How Lesson 1 ends",
-        steps: [
-          {
-            copy: "To win, eliminate everyone on the board or reach your opponent's base.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              goals: [{ r: 6, c: 6 }],
-              focus: [{ r: 6, c: 5 }, { r: 6, c: 6 }],
-              tokens: [{ r: 6, c: 5, color: "p1" }],
-            },
-          },
-          {
-            copy: "If a win screen appears during Lesson 1, restart the lesson and try the basics again.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              goals: [{ r: 6, c: 6 }],
-              tiles: [{ r: 6, c: 5, type: "straightaway", rot: 0 }],
-              tokens: [{ r: 6, c: 6, color: "p1" }],
-              badges: [{ r: 6, c: 6, label: "WIN" }],
-            },
-          },
-          {
-            copy: "If no win screen appears, place another tile on the green cell in front of your entrance. Then proceed to the next lesson.",
-            board: {
-              size: 7,
-              starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
-              valid: [{ r: 0, c: 2 }],
-              focus: [{ r: 0, c: 2 }],
-              tiles: [
-                { r: 0, c: 1, type: "straightaway", rot: 0 },
-                { r: 6, c: 5, type: "straightaway", rot: 0 },
-              ],
-              tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
-              badges: [{ r: 0, c: 2, label: "NEXT" }],
-              trails: [
-                {
-                  color: "p1",
-                  points: [
-                    { row: 0, col: 1, ax: 0, ay: 0.3 },
-                    { row: 0, col: 1, ax: 1, ay: 0.3 },
-                    { row: 0, col: 2, ax: 0, ay: 0.3 },
-                  ],
-                },
-                {
-                  color: "p2",
-                  points: [
-                    { row: 6, col: 5, ax: 1, ay: 0.3 },
-                    { row: 6, col: 5, ax: 0, ay: 0.3 },
-                    { row: 6, col: 4, ax: 1, ay: 0.3 },
-                  ],
-                },
+        board: {
+          size: 7,
+          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+          tokens: [{ r: 6, c: 6, color: "p2" }, { r: 0, c: 2, color: "p1" }],
+          valid: [{ r: 5, c: 6 }, { r: 6, c: 5 }],
+          focus: [{ r: 0, c: 1 }, { r: 0, c: 2 }],
+          tiles: [{ r: 0, c: 1, type: "straightaway", rot: 0 }],
+          trails: [
+            {
+              color: "p1",
+              points: [
+                { row: 0, col: 1, ax: 0, ay: 0.3 },
+                { row: 0, col: 1, ax: 1, ay: 0.3 },
+                { row: 0, col: 2, ax: 0, ay: 0.3 },
               ],
             },
-          },
-        ],
+          ],
+        },
+      },
+      {
+        board: {
+          size: 7,
+          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+          valid: [{ r: 0, c: 2 }],
+          focus: [{ r: 0, c: 2 }],
+          tiles: [
+            { r: 0, c: 1, type: "straightaway", rot: 0 },
+            { r: 6, c: 5, type: "straightaway", rot: 0 },
+          ],
+          tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
+          trails: [
+            {
+              color: "p1",
+              points: [
+                { row: 0, col: 1, ax: 0, ay: 0.3 },
+                { row: 0, col: 1, ax: 1, ay: 0.3 },
+                { row: 0, col: 2, ax: 0, ay: 0.3 },
+              ],
+            },
+            {
+              color: "p2",
+              points: [
+                { row: 6, col: 5, ax: 1, ay: 0.3 },
+                { row: 6, col: 5, ax: 0, ay: 0.3 },
+                { row: 6, col: 4, ax: 1, ay: 0.3 },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        board: {
+          size: 7,
+          starts: [{ r: 0, c: 0, owner: 0 }, { r: 6, c: 6, owner: 1 }],
+          tiles: [
+            { r: 0, c: 1, type: "straightaway", rot: 0 },
+            { r: 6, c: 5, type: "straightaway", rot: 0 },
+          ],
+          tokens: [{ r: 0, c: 2, color: "p1" }, { r: 6, c: 4, color: "p2" }],
+          trails: [
+            {
+              color: "p1",
+              points: [
+                { row: 0, col: 1, ax: 0, ay: 0.3 },
+                { row: 0, col: 1, ax: 1, ay: 0.3 },
+                { row: 0, col: 2, ax: 0, ay: 0.3 },
+              ],
+            },
+            {
+              color: "p2",
+              points: [
+                { row: 6, col: 5, ax: 1, ay: 0.3 },
+                { row: 6, col: 5, ax: 0, ay: 0.3 },
+                { row: 6, col: 4, ax: 1, ay: 0.3 },
+              ],
+            },
+          ],
+        },
       },
     ];
     let tutorialLessonIndex = 0;
@@ -1542,12 +1502,12 @@
       }
       if (el.tutorialLessonOneBoards) {
         el.tutorialLessonOneBoards.addEventListener("click", (ev) => {
-          const actionBtn = ev.target.closest("[data-demo-action][data-demo-id]");
+          const actionBtn = ev.target.closest("[data-lesson-one-action]");
           if (!actionBtn) return;
-          const { demoAction, demoId } = actionBtn.dataset;
-          if (!demoId) return;
-          if (demoAction === "reset") resetTutorialDemo(demoId);
-          else advanceTutorialDemo(demoId);
+          const action = actionBtn.dataset.lessonOneAction;
+          if (action === "reset") resetTutorialLessonOneBoard();
+          else if (action === "prev") stepTutorialLessonOneBoard(-1);
+          else if (action === "next") stepTutorialLessonOneBoard(1);
         });
       }
     }
@@ -1687,6 +1647,7 @@
       if (!lesson) return;
 
       tutorialLessonIndex = lessonIdx;
+      if (lessonIdx === 0) tutorialLessonOneStepIndex = 0;
       renderTutorialCard();
       setTab("play");
 
@@ -1718,45 +1679,41 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
 
-    function advanceTutorialDemo(demoId) {
-      const demo = tutorialBoardDemos.find((item) => item.id === demoId);
-      if (!demo) return;
-      tutorialDemoState[demoId] = (tutorialDemoState[demoId] + 1) % demo.steps.length;
+    function stepTutorialLessonOneBoard(direction) {
+      const count = tutorialLessonOneSteps.length;
+      if (!count) return;
+      tutorialLessonOneStepIndex = (tutorialLessonOneStepIndex + direction + count) % count;
       renderTutorialLessonOneBoards();
     }
 
-    function resetTutorialDemo(demoId) {
-      if (!(demoId in tutorialDemoState)) return;
-      tutorialDemoState[demoId] = 0;
+    function resetTutorialLessonOneBoard() {
+      tutorialLessonOneStepIndex = 0;
       renderTutorialLessonOneBoards();
     }
 
     function renderTutorialLessonOneBoards() {
       if (!el.tutorialLessonOneBoards) return;
-      el.tutorialLessonOneBoards.innerHTML = tutorialBoardDemos.map((demo) => {
-        const stepIdx = tutorialDemoState[demo.id] || 0;
-        const step = demo.steps[stepIdx];
-        const nextLabel = stepIdx === demo.steps.length - 1 ? "Replay" : "Next";
-        return `
-          <section class="tutorial-demo-card">
-            <div class="tutorial-demo-head">
-              <h4 class="tutorial-demo-title">${demo.title}</h4>
-              <span class="tutorial-demo-progress">Step ${stepIdx + 1}/${demo.steps.length}</span>
+      const step = tutorialLessonOneSteps[tutorialLessonOneStepIndex] || tutorialLessonOneSteps[0];
+      const totalSteps = tutorialLessonOneSteps.length;
+      el.tutorialLessonOneBoards.innerHTML = `
+        <section class="tutorial-lesson-one-shell">
+          <div class="tutorial-lesson-one-board-wrap board-wrap card">
+            ${renderTutorialDemoBoard(step.board, {
+              cellSize: BOARD_CELL_SIZE,
+              boardClass: "board--tutorial-live",
+              shellClass: "tutorial-lesson-one-board-shell",
+            })}
+          </div>
+          <div class="tutorial-lesson-one-controls">
+            <span class="tutorial-lesson-one-progress">Board View ${tutorialLessonOneStepIndex + 1}/${totalSteps}</span>
+            <div class="tutorial-demo-buttons">
+              <button class="tutorial-demo-btn tutorial-demo-btn--ghost" type="button" data-lesson-one-action="prev">Back</button>
+              <button class="tutorial-demo-btn" type="button" data-lesson-one-action="next">${tutorialLessonOneStepIndex === totalSteps - 1 ? "Replay" : "Next"}</button>
+              <button class="tutorial-demo-btn tutorial-demo-btn--ghost" type="button" data-lesson-one-action="reset">Reset</button>
             </div>
-            <p class="tutorial-demo-copy">${step.copy}</p>
-            <button class="tutorial-demo-board" type="button" data-demo-action="next" data-demo-id="${demo.id}" aria-label="Advance ${demo.title} demo">
-              ${renderTutorialDemoBoard(step.board)}
-            </button>
-            <div class="tutorial-demo-controls">
-              <span class="tutorial-demo-hint">Click the board or use the buttons.</span>
-              <div class="tutorial-demo-buttons">
-                <button class="tutorial-demo-btn" type="button" data-demo-action="next" data-demo-id="${demo.id}">${nextLabel}</button>
-                <button class="tutorial-demo-btn tutorial-demo-btn--ghost" type="button" data-demo-action="reset" data-demo-id="${demo.id}">Reset</button>
-              </div>
-            </div>
-          </section>
-        `;
-      }).join("");
+          </div>
+        </section>
+      `;
     }
 
     function hasTutorialDemoCell(items = [], r, c) {
@@ -1817,9 +1774,11 @@
       return `<svg class="trail-layer" viewBox="0 0 ${span} ${span}" width="${span}" height="${span}">${polylines}</svg>`;
     }
 
-    function renderTutorialDemoBoard(board) {
+    function renderTutorialDemoBoard(board, options = {}) {
       const size = board.size || 5;
-      const cellSize = TUTORIAL_BOARD_CELL_SIZE;
+      const cellSize = options.cellSize || TUTORIAL_BOARD_CELL_SIZE;
+      const boardClass = options.boardClass || "board--tutorial";
+      const shellClass = options.shellClass || "tutorial-demo-board-shell";
       const cells = [];
       const deadZones = getDeadZoneSet(size);
       
@@ -1852,10 +1811,10 @@
       }
 
       return `
-        <div class="tutorial-demo-board-shell">
+        <div class="${shellClass}">
           <div class="board-stack">
             ${renderStaticTrails(board.trails, size, cellSize)}
-            <div class="board board--tutorial" style="grid-template-columns: repeat(${size}, ${cellSize}px)">${cells.join("")}</div>
+            <div class="board ${boardClass}" style="--cell-size:${cellSize}px;grid-template-columns: repeat(${size}, ${cellSize}px)">${cells.join("")}</div>
           </div>
         </div>
       `;
