@@ -1454,7 +1454,12 @@
       const isLessonTwoComplete = app.tutorialMode?.lessonIdx === 1 && app.gameOver;
       const isLessonThreeCompleteNow = app.tutorialMode?.lessonIdx === 2 && isLessonThreeComplete();
       const isLessonFourCompleteNow = app.tutorialMode?.lessonIdx === 3 && isLessonThreeComplete();
-      const showNextLessonButton = isLessonOneComplete || isLessonTwoComplete || isLessonThreeCompleteNow || isLessonFourCompleteNow;
+      const isLessonFiveCompleteNow = app.tutorialMode?.lessonIdx === 4 && app.gameOver;
+      const showNextLessonButton = isLessonOneComplete
+        || isLessonTwoComplete
+        || isLessonThreeCompleteNow
+        || isLessonFourCompleteNow
+        || isLessonFiveCompleteNow;
       if (showNextLessonButton) {
         const btn = document.createElement("button");
         btn.type = "button";
@@ -1532,6 +1537,14 @@
         && row.some((cell) => cell?.tile?.type === tileType));
     }
 
+    function countPlacedTileType(tileType) {
+      if (!tileType || !Array.isArray(app.board)) return 0;
+      return app.board.reduce((total, row) => {
+        if (!Array.isArray(row)) return total;
+        return total + row.filter((cell) => cell?.tile?.type === tileType).length;
+      }, 0);
+    }
+
     function getLessonFourTutorialMessage() {
       const playerOne = app.players[0];
       const reachedOne = hasPlayerVisitedCell(playerOne, 0, 1);
@@ -1557,6 +1570,33 @@
       return "1. The centrifugal tile performs a sharp, ninety degree turn. Place it and choose the `W0` entrance to get to `1`.";
     }
 
+    function getLessonFiveTutorialMessage() {
+      const playerOne = app.players[0];
+      const reachedOne = hasPlayerVisitedCell(playerOne, 0, 1);
+      const placedCentrifugalCount = countPlacedTileType("centrifugal");
+      const placedUTurnCount = countPlacedTileType("uturn");
+      const placedDiagonalCount = countPlacedTileType("diagonal");
+      const completedStepTwoBuild = placedCentrifugalCount >= 1
+        && placedUTurnCount >= 4
+        && placedDiagonalCount >= 4;
+      const hasPlacedWeave = hasPlacedTileType("weave");
+      const placedStraightawayAtTwo = app.board?.[0]?.[4]?.tile?.type === "straightaway";
+
+      if (app.gameOver) {
+        return "5. Lesson complete. Proceed to the next lesson.";
+      }
+      if (hasPlacedWeave && placedStraightawayAtTwo) {
+        return "4. Get to your opponent's base however you want.";
+      }
+      if (completedStepTwoBuild || hasPlacedWeave) {
+        return "3. A weave has an intersection in the center of the tile. Place it to get to `3`. Then place 2 diagonals to get to `2`. Place a straightaway at `2`.";
+      }
+      if (reachedOne) {
+        return "2. Place a centrifugal tile. Then place a U-turn 3 times. Then place a diagonal 3 times. Then place another U-turn.";
+      }
+      return "1. The diagonal acts as a wider ninety degree turn. Place it and choose the `W1` entrance to get to `1`.";
+    }
+
     function isTutorialLessonOneFollowUpTurn(player = currentPlayer()) {
       return app.tutorialMode?.lessonIdx === 0 && !!player?.alive && !!player?.hasPlacedFirstTile;
     }
@@ -1567,6 +1607,7 @@
       if (app.tutorialMode.lessonIdx === 1) return getLessonTwoTutorialMessage();
       if (app.tutorialMode.lessonIdx === 2) return getLessonThreeTutorialMessage();
       if (app.tutorialMode.lessonIdx === 3) return getLessonFourTutorialMessage();
+      if (app.tutorialMode.lessonIdx === 4) return getLessonFiveTutorialMessage();
       if (isTutorialLessonOneFollowUpTurn()) {
         return "Choose a tile and place it in front of your entrance. The red line shows the path you took.";
       }
