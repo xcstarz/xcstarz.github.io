@@ -195,12 +195,6 @@
       background: linear-gradient(180deg, #1a232e 0%, #0f212f 72%, #0f4d60 100%);
       box-shadow: 0 20px 44px rgba(0, 0, 0, .35);
     }
-    .tutorial-shell.tutorial-intro .tutorial-content {
-      display: none;
-    }
-    .tutorial-shell.tutorial-embedded-live .tutorial-content {
-      display: none;
-    }
     .tutorial-board {
       order: 1;
       position: relative;
@@ -514,20 +508,20 @@
       margin-top: 0;
     }
     .tutorial-content {
-      order: 0;
-      padding: 24px 24px 18px;
+      order: 2;
+      padding: 14px 24px 10px;
       background: linear-gradient(180deg, rgba(16, 31, 41, .25), rgba(7, 23, 34, .7));
     }
     .tutorial-title {
-      font-size: 52px;
+      font-size: 24px;
       letter-spacing: .2px;
       margin: 0;
-      line-height: .96;
+      line-height: 1.1;
     }
     .tutorial-step {
       margin: 8px 0 14px;
       color: #ceecf7;
-      font-size: 19px;
+      font-size: 16px;
       font-weight: 650;
       min-height: 24px;
     }
@@ -538,57 +532,17 @@
       line-height: 1.45;
       white-space: pre-line;
     }
-    .tutorial-actions {
-      display: grid;
-      grid-template-columns: 48px 1fr;
-      gap: 10px;
-      margin-top: 10px;
-    }
-    .tutorial-list-btn {
-      border: 0;
-      border-radius: 8px;
-      background: linear-gradient(180deg, #314854, #223745);
-      color: #d8edf6;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 8px 18px rgba(0, 0, 0, .28);
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .list-icon {
-      width: 24px;
-      display: grid;
-      gap: 4px;
-    }
-    .list-icon-row {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-    .list-icon-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 99px;
-      background: rgba(216, 237, 246, .9);
-      flex: 0 0 auto;
-    }
-    .list-icon-line {
-      height: 4px;
-      border-radius: 99px;
-      background: rgba(216, 237, 246, .88);
-      flex: 1;
-    }
     .tutorial-next-btn {
-      border: 0;
+      border: 1px solid #4566a4;
       border-radius: 8px;
-      background: linear-gradient(180deg, #85c74e, #6ead3e);
-      color: #f5ffe8;
-      font-size: 24px;
-      font-weight: 900;
-      text-shadow: 0 2px 0 rgba(0, 0, 0, .25);
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 8px 18px rgba(0, 0, 0, .3);
-      line-height: 1.1;
-      padding: 8px 12px;
+      background: linear-gradient(180deg, #2d4d8f, #223d74);
+      color: #f1f7ff;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 12px;
+      margin-bottom: 10px;
+      display: inline-flex;
+      align-self: flex-start;
     }
     .tutorial-lesson-list {
       margin-top: 14px;
@@ -615,7 +569,8 @@
       font-weight: 700;
     }
     .tutorial-bottom {
-      margin-top: 14px;
+      order: 3;
+      margin: 0 24px 18px;
       padding: 12px;
       border-radius: 12px;
       border: 1px solid rgba(146, 205, 222, .24);
@@ -628,18 +583,20 @@
       line-height: 1.45;
     }
     .tutorial-lesson-overview {
-      margin: 10px 0 0;
-      padding-left: 20px;
-      color: #c7e8f3;
-      font-size: 13px;
-      line-height: 1.45;
-      display: grid;
-      gap: 4px;
+      margin-top: 10px;
     }
-    .tutorial-lesson-overview li {
-      margin: 0;
+    .tutorial-lesson-overview-box {
+      margin-top: 0;
     }
-    .tutorial-lesson-overview li.active {
+    .tutorial-lesson-overview-item {
+      font-size: 14px;
+    }
+    .tutorial-lesson-overview-item:focus-visible {
+      outline: 2px solid rgba(94, 240, 218, .75);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    .tutorial-lesson-overview-item.active {
       color: #f3fffb;
       font-weight: 700;
     }
@@ -964,9 +921,8 @@
         max-width: 520px;
       }
       .tutorial-board { min-height: 280px; }
-      .tutorial-title { font-size: 42px; }
+      .tutorial-title { font-size: 22px; }
       .tutorial-step { font-size: 18px; }
-      .tutorial-next-btn { font-size: 20px; }
     }
   </style>
 </head>
@@ -1129,21 +1085,11 @@
               <h3 class="tutorial-title">Learn To Play</h3>
               <div id="tutorialStepText" class="tutorial-step"></div>
               <p id="tutorialStartText" class="tutorial-start-copy"></p>
-              <div class="tutorial-actions">
-                <button id="tutorialListBtn" class="tutorial-list-btn" type="button" aria-label="Lesson list">
-                  <span class="list-icon" aria-hidden="true">
-                    <span class="list-icon-row"><span class="list-icon-dot"></span><span class="list-icon-line"></span></span>
-                    <span class="list-icon-row"><span class="list-icon-dot"></span><span class="list-icon-line"></span></span>
-                    <span class="list-icon-row"><span class="list-icon-dot"></span><span class="list-icon-line"></span></span>
-                  </span>
-                </button>
-                <button id="tutorialNextBtn" class="tutorial-next-btn" type="button">Next<br>Lesson</button>
-              </div>
-              <div id="tutorialLessonList" class="tutorial-lesson-list hidden"></div>
-              <div class="tutorial-bottom">
-                <p id="tutorialSummaryText" class="tutorial-summary"></p>
-                <ol id="tutorialLessonOverview" class="tutorial-lesson-overview"></ol>
-              </div>
+              <button id="tutorialNextBtn" class="tutorial-next-btn" type="button">Next Lesson</button>
+            </div>
+            <div class="tutorial-bottom">
+              <p id="tutorialSummaryText" class="tutorial-summary"></p>
+              <div id="tutorialLessonOverview" class="tutorial-lesson-list tutorial-lesson-overview tutorial-lesson-overview-box"></div>
             </div>
           </div>
         </div>
@@ -1247,9 +1193,7 @@
       tutorialTabPanel: document.getElementById("tutorialTabPanel"),
       tutorialBubbleBtn: null,
       tutorialNextBtn: document.getElementById("tutorialNextBtn"),
-      tutorialListBtn: document.getElementById("tutorialListBtn"),
       tutorialStepText: document.getElementById("tutorialStepText"),
-      tutorialLessonList: document.getElementById("tutorialLessonList"),
       tutorialDefaultVisual: document.getElementById("tutorialDefaultVisual"),
       tutorialLessonOneBoards: document.getElementById("tutorialLessonOneBoards"),
       tutorialStartText: document.getElementById("tutorialStartText"),
@@ -1462,11 +1406,12 @@
         el.tutorialBubbleBtn.addEventListener("click", cycleTutorialLesson);
       }
       if (el.tutorialNextBtn) {
-        el.tutorialNextBtn.addEventListener("click", cycleTutorialLesson);
-      }
-      if (el.tutorialListBtn) {
-        el.tutorialListBtn.addEventListener("click", () => {
-          el.tutorialLessonList.classList.toggle("hidden");
+        el.tutorialNextBtn.addEventListener("click", () => {
+          if (!tutorialLessons.length) return;
+          const nextIdx = hasSelectedTutorialLesson()
+            ? (tutorialLessonIndex + 1) % tutorialLessons.length
+            : 0;
+          startTutorialLesson(nextIdx);
         });
       }
     }
@@ -1485,24 +1430,24 @@
       copy.textContent = message;
       el.tutorialTopNotice.appendChild(copy);
 
-      const isLessonOneComplete = app.tutorialMode?.lessonIdx === 0 && app.tutorialMode?.lessonOneComplete;
-      const isLessonTwoComplete = app.tutorialMode?.lessonIdx === 1 && app.gameOver;
-      const isLessonThreeCompleteNow = app.tutorialMode?.lessonIdx === 2 && isLessonThreeComplete();
-      const isLessonFourCompleteNow = app.tutorialMode?.lessonIdx === 3 && isLessonThreeComplete();
-      const isLessonFiveCompleteNow = app.tutorialMode?.lessonIdx === 4 && app.gameOver;
-      const showNextLessonButton = isLessonOneComplete
-        || isLessonTwoComplete
-        || isLessonThreeCompleteNow
-        || isLessonFourCompleteNow
-        || isLessonFiveCompleteNow;
-      if (showNextLessonButton) {
+      const lessonIdx = app.tutorialMode?.lessonIdx;
+      const isLessonComplete = lessonIdx === 0
+        ? !!app.tutorialMode?.lessonOneComplete
+        : lessonIdx === 1
+          ? !!app.gameOver
+          : lessonIdx === 2 || lessonIdx === 3
+            ? isLessonThreeComplete()
+            : Number.isInteger(lessonIdx)
+              ? !!app.gameOver
+              : false;
+      if (isLessonComplete) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "tutorial-top-notice-action";
         btn.textContent = "Next Lesson";
         btn.addEventListener("click", () => {
           if (!tutorialLessons.length) return;
-          const nextIdx = (app.tutorialMode.lessonIdx + 1) % tutorialLessons.length;
+          const nextIdx = (lessonIdx + 1) % tutorialLessons.length;
           startTutorialLesson(nextIdx);
         });
         el.tutorialTopNotice.appendChild(btn);
@@ -1688,13 +1633,12 @@
     }
 
     function renderTutorialCard() {
-      if (!el.tutorialStepText || !el.tutorialLessonList) return;
+      if (!el.tutorialStepText) return;
       if (!tutorialLessons.length) {
         el.tutorialStepText.textContent = "";
         if (el.tutorialStartText) el.tutorialStartText.textContent = "";
         if (el.tutorialSummaryText) el.tutorialSummaryText.textContent = "";
         if (el.tutorialLessonOverview) el.tutorialLessonOverview.innerHTML = "";
-        el.tutorialLessonList.innerHTML = "";
         renderTutorialVisuals();
         return;
       }
@@ -1717,25 +1661,21 @@
         if (el.tutorialStartText) el.tutorialStartText.textContent = "";
       }
       renderTutorialVisuals();
-
-      el.tutorialLessonList.innerHTML = tutorialLessons.map((item, idx) =>
-        `<button class="tutorial-lesson-item ${idx === tutorialLessonIndex ? "active" : ""}" data-lesson-idx="${idx}" type="button">${item.step}: ${item.title}</button>`
-      ).join("");
       if (el.tutorialLessonOverview) {
         el.tutorialLessonOverview.innerHTML = tutorialLessons.map((item, idx) =>
-          `<li class="${idx === tutorialLessonIndex ? "active" : ""}">${item.step} - ${item.title}</li>`
+          `<button class="tutorial-lesson-item tutorial-lesson-overview-item ${idx === tutorialLessonIndex ? "active" : ""}" data-lesson-idx="${idx}" type="button">${item.step}: ${item.title}</button>`
         ).join("");
       }
-
-      el.tutorialLessonList.querySelectorAll(".tutorial-lesson-item").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const lessonIdx = Number(btn.dataset.lessonIdx) || 0;
-          tutorialLessonIndex = lessonIdx;
-          renderTutorialCard();
-          el.tutorialLessonList.classList.add("hidden");
-          startTutorialLesson(lessonIdx);
+      if (el.tutorialLessonOverview) {
+        el.tutorialLessonOverview.querySelectorAll(".tutorial-lesson-overview-item").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const lessonIdx = Number(btn.dataset.lessonIdx) || 0;
+            tutorialLessonIndex = lessonIdx;
+            renderTutorialCard();
+            startTutorialLesson(lessonIdx);
+          });
         });
-      });
+      }
     }
 
     function renderTutorialVisuals() {
