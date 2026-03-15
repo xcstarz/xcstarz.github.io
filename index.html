@@ -985,6 +985,15 @@
     .win-box h2 {
       color: #7ef3a2;
     }
+    .tie-overlay {
+      background: rgba(72, 78, 89, .62);
+    }
+    .tie-box {
+      border-color: #8f97a9;
+    }
+    .tie-box h2 {
+      color: #d4d8e0;
+    }
     @media (max-width: 1120px) {
       .game { grid-template-columns: 1fr; }
     }
@@ -1229,6 +1238,7 @@
       drag: { active: false, tileType: null, ghost: null, hoveredCell: null },
       eliminationQueue: [],
       winShown: false,
+      tieShown: false,
       overlayMode: null,
       tutorialMode: null,
       menuCollapsed: false,
@@ -1552,6 +1562,7 @@
         logs: [...app.logs],
         eliminationQueueIds: queueIdsFromState(),
         winShown: app.winShown,
+        tieShown: app.tieShown,
         overlayMode: app.overlayMode,
         tutorialMode: cloneStateValue(app.tutorialMode),
         hoverTilePickerEnabled: !!app.hoverTilePickerEnabled,
@@ -1577,6 +1588,7 @@
         .map((id) => app.players.find((player) => player.id === id))
         .filter(Boolean);
       app.winShown = !!snapshot.winShown;
+      app.tieShown = !!snapshot.tieShown;
       app.overlayMode = snapshot.overlayMode || null;
       app.tutorialMode = cloneStateValue(snapshot.tutorialMode);
       app.hoverTilePickerEnabled = !!snapshot.hoverTilePickerEnabled;
@@ -1589,8 +1601,12 @@
       el.eliminationOverlay.classList.add("hidden");
       el.winOverlay.classList.add("hidden");
       el.eliminationOverlay.classList.remove("win-overlay");
+      el.eliminationOverlay.classList.remove("tie-overlay");
       const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
-      if (elimBox) elimBox.classList.remove("win-box");
+      if (elimBox) {
+        elimBox.classList.remove("win-box");
+        elimBox.classList.remove("tie-box");
+      }
       syncGameViewHost();
       renderAll();
       updateUndoButtons();
@@ -2401,14 +2417,19 @@
       app.winner = null;
       app.eliminationQueue = [];
       app.winShown = false;
+      app.tieShown = false;
       app.overlayMode = null;
       app.tutorialMode = options.tutorialMode || null;
       setTutorialTopNotice(app.tutorialMode?.message || "");
       el.eliminationOverlay.classList.add("hidden");
       el.winOverlay.classList.add("hidden");
       el.eliminationOverlay.classList.remove("win-overlay");
+      el.eliminationOverlay.classList.remove("tie-overlay");
       const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
-      if (elimBox) elimBox.classList.remove("win-box");
+      if (elimBox) {
+        elimBox.classList.remove("win-box");
+        elimBox.classList.remove("tie-box");
+      }
 
       const interior = size === 13 ? DEAD_ZONES_13 : DEAD_ZONES_7;
       for (const k of interior) {
@@ -2595,6 +2616,7 @@
       player.hasPlacedFirstTile = true;
       app.pendingFirstPlacement = null;
       el.entrySelectWrap.classList.add("hidden");
+      finalizeRemainingPlayersOutcome();
       postTurnAdvance();
     }
 
@@ -2851,6 +2873,7 @@
 
       checkPositionDraw();
       if (app.gameOver) return;
+      finalizeRemainingPlayersOutcome();
     }
 
     function resolveMovement(player) {
@@ -2952,12 +2975,20 @@
       player.alive = false;
       log(msg);
       app.eliminationQueue.push(player);
-      if (!app.gameOver) {
-        const alive = app.players.filter(p => p.alive);
-        if (alive.length === 1) {
-          setWinner(alive[0].id);
-          log(`${alive[0].name} wins as last player alive.`);
-        }
+    }
+
+    function finalizeRemainingPlayersOutcome() {
+      if (app.gameOver) return;
+      const alive = app.players.filter(p => p.alive);
+      if (alive.length === 1) {
+        setWinner(alive[0].id);
+        log(`${alive[0].name} wins as last player alive.`);
+        return;
+      }
+      if (alive.length === 0) {
+        if (app.config?.playerCount === 2) log("Both players were eliminated. It's a tie.");
+        else log("All players were eliminated. Result is a draw.");
+        setTie();
       }
     }
 
@@ -2969,19 +3000,24 @@
       const p = app.eliminationQueue.shift();
       app.overlayMode = "elim";
       el.eliminationOverlay.classList.remove("win-overlay");
+      el.eliminationOverlay.classList.remove("tie-overlay");
       const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
-      if (elimBox) elimBox.classList.remove("win-box");
+      if (elimBox) {
+        elimBox.classList.remove("win-box");
+        elimBox.classList.remove("tie-box");
+      }
       el.elimText.textContent = `${p.name} was eliminated!`;
       el.eliminationOverlay.classList.remove("hidden");
     }
 
     function dismissElimination() {
       el.eliminationOverlay.classList.add("hidden");
-      if (app.overlayMode === "win") {
+      if (app.overlayMode === "win" || app.overlayMode === "tie") {
         app.overlayMode = null;
         return;
       }
       showNextElimination();
+      showTieOverlayIfReady();
       showWinnerOverlayIfReady();
     }
 
@@ -2993,6 +3029,7 @@
       app.gameOver = true;
       app.winner = playerId;
       app.winShown = false;
+      app.tieShown = false;
       app.pendingFirstPlacement = null;
       app.eliminationQueue = [];
       el.entrySelectWrap.classList.add("hidden");
@@ -3003,6 +3040,21 @@
         app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
       }
       showWinnerOverlayIfReady();
+    }
+
+    function setTie() {
+      app.gameOver = true;
+      app.winner = null;
+      app.tieShown = false;
+      app.pendingFirstPlacement = null;
+      app.eliminationQueue = [];
+      el.entrySelectWrap.classList.add("hidden");
+      if (app.drag.active) {
+        if (app.drag.ghost) app.drag.ghost.remove();
+        if (app.drag.hoveredCell) app.drag.hoveredCell.classList.remove("drag-hover");
+        app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
+      }
+      showTieOverlayIfReady();
     }
 
     function checkPositionDraw() {
@@ -3042,7 +3094,25 @@
       }
       renderAll();
       showNextElimination();
+      showTieOverlayIfReady();
       showWinnerOverlayIfReady();
+    }
+
+    function showTieOverlayIfReady() {
+      if (!app.gameOver || app.winner != null || app.tieShown) return;
+      if (app.eliminationQueue.length > 0) return;
+      if (!el.eliminationOverlay.classList.contains("hidden")) return;
+      app.overlayMode = "tie";
+      el.elimText.textContent = "It's a Tie!";
+      el.eliminationOverlay.classList.remove("win-overlay");
+      el.eliminationOverlay.classList.add("tie-overlay");
+      const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
+      if (elimBox) {
+        elimBox.classList.remove("win-box");
+        elimBox.classList.add("tie-box");
+      }
+      el.eliminationOverlay.classList.remove("hidden");
+      app.tieShown = true;
     }
 
     function showWinnerOverlayIfReady() {
@@ -3052,9 +3122,13 @@
       app.overlayMode = "win";
       const winner = app.players[app.winner];
       if (winner) el.elimText.textContent = `${winner.name} Wins!`;
+      el.eliminationOverlay.classList.remove("tie-overlay");
       el.eliminationOverlay.classList.add("win-overlay");
       const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
-      if (elimBox) elimBox.classList.add("win-box");
+      if (elimBox) {
+        elimBox.classList.remove("tie-box");
+        elimBox.classList.add("win-box");
+      }
       el.eliminationOverlay.classList.remove("hidden");
       app.winShown = true;
     }
@@ -3315,7 +3389,7 @@
       if (app.gameOver) {
         el.statusText.innerHTML = "Game over.";
         if (app.winner == null) {
-          el.winnerText.textContent = "Result: Draw";
+          el.winnerText.textContent = "Result: Tie";
         } else {
           el.winnerText.textContent = `Winner: ${app.players[app.winner].name}`;
         }
