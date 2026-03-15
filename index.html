@@ -689,6 +689,82 @@
       width: max-content;
       margin: 0 auto;
     }
+    .cell-hover-menu {
+      position: absolute;
+      z-index: 6;
+      min-width: 152px;
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid #43639a;
+      background: rgba(12, 22, 44, 0.97);
+      box-shadow: 0 14px 32px rgba(0, 0, 0, 0.46);
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+      backdrop-filter: blur(4px);
+    }
+    .cell-hover-menu.entry-mode {
+      min-width: 260px;
+      padding: 8px;
+    }
+    .cell-hover-menu.hidden { display: none; }
+    .cell-hover-menu-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .cell-hover-menu-entry-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+    .cell-hover-entry-preview {
+      border: 1px solid #3a5486;
+      border-radius: 10px;
+      background: #0e1a35;
+      padding: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cell-hover-entry-hint {
+      font-size: 11px;
+      color: #c9dcff;
+      line-height: 1.3;
+    }
+    .cell-hover-entry-buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .cell-hover-menu-btn {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 34px;
+      padding: 3px;
+      border-radius: 8px;
+      border: 1px solid #3a5486;
+      background: #111f3e;
+      color: #dbe8ff;
+      cursor: pointer;
+    }
+    .cell-hover-menu-btn:hover { border-color: #66b0ff; background: #15284c; }
+    .cell-hover-menu-btn.selected {
+      outline: 2px solid #7eb4ff;
+      outline-offset: -2px;
+    }
+    .cell-hover-menu-entry-btn {
+      border-radius: 8px;
+      border: 1px solid #4566a4;
+      background: linear-gradient(180deg, #28427e, #1f3568);
+      color: #e6eeff;
+      min-height: 30px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 6px;
+      cursor: pointer;
+    }
+    .cell-hover-menu-entry-btn:hover { filter: brightness(1.08); }
     .board {
       --cell-size: 60px;
       display: grid;
@@ -846,6 +922,10 @@
       color: #9cb6e9;
       line-height: 1.35;
     }
+    .tile-entry-label { pointer-events: none; user-select: none; }
+    .tile-entry-dot-hit { cursor: pointer; }
+    .tile-entry-dot.selectable { cursor: pointer; transition: filter .08s ease; }
+    .tile-entry-dot.selectable:hover { filter: brightness(1.12); }
     .log {
       max-height: 180px;
       overflow: auto;
@@ -993,6 +1073,13 @@
                 <option value="separate" selected>Separate pools (2 each)</option>
               </select>
             </div>
+            <div class="field" style="margin-top: 12px;">
+              <label for="hoverTilePickerEnabled">Hover tile picker</label>
+              <select id="hoverTilePickerEnabled">
+                <option value="off" selected>Off</option>
+                <option value="on">On</option>
+              </select>
+            </div>
             <div class="grid-2" style="margin-top: 12px;">
               <div class="field"><label for="p1Name">Player 1</label><input id="p1Name" type="text" value="Player 1"></div>
               <div class="field"><label for="p2Name">Player 2</label><input id="p2Name" type="text" value="Player 2"></div>
@@ -1026,14 +1113,16 @@
                   <div class="board-stack">
                     <svg id="trailLayer" class="trail-layer"></svg>
                     <div id="board" class="board"></div>
+                    <div id="cellHoverMenu" class="cell-hover-menu hidden" role="dialog" aria-label="Tile options"></div>
                   </div>
                 </div>
                 <div class="game-sidebar card">
-                  <div class="panel">
-                    <h3>Game Status</h3>
-                    <div id="statusText" class="status"></div>
-                    <div id="winnerText" class="winner hidden"></div>
+                  <div style="display:flex; gap:8px; margin-bottom: 10px;">
+                    <button id="undoBtn" type="button" disabled>Undo</button>
+                    <button id="newGameBtn">New Game</button>
                   </div>
+                  <div id="statusText" class="status hidden"></div>
+                  <div id="winnerText" class="winner hidden"></div>
                   <div class="panel">
                     <h3>Tile Selection</h3>
                     <div id="tileGrid" class="tile-grid"></div>
@@ -1051,9 +1140,6 @@
                   <div class="panel">
                     <h3>Action Log</h3>
                     <div id="log" class="log"></div>
-                  </div>
-                  <div style="display:flex; gap:8px;">
-                    <button id="newGameBtn">New Game</button>
                   </div>
                 </div>
               </div>
@@ -1146,6 +1232,9 @@
       overlayMode: null,
       tutorialMode: null,
       menuCollapsed: false,
+      hoverTilePickerEnabled: false,
+      hoverMenuHideTimer: null,
+      undoStack: [],
     };
 
     const el = {
@@ -1153,6 +1242,8 @@
       playGameHost: document.getElementById("playGameHost"),
       gameView: document.getElementById("gameView"),
       board: document.getElementById("board"),
+      boardStack: document.querySelector(".board-stack"),
+      cellHoverMenu: document.getElementById("cellHoverMenu"),
       trailLayer: document.getElementById("trailLayer"),
       statusText: document.getElementById("statusText"),
       winnerText: document.getElementById("winnerText"),
@@ -1170,12 +1261,14 @@
       threePlayerCornerField: document.getElementById("threePlayerCornerField"),
       jumpSelection: document.getElementById("jumpSelection"),
       poolMode: document.getElementById("poolMode"),
+      hoverTilePickerEnabled: document.getElementById("hoverTilePickerEnabled"),
       bothPoolField: document.getElementById("bothPoolField"),
       p1Name: document.getElementById("p1Name"),
       p2Name: document.getElementById("p2Name"),
       p3Name: document.getElementById("p3Name"),
       p4Name: document.getElementById("p4Name"),
       startBtn: document.getElementById("startBtn"),
+      undoBtn: document.getElementById("undoBtn"),
       newGameBtn: document.getElementById("newGameBtn"),
       eliminationOverlay: document.getElementById("eliminationOverlay"),
       elimText: document.getElementById("elimText"),
@@ -1249,8 +1342,8 @@
         title: "Diagonal Tile",
         step: "Lesson 6 of 9",
         selectedTile: "diagonal",
-        startCopy: "Start this lesson to practice the diagonal tile on a live 7 x 7 board.",
-        playNotice: "Tutorial lesson 6: the diagonal tile is preselected. Scroll down, place it by your base, then choose an entrance and follow the diagonal lane.",
+        startCopy: "1. Place a centrifugal tile below your base and choose the `N1` entrance.\n2. Place a diagonal, straightaway, and a centrifugal in their corresponding order.\n3. A jump tile \"jumps\" the cell in front of where the jump tile was placed. Place it to get over the dead zone. You only get two jump tiles in a game.\n4. Place a straightaway, a centrifugal tile, another straightaway, another centrifugal tile, then another straightaway, and finally another centrifugal tile.\n5. The diagonal jump tile \"jumps\" to a diagonally adjacent cell. Place it down. You only get two diagonal jump tiles in each game.\n6. Place a diagonal, weave, centrifugal, a straightaway, and another weave.\n7. Jump tiles can also jump over tiles. Place a diagonal jump tile. Then, place a jump tile.\n8. Place a centrifugal tile, a straightaway, a weave, then a diagonal tile.\n9. Place 2 centrifugal tiles, a straightaway, a centrifugal, and then a weave.\n10. Get to your opponent's base however you want.\n11. Lesson complete! Proceed to the next lesson.",
+        playNotice: "1. Place a centrifugal tile below your base and choose the `N1` entrance.",
       },
       {
         title: "Weave Tile",
@@ -1386,13 +1479,18 @@
         el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
       });
       el.startBtn.addEventListener("click", () => startGame());
+      if (el.undoBtn) {
+        el.undoBtn.addEventListener("click", undoLastMove);
+      }
       el.newGameBtn.addEventListener("click", () => {
         app.tutorialMode = null;
+        app.undoStack = [];
         setTutorialTopNotice("");
         syncGameViewHost();
         el.gameView.classList.add("hidden");
         el.setupView.classList.remove("hidden");
         setTab("play");
+        updateUndoButtons();
       });
 
       el.elimOkBtn.addEventListener("click", dismissElimination);
@@ -1401,6 +1499,10 @@
       document.addEventListener("pointermove", onDragMove);
       document.addEventListener("pointerup", onDragEnd);
       document.addEventListener("pointercancel", onDragEnd);
+      if (el.cellHoverMenu) {
+        el.cellHoverMenu.addEventListener("mouseenter", cancelHoverMenuHide);
+        el.cellHoverMenu.addEventListener("mouseleave", scheduleHoverMenuHide);
+      }
 
       if (el.tutorialBubbleBtn) {
         el.tutorialBubbleBtn.addEventListener("click", cycleTutorialLesson);
@@ -1414,6 +1516,91 @@
           startTutorialLesson(nextIdx);
         });
       }
+    }
+
+    function cloneStateValue(value) {
+      if (typeof structuredClone === "function") return structuredClone(value);
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function canUndoLastMove() {
+      return Array.isArray(app.undoStack) && app.undoStack.length > 0 && !!app.config;
+    }
+
+    function updateUndoButtons() {
+      const disabled = !canUndoLastMove();
+      if (el.undoBtn) el.undoBtn.disabled = disabled;
+    }
+
+    function queueIdsFromState() {
+      return (app.eliminationQueue || [])
+        .map((entry) => (Number.isInteger(entry) ? entry : entry?.id))
+        .filter((id) => Number.isInteger(id));
+    }
+
+    function createUndoSnapshot() {
+      if (!app.config || app.gameOver) return;
+      const snapshot = {
+        config: cloneStateValue(app.config),
+        board: cloneStateValue(app.board),
+        players: cloneStateValue(app.players),
+        currentPlayerIdx: app.currentPlayerIdx,
+        selectedTile: app.selectedTile,
+        gameOver: app.gameOver,
+        winner: app.winner,
+        pendingFirstPlacement: app.pendingFirstPlacement ? { ...app.pendingFirstPlacement } : null,
+        logs: [...app.logs],
+        eliminationQueueIds: queueIdsFromState(),
+        winShown: app.winShown,
+        overlayMode: app.overlayMode,
+        tutorialMode: cloneStateValue(app.tutorialMode),
+        hoverTilePickerEnabled: !!app.hoverTilePickerEnabled,
+        tutorialLessonIndex,
+      };
+      app.undoStack.push(snapshot);
+      if (app.undoStack.length > 60) app.undoStack.shift();
+      updateUndoButtons();
+    }
+
+    function restoreSnapshot(snapshot) {
+      if (!snapshot) return;
+      app.config = cloneStateValue(snapshot.config);
+      app.board = cloneStateValue(snapshot.board);
+      app.players = cloneStateValue(snapshot.players);
+      app.currentPlayerIdx = snapshot.currentPlayerIdx;
+      app.selectedTile = snapshot.selectedTile;
+      app.gameOver = !!snapshot.gameOver;
+      app.winner = Number.isInteger(snapshot.winner) ? snapshot.winner : null;
+      app.pendingFirstPlacement = snapshot.pendingFirstPlacement ? { ...snapshot.pendingFirstPlacement } : null;
+      app.logs = Array.isArray(snapshot.logs) ? [...snapshot.logs] : [];
+      app.eliminationQueue = (snapshot.eliminationQueueIds || [])
+        .map((id) => app.players.find((player) => player.id === id))
+        .filter(Boolean);
+      app.winShown = !!snapshot.winShown;
+      app.overlayMode = snapshot.overlayMode || null;
+      app.tutorialMode = cloneStateValue(snapshot.tutorialMode);
+      app.hoverTilePickerEnabled = !!snapshot.hoverTilePickerEnabled;
+      app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
+      tutorialLessonIndex = Number.isInteger(snapshot.tutorialLessonIndex)
+        ? snapshot.tutorialLessonIndex
+        : tutorialLessonIndex;
+
+      hideHoverTileMenu(true);
+      el.eliminationOverlay.classList.add("hidden");
+      el.winOverlay.classList.add("hidden");
+      el.eliminationOverlay.classList.remove("win-overlay");
+      const elimBox = el.eliminationOverlay.querySelector(".elimination-box");
+      if (elimBox) elimBox.classList.remove("win-box");
+      syncGameViewHost();
+      renderAll();
+      updateUndoButtons();
+    }
+
+    function undoLastMove() {
+      if (!canUndoLastMove()) return;
+      const snapshot = app.undoStack.pop();
+      restoreSnapshot(snapshot);
+      updateUndoButtons();
     }
 
     function setTutorialTopNotice(message = "") {
@@ -1577,6 +1764,114 @@
       return "1. The diagonal acts as a wider ninety degree turn. Place it and choose the `W1` entrance to get to `1`.";
     }
 
+    function isLessonSixFirstMoveValid(action, player) {
+      if (!action || !player) return false;
+      if (!action.isFirstTurn || action.tileType !== "centrifugal" || action.entry !== 1) return false;
+      const [northR, northC] = stepCard(action.r, action.c, "N");
+      return playerOwnsBaseCell(player, northR, northC);
+    }
+
+    function getLessonSixSequenceProgress(placedTypes = [], expected = []) {
+      const max = Math.min(placedTypes.length, expected.length);
+      for (let i = 0; i < max; i++) {
+        if (placedTypes[i] !== expected[i]) {
+          return { count: i, mismatch: true };
+        }
+      }
+      if (placedTypes.length > expected.length) {
+        return { count: expected.length, mismatch: true };
+      }
+      return { count: max, mismatch: false };
+    }
+
+    function getLessonSixTutorialMessage() {
+      const playerOne = app.players[0];
+      const actions = app.tutorialMode?.lessonSixPlacements || [];
+      const firstAction = actions[0] || null;
+
+      if (app.gameOver) {
+        return "11. Lesson complete! Proceed to the next lesson.";
+      }
+
+      if (!firstAction) {
+        return "1. Place a centrifugal tile below your base and choose the `N1` entrance.";
+      }
+
+      if (!isLessonSixFirstMoveValid(firstAction, playerOne)) {
+        return "1. Place a centrifugal tile below your base and choose the `N1` entrance. If you used a different tile or entrance, restart Lesson 6.";
+      }
+
+      const placedAfterFirst = actions.slice(1).map((action) => action.tileType);
+      const lessonSteps = [
+        {
+          expected: ["diagonal", "straightaway", "centrifugal"],
+          text: "2. Place a diagonal, straightaway, and a centrifugal in their corresponding order.",
+          mismatchText: "2. Place a diagonal, straightaway, and a centrifugal in this exact order. If the order is broken, restart Lesson 6.",
+        },
+        {
+          expected: ["jump"],
+          text: "3. A jump tile \"jumps\" the cell in front of where the jump tile was placed. Place it to get over the dead zone. You only get two jump tiles in a game.",
+          mismatchText: "3. Place a jump tile for this step. If another tile was placed first, restart Lesson 6.",
+        },
+        {
+          expected: ["straightaway", "centrifugal", "straightaway", "centrifugal", "straightaway", "centrifugal"],
+          text: "4. Place a straightaway, a centrifugal tile, another straightaway, another centrifugal tile, then another straightaway, and finally another centrifugal tile.",
+          mismatchText: "4. Follow the exact straightaway/centrifugal order for this step. If it was broken, restart Lesson 6.",
+        },
+        {
+          expected: ["diagonalJump"],
+          text: "5. The diagonal jump tile \"jumps\" to a diagonally adjacent cell. Place it down. You only get two diagonal jump tiles in each game.",
+          mismatchText: "5. Place a diagonal jump tile for this step. If another tile was placed first, restart Lesson 6.",
+        },
+        {
+          expected: ["diagonal", "weave", "centrifugal", "straightaway", "weave"],
+          text: "6. Place a diagonal, weave, centrifugal, a straightaway, and another weave.",
+          mismatchText: "6. Follow the exact diagonal/weave/centrifugal/straightaway/weave order. If it was broken, restart Lesson 6.",
+        },
+        {
+          expected: ["diagonalJump", "jump"],
+          text: "7. Jump tiles can also jump over tiles. Place a diagonal jump tile. Then, place a jump tile.",
+          mismatchText: "7. Place diagonal jump, then jump. If the order was broken, restart Lesson 6.",
+        },
+        {
+          expected: ["centrifugal", "straightaway", "weave", "diagonal"],
+          text: "8. Place a centrifugal tile, a straightaway, a weave, then a diagonal tile.",
+          mismatchText: "8. Follow the exact centrifugal/straightaway/weave/diagonal order. If it was broken, restart Lesson 6.",
+        },
+        {
+          expected: ["centrifugal", "centrifugal", "straightaway", "centrifugal", "weave"],
+          text: "9. Place 2 centrifugal tiles, a straightaway, a centrifugal, and then a weave.",
+          mismatchText: "9. Place centrifugal, centrifugal, straightaway, centrifugal, weave in that order. If it was broken, restart Lesson 6.",
+        },
+      ];
+
+      let offset = 0;
+      for (const step of lessonSteps) {
+        const segment = placedAfterFirst.slice(offset, offset + step.expected.length);
+        const progress = getLessonSixSequenceProgress(segment, step.expected);
+        if (progress.mismatch) return step.mismatchText;
+        if (progress.count < step.expected.length) return step.text;
+        offset += step.expected.length;
+      }
+
+      return "10. Get to your opponent's base however you want.";
+    }
+
+    function recordLessonSixPlacement(player, r, c, tileType, options = {}) {
+      if (app.tutorialMode?.lessonIdx !== 5) return;
+      if (!player || player.id !== 0 || !tileType) return;
+      if (!Array.isArray(app.tutorialMode.lessonSixPlacements)) {
+        app.tutorialMode.lessonSixPlacements = [];
+      }
+      app.tutorialMode.lessonSixPlacements.push({
+        r,
+        c,
+        tileType,
+        entry: Number.isInteger(options.entry) ? options.entry : null,
+        isFirstTurn: !!options.isFirstTurn,
+      });
+    }
+
     function isTutorialLessonOneFollowUpTurn(player = currentPlayer()) {
       return app.tutorialMode?.lessonIdx === 0 && !!player?.alive && !!player?.hasPlacedFirstTile;
     }
@@ -1588,6 +1883,7 @@
       if (app.tutorialMode.lessonIdx === 2) return getLessonThreeTutorialMessage();
       if (app.tutorialMode.lessonIdx === 3) return getLessonFourTutorialMessage();
       if (app.tutorialMode.lessonIdx === 4) return getLessonFiveTutorialMessage();
+      if (app.tutorialMode.lessonIdx === 5) return getLessonSixTutorialMessage();
       if (isTutorialLessonOneFollowUpTurn()) {
         return "Choose a tile and place it in front of your entrance. The red line shows the path you took.";
       }
@@ -1601,6 +1897,7 @@
         playerCount: Number(el.playerCount.value),
         jumpSelection: el.jumpSelection.value,
         poolMode: el.poolMode.value,
+        hoverTilePickerEnabled: el.hoverTilePickerEnabled?.value === "on",
         names: [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value],
         deadCorner: Number(el.deadCornerSelect.value),
       };
@@ -1611,6 +1908,9 @@
       el.playerCount.value = String(options.playerCount);
       el.jumpSelection.value = options.jumpSelection;
       el.poolMode.value = options.poolMode;
+      if (el.hoverTilePickerEnabled) {
+        el.hoverTilePickerEnabled.value = options.hoverTilePickerEnabled ? "on" : "off";
+      }
       if (Array.isArray(options.names)) {
         const nameEls = [el.p1Name, el.p2Name, el.p3Name, el.p4Name];
         nameEls.forEach((input, idx) => {
@@ -1723,6 +2023,7 @@
         playerCount: 2,
         jumpSelection: "both",
         poolMode: "separate",
+        hoverTilePickerEnabled: el.hoverTilePickerEnabled?.value === "on",
         names: [
           el.p1Name.value || "Player 1",
           el.p2Name.value || "Player 2",
@@ -1739,6 +2040,7 @@
           lessonIdx,
           message: lesson.playNotice || "",
           lessonOneComplete: lessonIdx === 0 ? false : undefined,
+          lessonSixPlacements: lessonIdx === 5 ? [] : undefined,
         },
       });
       applyTutorialLessonPreset(lesson.presetId);
@@ -1759,7 +2061,7 @@
 
     function shouldSkipPlayerTwoTutorialTurns() {
       const lessonIdx = app.tutorialMode?.lessonIdx;
-      return lessonIdx === 2 || lessonIdx === 3 || lessonIdx === 4;
+      return lessonIdx === 2 || lessonIdx === 3 || lessonIdx === 4 || lessonIdx === 5;
     }
 
     function getLessonThreePresetMarkers() {
@@ -2091,6 +2393,9 @@
       app.currentPlayerIdx = 0;
       app.selectedTile = "straightaway";
       app.pendingFirstPlacement = null;
+      app.hoverTilePickerEnabled = !!options.hoverTilePickerEnabled;
+      hideHoverTileMenu(true);
+      app.undoStack = [];
       app.logs = [];
       app.gameOver = false;
       app.winner = null;
@@ -2255,13 +2560,7 @@
         log(`${p.name} first move: now choose one of the entry points touching your base.`);
         renderEntryChoices(entries, (entry) => {
           if (app.gameOver) return;
-          placeTile(r, c, tileType);
-          consumeTile(p, tileType);
-          executeFirstTurnMovement(p, r, c, entry);
-          p.hasPlacedFirstTile = true;
-          app.pendingFirstPlacement = null;
-          el.entrySelectWrap.classList.add("hidden");
-          postTurnAdvance();
+          completeFirstTurnPlacement(p, r, c, tileType, entry);
         });
         renderAll();
         return;
@@ -2270,17 +2569,189 @@
       const valid = validSubsequentCell(p);
       if (!valid || valid[0] !== r || valid[1] !== c) return;
 
+      createUndoSnapshot();
       placeTile(r, c, tileType);
       if (app.tutorialMode?.lessonIdx === 0 && p.id === 0 && p.hasPlacedFirstTile) {
         app.tutorialMode.lessonOneComplete = true;
       }
+      recordLessonSixPlacement(p, r, c, tileType);
       consumeTile(p, tileType);
       resolveAfterPlacement(r, c);
       postTurnAdvance();
     }
 
     function onCellClick(r, c) {
+      hideHoverTileMenu(true);
       attemptPlaceAtCell(r, c, app.selectedTile);
+    }
+
+    function completeFirstTurnPlacement(player, r, c, tileType, entry) {
+      if (!player || app.gameOver) return;
+      createUndoSnapshot();
+      placeTile(r, c, tileType);
+      recordLessonSixPlacement(player, r, c, tileType, { entry, isFirstTurn: true });
+      consumeTile(player, tileType);
+      executeFirstTurnMovement(player, r, c, entry);
+      player.hasPlacedFirstTile = true;
+      app.pendingFirstPlacement = null;
+      el.entrySelectWrap.classList.add("hidden");
+      postTurnAdvance();
+    }
+
+    function getSelectableTileTypesForCurrentPlayer() {
+      const p = currentPlayer();
+      if (!p || !p.alive || app.gameOver) return [];
+      return Object.keys(TILE_LABELS)
+        .filter((type) => tileIsEnabledForSelection(type) && canUseTile(p, type));
+    }
+
+    function cancelHoverMenuHide() {
+      if (!app.hoverMenuHideTimer) return;
+      clearTimeout(app.hoverMenuHideTimer);
+      app.hoverMenuHideTimer = null;
+    }
+
+    function scheduleHoverMenuHide() {
+      if (el.cellHoverMenu?.classList.contains("entry-mode")) return;
+      cancelHoverMenuHide();
+      app.hoverMenuHideTimer = setTimeout(() => {
+        hideHoverTileMenu(true);
+      }, 260);
+    }
+
+    function hideHoverTileMenu(immediate = false) {
+      cancelHoverMenuHide();
+      if (!el.cellHoverMenu) return;
+      if (!immediate) {
+        scheduleHoverMenuHide();
+        return;
+      }
+      el.cellHoverMenu.classList.add("hidden");
+      el.cellHoverMenu.classList.remove("entry-mode");
+      el.cellHoverMenu.innerHTML = "";
+      delete el.cellHoverMenu.dataset.r;
+      delete el.cellHoverMenu.dataset.c;
+    }
+
+    function positionHoverMenuOverCell(btn) {
+      if (!el.cellHoverMenu || !el.boardStack || !btn) return;
+      const menu = el.cellHoverMenu;
+      const cellRect = btn.getBoundingClientRect();
+      const stackRect = el.boardStack.getBoundingClientRect();
+      const menuWidth = menu.offsetWidth || 152;
+      const menuHeight = menu.offsetHeight || 84;
+      const stackWidth = stackRect.width;
+      const stackHeight = stackRect.height;
+      const desiredLeft = cellRect.left - stackRect.left + cellRect.width / 2;
+      const desiredTop = cellRect.top - stackRect.top + cellRect.height / 2;
+      const pad = 4;
+      const minLeft = menuWidth / 2 + pad;
+      const maxLeft = stackWidth - menuWidth / 2 - pad;
+      const minTop = menuHeight / 2 + pad;
+      const maxTop = stackHeight - menuHeight / 2 - pad;
+      const left = Math.max(minLeft, Math.min(maxLeft, desiredLeft));
+      const top = Math.max(minTop, Math.min(maxTop, desiredTop));
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
+    }
+
+    function showHoverEntryMenu(btn, r, c, tileType) {
+      if (!el.cellHoverMenu || !btn) return;
+      const p = currentPlayer();
+      if (!p || !p.alive || p.hasPlacedFirstTile || app.gameOver) return;
+      const entries = getFirstTurnEntryChoices(p, r, c);
+      if (!entries.length) return;
+      const menu = el.cellHoverMenu;
+      menu.classList.add("entry-mode");
+      menu.innerHTML = `
+        <div class="cell-hover-menu-entry-grid">
+          <div class="cell-hover-entry-preview"></div>
+          <div class="cell-hover-entry-hint">Choose an entrance touching your base.</div>
+          <div class="cell-hover-entry-buttons"></div>
+        </div>
+      `;
+      const preview = menu.querySelector(".cell-hover-entry-preview");
+      if (preview) {
+        preview.innerHTML = tileSvg({ type: tileType, rot: 0 }, 120, {
+          showEntrances: true,
+          showEntranceLabels: true,
+          highlightedEntrances: entries,
+          interactiveEntrances: entries,
+        });
+        bindEntranceDotSelection(preview, entries, (entry) => {
+          hideHoverTileMenu(true);
+          completeFirstTurnPlacement(p, r, c, tileType, entry);
+        });
+      }
+      const buttonRow = menu.querySelector(".cell-hover-entry-buttons");
+      entries.forEach((entry) => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "cell-hover-menu-entry-btn";
+        option.textContent = `${entranceName(entry)} (${entranceHint(entry)})`;
+        option.setAttribute("aria-label", `Choose ${entranceName(entry)} for tile at (${r},${c})`);
+        option.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          hideHoverTileMenu(true);
+          completeFirstTurnPlacement(p, r, c, tileType, entry);
+        });
+        buttonRow.appendChild(option);
+      });
+      menu.classList.remove("hidden");
+      positionHoverMenuOverCell(btn);
+    }
+
+    function showHoverTileMenu(btn, r, c) {
+      if (!el.cellHoverMenu || !el.boardStack) return;
+      if (!app.hoverTilePickerEnabled || app.gameOver || app.drag.active) {
+        hideHoverTileMenu(true);
+        return;
+      }
+      if (!btn.classList.contains("valid")) {
+        hideHoverTileMenu(true);
+        return;
+      }
+      const types = getSelectableTileTypesForCurrentPlayer();
+      if (!types.length) {
+        hideHoverTileMenu(true);
+        return;
+      }
+      cancelHoverMenuHide();
+      const menu = el.cellHoverMenu;
+      if (menu.classList.contains("entry-mode")) return;
+      const isOpen = !menu.classList.contains("hidden");
+      const sameCell = menu.dataset.r === String(r) && menu.dataset.c === String(c);
+      if (isOpen && !sameCell) return;
+      menu.classList.remove("entry-mode");
+      menu.innerHTML = `<div class="cell-hover-menu-grid"></div>`;
+      menu.dataset.r = String(r);
+      menu.dataset.c = String(c);
+      const grid = menu.querySelector(".cell-hover-menu-grid");
+      types.forEach((type) => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "cell-hover-menu-btn" + (app.selectedTile === type ? " selected" : "");
+        option.setAttribute("aria-label", `Place ${TILE_LABELS[type]} at (${r},${c})`);
+        option.innerHTML = `${tileSvg({ type, rot: 0 }, 28)}`;
+        option.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          app.selectedTile = type;
+          const p = currentPlayer();
+          if (p && !p.hasPlacedFirstTile) {
+            app.pendingFirstPlacement = { r, c };
+            el.entrySelectWrap.classList.add("hidden");
+            renderSelectedTilePreview();
+            showHoverEntryMenu(btn, r, c, type);
+            return;
+          }
+          hideHoverTileMenu(true);
+          attemptPlaceAtCell(r, c, type);
+        });
+        grid.appendChild(option);
+      });
+
+      menu.classList.remove("hidden");
+      positionHoverMenuOverCell(btn);
     }
 
     function placeTile(r, c, type) {
@@ -2617,6 +3088,30 @@
       });
     }
 
+    function bindEntranceDotSelection(container, entries, onPick) {
+      if (!container || !Array.isArray(entries) || !entries.length || typeof onPick !== "function") return;
+      const allowed = new Set(entries);
+      const activate = (entry) => {
+        if (app.gameOver || !allowed.has(entry)) return;
+        onPick(entry);
+      };
+      const dots = container.querySelectorAll(".tile-entry-dot[data-entrance], .tile-entry-dot-hit[data-entrance]");
+      dots.forEach((dot) => {
+        const entry = Number(dot.dataset.entrance);
+        if (!Number.isInteger(entry) || !allowed.has(entry)) return;
+        dot.addEventListener("pointerdown", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          activate(entry);
+        });
+        dot.addEventListener("keydown", (ev) => {
+          if (ev.key !== "Enter" && ev.key !== " ") return;
+          ev.preventDefault();
+          activate(entry);
+        });
+      });
+    }
+
     function renderAll() {
       renderHeader();
       renderTiles();
@@ -2626,6 +3121,7 @@
       renderPlayers();
       setTutorialTopNotice(getTutorialTopNoticeMessage());
       el.log.textContent = app.logs.join("\n");
+      updateUndoButtons();
     }
 
     function renderSelectedTilePreview() {
@@ -2643,9 +3139,18 @@
         showEntrances: true,
         showEntranceLabels: true,
         highlightedEntrances,
+        interactiveEntrances: highlightedEntrances,
       });
+      if (highlightedEntrances.length && app.pendingFirstPlacement && p && !p.hasPlacedFirstTile) {
+        const pending = app.pendingFirstPlacement;
+        const tileType = app.selectedTile;
+        bindEntranceDotSelection(el.selectedTilePreview, highlightedEntrances, (entry) => {
+          hideHoverTileMenu(true);
+          completeFirstTurnPlacement(p, pending.r, pending.c, tileType, entry);
+        });
+      }
       el.selectedTileNote.textContent = highlightedEntrances.length
-        ? "Green dots are valid entries touching your base."
+        ? "Green dots are valid entries touching your base. Click one to choose it."
         : "Dots show all tile entrances.";
     }
 
@@ -2711,6 +3216,7 @@
       const size = app.config.size;
       el.board.style.gridTemplateColumns = `repeat(${size}, ${BOARD_CELL_SIZE}px)`;
       el.board.innerHTML = "";
+      hideHoverTileMenu(true);
 
       const validSet = new Set();
       const markerMap = new Map(
@@ -2735,7 +3241,11 @@
             btn.classList.add("start", `start-p${cell.startOwner + 1}`);
           }
           btn.dataset.rc = `${r},${c}`;
-          if (validSet.has(key(r, c))) btn.classList.add("valid");
+          if (validSet.has(key(r, c))) {
+            btn.classList.add("valid");
+            btn.addEventListener("mouseenter", () => showHoverTileMenu(btn, r, c));
+            btn.addEventListener("mouseleave", scheduleHoverMenuHide);
+          }
           btn.disabled = app.gameOver;
           btn.onclick = () => onCellClick(r, c);
 
@@ -2800,6 +3310,7 @@
     }
 
     function renderStatus() {
+      if (!el.statusText || !el.winnerText || el.statusText.classList.contains("hidden")) return;
       const p = currentPlayer();
       if (app.gameOver) {
         el.statusText.innerHTML = "Game over.";
@@ -2871,6 +3382,7 @@
       const showEntrances = !!options.showEntrances;
       const showEntranceLabels = !!options.showEntranceLabels;
       const highlightedEntrances = new Set(options.highlightedEntrances || []);
+      const interactiveEntrances = new Set(options.interactiveEntrances || []);
       const lines = pairs.map(([a, b]) => {
         if (tile.type === "uturn") {
           return `<path d="${uTurnPath(a, b, size)}" fill="none" stroke="#d9e8ff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -2883,14 +3395,24 @@
         ? Array.from({ length: 8 }, (_, i) => {
           const [x, y] = getEntrancePoint(i);
           const fill = highlightedEntrances.has(i) ? "#58e2a9" : "#8fb0df";
-          return `<circle cx="${x * size}" cy="${y * size}" r="${size * 0.045}" fill="${fill}" stroke="#0d1730" stroke-width="${Math.max(1.6, size * 0.015)}"/>`;
+          const interactive = interactiveEntrances.has(i);
+          const cls = `tile-entry-dot${interactive ? " selectable" : ""}`;
+          const attrs = interactive
+            ? ` data-entrance="${i}" role="button" tabindex="0" pointer-events="all" aria-label="Choose entrance ${entranceName(i)} (${entranceHint(i)})"`
+            : "";
+          const visualRadius = size * (interactive ? 0.08 : 0.045);
+          const hitRadius = size * (interactive ? 0.18 : 0.082);
+          const hitDot = interactive
+            ? `<circle class="tile-entry-dot-hit" cx="${x * size}" cy="${y * size}" r="${hitRadius}" fill="transparent"${attrs}/>`
+            : "";
+          return `${hitDot}<circle class="${cls}" cx="${x * size}" cy="${y * size}" r="${visualRadius}" fill="${fill}" stroke="#0d1730" stroke-width="${Math.max(1.6, size * 0.015)}"${attrs}/>`;
         }).join("")
         : "";
       const entranceLabels = showEntranceLabels
         ? Array.from({ length: 8 }, (_, i) => {
           const label = entranceName(i);
           const pos = entranceLabelSpec(i, size);
-          return `<text x="${pos.x}" y="${pos.y}" text-anchor="${pos.anchor}" font-size="${Math.max(9, size * 0.09)}" font-weight="700" fill="#dce8ff" stroke="#0d1730" stroke-width="${Math.max(0.8, size * 0.01)}" paint-order="stroke">${label}</text>`;
+          return `<text class="tile-entry-label" x="${pos.x}" y="${pos.y}" text-anchor="${pos.anchor}" font-size="${Math.max(9, size * 0.09)}" font-weight="700" fill="#dce8ff" stroke="#0d1730" stroke-width="${Math.max(0.8, size * 0.01)}" paint-order="stroke">${label}</text>`;
         }).join("")
         : "";
       const jumpCircle = (tile.type === "jump" || tile.type === "diagonalJump")
