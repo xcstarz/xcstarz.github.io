@@ -3249,9 +3249,8 @@
         for (let j = i + 1; j < alive.length; j++) {
           const a = alive[i], b = alive[j];
           if (a.row === b.row && a.col === b.col && a.entrance === b.entrance) {
-            app.gameOver = true;
-            app.winner = null;
             log(`Draw: ${a.name} and ${b.name} landed on same position.`);
+            setTie();
             return;
           }
         }
