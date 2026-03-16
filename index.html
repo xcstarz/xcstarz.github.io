@@ -2604,12 +2604,23 @@
       if (player.lastTile && Number.isInteger(player.lastTile.r) && Number.isInteger(player.lastTile.c)) {
         r = player.lastTile.r;
         c = player.lastTile.c;
+      } else if (Array.isArray(player.trail) && player.row != null && player.col != null) {
+        // Fallback for occasional stale lastTile: derive the previous tile from rendered movement trail.
+        for (let i = player.trail.length - 1; i >= 0; i--) {
+          const point = player.trail[i];
+          if (!point || !Number.isInteger(point.row) || !Number.isInteger(point.col)) continue;
+          if (point.row === player.row && point.col === player.col) continue;
+          r = point.row;
+          c = point.col;
+          break;
+        }
       } else if (player.row != null && player.col != null && Number.isInteger(player.entrance)) {
         // Fallback for legacy snapshots that predate lastTile tracking.
         [r, c] = stepCard(player.row, player.col, edgeDir(player.entrance));
       } else {
         return null;
       }
+      if (!Number.isInteger(r) || !Number.isInteger(c)) return null;
       if (!inBounds(app.config.size, r, c)) return null;
       const cell = app.board[r][c];
       if (!cell || cell.dead || cell.startOwner != null || !cell.tile) return null;
