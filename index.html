@@ -795,6 +795,7 @@
       padding: 0;
     }
     .cell.valid { outline: 2px solid #58e2a9; outline-offset: -2px; }
+    .cell.current-player-cell { outline: 2px solid #58e2a9; outline-offset: -2px; }
     .cell.invalid { cursor: not-allowed; }
     .cell.dead {
       background:
@@ -1083,6 +1084,16 @@
               </select>
             </div>
             <div class="field" style="margin-top: 12px;">
+              <label for="variantMode">Variant</label>
+              <select id="variantMode">
+                <option value="standard" selected>Standard</option>
+                <option value="overload">Overload</option>
+              </select>
+              <div style="font-size:12px;color:#9eb8e6;margin-top:6px;">
+                Overload lets a standard tile replace the tile you left from by spending 1 shared jump tile.
+              </div>
+            </div>
+            <div class="field" style="margin-top: 12px;">
               <label for="hoverTilePickerEnabled">Hover tile picker</label>
               <select id="hoverTilePickerEnabled">
                 <option value="off" selected>Off</option>
@@ -1141,6 +1152,10 @@
                       <div style="font-size:12px;color:#ffdba8;margin-bottom:6px;">Step 2: choose the entry on the side touching your base</div>
                       <div id="entryRow" class="entry-row"></div>
                     </div>
+                  </div>
+                  <div class="panel">
+                    <h3>Variant</h3>
+                    <div id="variantText" class="status"></div>
                   </div>
                   <div class="panel">
                     <h3>Players</h3>
@@ -1271,6 +1286,7 @@
       threePlayerCornerField: document.getElementById("threePlayerCornerField"),
       jumpSelection: document.getElementById("jumpSelection"),
       poolMode: document.getElementById("poolMode"),
+      variantMode: document.getElementById("variantMode"),
       hoverTilePickerEnabled: document.getElementById("hoverTilePickerEnabled"),
       bothPoolField: document.getElementById("bothPoolField"),
       p1Name: document.getElementById("p1Name"),
@@ -1303,6 +1319,7 @@
       tutorialTopNotice: document.getElementById("tutorialTopNotice"),
       tutorialSummaryText: document.getElementById("tutorialSummaryText"),
       tutorialLessonOverview: document.getElementById("tutorialLessonOverview"),
+      variantText: document.getElementById("variantText"),
       tutorialShell: document.querySelector(".tutorial-shell"),
     };
     const tutorialLessons = [
@@ -1485,9 +1502,9 @@
       el.playerCount.addEventListener("change", () => {
         el.threePlayerCornerField.classList.toggle("hidden", el.playerCount.value !== "3");
       });
-      el.jumpSelection.addEventListener("change", () => {
-        el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
-      });
+      el.jumpSelection.addEventListener("change", syncVariantControls);
+      el.poolMode.addEventListener("change", syncVariantControls);
+      if (el.variantMode) el.variantMode.addEventListener("change", syncVariantControls);
       el.startBtn.addEventListener("click", () => startGame());
       if (el.undoBtn) {
         el.undoBtn.addEventListener("click", undoLastMove);
@@ -1526,6 +1543,17 @@
           startTutorialLesson(nextIdx);
         });
       }
+    }
+
+    function syncVariantControls() {
+      const overloadEnabled = el.variantMode?.value === "overload";
+      if (overloadEnabled) {
+        el.jumpSelection.value = "both";
+        el.poolMode.value = "combined";
+      }
+      if (el.jumpSelection) el.jumpSelection.disabled = overloadEnabled;
+      if (el.poolMode) el.poolMode.disabled = overloadEnabled;
+      el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
     }
 
     function cloneStateValue(value) {
@@ -1908,11 +1936,13 @@
     }
 
     function readGameOptionsFromControls() {
+      const variantMode = el.variantMode?.value || "standard";
       return {
         size: Number(el.boardSize.value),
         playerCount: Number(el.playerCount.value),
-        jumpSelection: el.jumpSelection.value,
-        poolMode: el.poolMode.value,
+        jumpSelection: variantMode === "overload" ? "both" : el.jumpSelection.value,
+        poolMode: variantMode === "overload" ? "combined" : el.poolMode.value,
+        variantMode,
         hoverTilePickerEnabled: el.hoverTilePickerEnabled?.value === "on",
         names: [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value],
         deadCorner: Number(el.deadCornerSelect.value),
@@ -1922,6 +1952,7 @@
     function applyGameOptionsToControls(options) {
       el.boardSize.value = String(options.size);
       el.playerCount.value = String(options.playerCount);
+      if (el.variantMode) el.variantMode.value = options.variantMode || "standard";
       el.jumpSelection.value = options.jumpSelection;
       el.poolMode.value = options.poolMode;
       if (el.hoverTilePickerEnabled) {
@@ -1935,7 +1966,7 @@
       }
       if (typeof options.deadCorner === "number") el.deadCornerSelect.value = String(options.deadCorner);
       el.threePlayerCornerField.classList.toggle("hidden", el.playerCount.value !== "3");
-      el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
+      syncVariantControls();
     }
 
     function cycleTutorialLesson() {
@@ -2039,6 +2070,7 @@
         playerCount: 2,
         jumpSelection: "both",
         poolMode: "separate",
+        variantMode: "standard",
         hoverTilePickerEnabled: el.hoverTilePickerEnabled?.value === "on",
         names: [
           el.p1Name.value || "Player 1",
@@ -2120,6 +2152,8 @@
       playerOne.entrance = 7;
       playerOne.alive = true;
       playerOne.hasPlacedFirstTile = true;
+      playerOne.startPlacement = { r: 0, c: 1, entry: 7 };
+      playerOne.lastTile = null;
       playerOne.trail = [];
 
       playerTwo.row = null;
@@ -2127,6 +2161,8 @@
       playerTwo.entrance = null;
       playerTwo.alive = true;
       playerTwo.hasPlacedFirstTile = false;
+      playerTwo.startPlacement = { r: 5, c: 6, entry: 5 };
+      playerTwo.lastTile = null;
       playerTwo.trail = [];
 
       app.currentPlayerIdx = 0;
@@ -2174,6 +2210,8 @@
       playerOne.entrance = null;
       playerOne.alive = true;
       playerOne.hasPlacedFirstTile = false;
+      playerOne.startPlacement = null;
+      playerOne.lastTile = null;
       playerOne.trail = [];
 
       playerTwo.row = null;
@@ -2181,6 +2219,8 @@
       playerTwo.entrance = null;
       playerTwo.alive = true;
       playerTwo.hasPlacedFirstTile = false;
+      playerTwo.startPlacement = null;
+      playerTwo.lastTile = null;
       playerTwo.trail = [];
 
       app.currentPlayerIdx = 0;
@@ -2386,8 +2426,9 @@
     function startGame(options = readGameOptionsFromControls()) {
       const size = Number(options.size);
       const playerCount = Number(options.playerCount);
-      const jumpSelection = options.jumpSelection;
-      const poolMode = options.poolMode;
+      const variantMode = options.variantMode || "standard";
+      const jumpSelection = variantMode === "overload" ? "both" : options.jumpSelection;
+      const poolMode = variantMode === "overload" ? "combined" : options.poolMode;
       const names = options.names || [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value];
 
       const activeCorners = [];
@@ -2401,7 +2442,7 @@
         activeCorners.push(...CORNERS);
       }
 
-      app.config = { size, playerCount, jumpSelection, poolMode, activeCorners };
+      app.config = { size, playerCount, jumpSelection, poolMode, variantMode, activeCorners };
       app.board = Array.from({ length: size }, (_, r) =>
         Array.from({ length: size }, (_, c) => ({ r, c, tile: null, dead: false, startOwner: null }))
       );
@@ -2460,6 +2501,8 @@
           entrance: null,
           alive: true,
           hasPlacedFirstTile: false,
+          startPlacement: null,
+          lastTile: null,
           jumpLeft: 0,
           diagonalJumpLeft: 0,
           combinedJumpLeft: 0,
@@ -2474,7 +2517,7 @@
         app.players.push(p);
       });
 
-      log(`Game started: ${size}×${size}, ${playerCount} players, jump mode "${jumpSelection}".`);
+      log(`Game started: ${size}×${size}, ${playerCount} players, jump mode "${jumpSelection}"${variantMode === "overload" ? ', variant "overload"' : ""}.`);
       el.setupView.classList.add("hidden");
       el.gameView.classList.remove("hidden");
       renderAll();
@@ -2542,19 +2585,106 @@
       }
     }
 
-    function validFirstTurnCells(player) {
-      return player.adjacentFirst.filter(([r, c]) => inBounds(app.config.size, r, c) &&
-        !app.board[r][c].dead && app.board[r][c].startOwner == null && app.board[r][c].tile == null);
+    function isStandardTileType(tileType) {
+      return tileType !== "jump" && tileType !== "diagonalJump";
     }
 
-    function validSubsequentCell(player) {
-      // Players rest on a blank cell entrance; subsequent placement occurs on that same blank cell.
-      const r = player.row;
-      const c = player.col;
+    function isOverloadVariantEnabled() {
+      return app.config?.variantMode === "overload";
+    }
+
+    function canSpendSharedJump(player) {
+      return !!player && player.combinedJumpLeft > 0;
+    }
+
+    function getTileLeftFromPlayer(player) {
+      if (!player || !player.hasPlacedFirstTile) return null;
+      let r = null;
+      let c = null;
+      if (player.lastTile && Number.isInteger(player.lastTile.r) && Number.isInteger(player.lastTile.c)) {
+        r = player.lastTile.r;
+        c = player.lastTile.c;
+      } else if (player.row != null && player.col != null && Number.isInteger(player.entrance)) {
+        // Fallback for legacy snapshots that predate lastTile tracking.
+        [r, c] = stepCard(player.row, player.col, edgeDir(player.entrance));
+      } else {
+        return null;
+      }
       if (!inBounds(app.config.size, r, c)) return null;
       const cell = app.board[r][c];
-      if (cell.dead || cell.startOwner != null || cell.tile != null) return null;
+      if (!cell || cell.dead || cell.startOwner != null || !cell.tile) return null;
       return [r, c];
+    }
+
+    function canOverloadTile(player, tileType, cell, r = null, c = null) {
+      if (!isOverloadVariantEnabled() || !player || !cell?.tile) return false;
+      if (!isStandardTileType(tileType)) return false;
+      if (!canSpendSharedJump(player)) return false;
+      const row = Number.isInteger(r) ? r : cell.r;
+      const col = Number.isInteger(c) ? c : cell.c;
+      const leftTile = getTileLeftFromPlayer(player);
+      if (!leftTile) return false;
+      return leftTile[0] === row && leftTile[1] === col;
+    }
+
+    function getPlacementContext(player, r, c, tileType) {
+      if (!player || !inBounds(app.config.size, r, c)) return null;
+      const cell = app.board[r][c];
+      if (!cell || cell.dead || cell.startOwner != null) return null;
+      if (!cell.tile) return { mode: "standard", replacedTile: null };
+      if (canOverloadTile(player, tileType, cell, r, c)) {
+        return { mode: "overload", replacedTile: { ...cell.tile } };
+      }
+      return null;
+    }
+
+    function spendOverloadCharge(player) {
+      if (!canSpendSharedJump(player)) return false;
+      player.combinedJumpLeft--;
+      return true;
+    }
+
+    function applyPlacement(player, r, c, tileType, placement = getPlacementContext(player, r, c, tileType)) {
+      if (!placement) return false;
+      if (placement.mode === "overload") {
+        if (!spendOverloadCharge(player)) return false;
+        const previousTile = placement.replacedTile || {};
+        placeTile(r, c, tileType, player.id, { skipLog: true });
+        log(`${player.name} overloaded ${TILE_LABELS[previousTile.type] || "tile"} at (${r},${c}) with ${TILE_LABELS[tileType]}, spending 1 shared jump tile.`);
+        return true;
+      }
+      placeTile(r, c, tileType, player.id);
+      consumeTile(player, tileType);
+      return true;
+    }
+
+    function validFirstTurnCells(player, tileType = app.selectedTile) {
+      if (!canUseTile(player, tileType)) return [];
+      return player.adjacentFirst.filter(([r, c]) => !!getPlacementContext(player, r, c, tileType));
+    }
+
+    function validSubsequentCells(player, tileType = app.selectedTile) {
+      if (!player || !canUseTile(player, tileType)) return [];
+      const options = [];
+      const addIfValid = (r, c) => {
+        if (!inBounds(app.config.size, r, c)) return;
+        if (!getPlacementContext(player, r, c, tileType)) return;
+        if (options.some(([or, oc]) => or === r && oc === c)) return;
+        options.push([r, c]);
+      };
+
+      // Standard subsequent placement cell.
+      if (player.row != null && player.col != null) addIfValid(player.row, player.col);
+
+      // Overload placement target: the tile this player left from.
+      const leftTile = getTileLeftFromPlayer(player);
+      if (leftTile) addIfValid(leftTile[0], leftTile[1]);
+
+      return options;
+    }
+
+    function validSubsequentCell(player, tileType = app.selectedTile) {
+      return validSubsequentCells(player, tileType)[0] || null;
     }
 
     function getFirstTurnEntryChoices(player, tileR, tileC) {
@@ -2572,32 +2702,33 @@
       const p = currentPlayer();
       if (!p || !p.alive) return;
       if (!canUseTile(p, tileType)) return;
+      const placement = getPlacementContext(p, r, c, tileType);
+      if (!placement) return;
 
       if (!p.hasPlacedFirstTile) {
-        const valid = validFirstTurnCells(p).some(([vr, vc]) => vr === r && vc === c);
+        const valid = validFirstTurnCells(p, tileType).some(([vr, vc]) => vr === r && vc === c);
         if (!valid) return;
         app.pendingFirstPlacement = { r, c };
         const entries = getFirstTurnEntryChoices(p, r, c);
         log(`${p.name} first move: now choose one of the entry points touching your base.`);
         renderEntryChoices(entries, (entry) => {
           if (app.gameOver) return;
-          completeFirstTurnPlacement(p, r, c, tileType, entry);
+          completeFirstTurnPlacement(p, r, c, tileType, entry, placement);
         });
         renderAll();
         return;
       }
 
-      const valid = validSubsequentCell(p);
-      if (!valid || valid[0] !== r || valid[1] !== c) return;
+      const valid = validSubsequentCells(p, tileType).some(([vr, vc]) => vr === r && vc === c);
+      if (!valid) return;
 
       createUndoSnapshot();
-      placeTile(r, c, tileType);
+      if (!applyPlacement(p, r, c, tileType, placement)) return;
       if (app.tutorialMode?.lessonIdx === 0 && p.id === 0 && p.hasPlacedFirstTile) {
         app.tutorialMode.lessonOneComplete = true;
       }
       recordLessonSixPlacement(p, r, c, tileType);
-      consumeTile(p, tileType);
-      resolveAfterPlacement(r, c);
+      resolveAfterPlacement(r, c, placement.mode);
       postTurnAdvance();
     }
 
@@ -2606,12 +2737,12 @@
       attemptPlaceAtCell(r, c, app.selectedTile);
     }
 
-    function completeFirstTurnPlacement(player, r, c, tileType, entry) {
+    function completeFirstTurnPlacement(player, r, c, tileType, entry, placement = getPlacementContext(player, r, c, tileType)) {
       if (!player || app.gameOver) return;
       createUndoSnapshot();
-      placeTile(r, c, tileType);
+      if (!applyPlacement(player, r, c, tileType, placement)) return;
       recordLessonSixPlacement(player, r, c, tileType, { entry, isFirstTurn: true });
-      consumeTile(player, tileType);
+      player.startPlacement = { r, c, entry };
       executeFirstTurnMovement(player, r, c, entry);
       player.hasPlacedFirstTile = true;
       app.pendingFirstPlacement = null;
@@ -2776,9 +2907,11 @@
       positionHoverMenuOverCell(btn);
     }
 
-    function placeTile(r, c, type) {
-      app.board[r][c].tile = { type, rot: 0 };
-      log(`${currentPlayer().name} placed ${TILE_LABELS[type]} at (${r},${c}).`);
+    function placeTile(r, c, type, ownerId = currentPlayer()?.id, options = {}) {
+      app.board[r][c].tile = { type, rot: 0, ownerId };
+      if (!options.skipLog) {
+        log(`${currentPlayer().name} placed ${TILE_LABELS[type]} at (${r},${c}).`);
+      }
     }
 
     function appendTrailPoint(player, point) {
@@ -2841,6 +2974,7 @@
       const exit = getExitEntrance(tile, curEntry);
       const next = jumpOrAdjacent(curR, curC, curEntry, exit, tile.type, tile.rot || 0);
       player.trail = [];
+      player.lastTile = null;
       if (next.eliminated || next.win) appendExitOnlyPath(player, curR, curC, curEntry, exit, tile.type);
       else appendMovementPath(player, curR, curC, curEntry, exit, next.row, next.col, next.entrance, tile.type);
       if (next.eliminated) {
@@ -2855,10 +2989,46 @@
       player.row = next.row;
       player.col = next.col;
       player.entrance = next.entrance;
+      player.lastTile = { r: curR, c: curC };
       log(`${player.name} ends first turn at (${player.row},${player.col}) on entrance ${entranceName(player.entrance)}.`);
     }
 
-    function resolveAfterPlacement(placedR, placedC) {
+    function playerTouchesOrPassedThroughTile(player, r, c) {
+      if (!player) return false;
+      if (player.row === r && player.col === c) return true;
+      return Array.isArray(player.trail) && player.trail.some((point) => point.row === r && point.col === c);
+    }
+
+    function rerouteTouchedPlayersFromBase(overloadedR, overloadedC) {
+      const routed = app.players
+        .filter((p) => p.alive && p.hasPlacedFirstTile && p.startPlacement)
+        .filter((p) => playerTouchesOrPassedThroughTile(p, overloadedR, overloadedC))
+        .sort((a, b) => a.id - b.id);
+
+      routed.forEach((p) => {
+        const { r, c, entry } = p.startPlacement;
+        p.row = r;
+        p.col = c;
+        p.entrance = entry;
+        p.lastTile = null;
+        p.trail = [];
+      });
+
+      for (const p of routed) {
+        if (!p.alive || app.gameOver) continue;
+        resolveMovement(p);
+      }
+
+      checkPositionDraw();
+      if (app.gameOver) return;
+      finalizeRemainingPlayersOutcome();
+    }
+
+    function resolveAfterPlacement(placedR, placedC, placementMode = "standard") {
+      if (isOverloadVariantEnabled() && placementMode === "overload") {
+        rerouteTouchedPlayersFromBase(placedR, placedC);
+        return;
+      }
       const affected = app.players
         .filter(p => p.alive && p.hasPlacedFirstTile && p.row != null)
         .filter(p => {
@@ -2886,13 +3056,15 @@
         }
         visited.add(stateK);
 
-        const cell = app.board[player.row][player.col];
+        const fromR = player.row;
+        const fromC = player.col;
+        const cell = app.board[fromR][fromC];
         if (!cell.tile) return;
 
         const exit = getExitEntrance(cell.tile, player.entrance);
-        const next = jumpOrAdjacent(player.row, player.col, player.entrance, exit, cell.tile.type, cell.tile.rot || 0, player);
-        if (next.eliminated || next.win) appendExitOnlyPath(player, player.row, player.col, player.entrance, exit, cell.tile.type);
-        else appendMovementPath(player, player.row, player.col, player.entrance, exit, next.row, next.col, next.entrance, cell.tile.type);
+        const next = jumpOrAdjacent(fromR, fromC, player.entrance, exit, cell.tile.type, cell.tile.rot || 0, player);
+        if (next.eliminated || next.win) appendExitOnlyPath(player, fromR, fromC, player.entrance, exit, cell.tile.type);
+        else appendMovementPath(player, fromR, fromC, player.entrance, exit, next.row, next.col, next.entrance, cell.tile.type);
 
         if (next.eliminated) {
           eliminatePlayer(player, `${player.name} was eliminated.`);
@@ -2907,7 +3079,10 @@
         player.row = next.row;
         player.col = next.col;
         player.entrance = next.entrance;
-        if (!app.board[player.row][player.col].tile) return;
+        if (!app.board[player.row][player.col].tile) {
+          player.lastTile = { r: fromR, c: fromC };
+          return;
+        }
       }
     }
 
@@ -3190,6 +3365,7 @@
       renderHeader();
       renderTiles();
       renderSelectedTilePreview();
+      renderVariant();
       renderBoard();
       renderStatus();
       renderPlayers();
@@ -3223,9 +3399,12 @@
           completeFirstTurnPlacement(p, pending.r, pending.c, tileType, entry);
         });
       }
+      const overloadNote = app.config?.variantMode === "overload"
+        ? " Overload is active: replacing the tile you left from with a standard tile costs 1 shared jump tile."
+        : "";
       el.selectedTileNote.textContent = highlightedEntrances.length
         ? "Green dots are valid entries touching your base. Click one to choose it."
-        : "Dots show all tile entrances.";
+        : `Dots show all tile entrances.${overloadNote}`;
     }
 
     function renderHeader() {
@@ -3235,12 +3414,22 @@
         `Players: ${app.config.playerCount}`,
         `Jump: ${app.config.jumpSelection}${app.config.jumpSelection === "both" ? ` (${app.config.poolMode})` : ""}`,
       ];
+      if (app.config.variantMode === "overload") chips.push("Variant: overload");
       chips.forEach(t => {
         const d = document.createElement("div");
         d.className = "chip";
         d.textContent = t;
         el.headerChips.appendChild(d);
       });
+    }
+
+    function renderVariant() {
+      if (!el.variantText) return;
+      if (app.config?.variantMode === "overload") {
+        el.variantText.innerHTML = "Overload active.<br>Replace the tile you left from with a standard tile by spending 1 shared jump tile from the combined pool.";
+        return;
+      }
+      el.variantText.textContent = "Standard rules.";
     }
 
     function tileIsEnabledForSelection(type) {
@@ -3298,10 +3487,15 @@
       );
       const p = currentPlayer();
       if (!app.gameOver && p?.alive) {
-        if (!p.hasPlacedFirstTile) validFirstTurnCells(p).forEach(([r, c]) => validSet.add(key(r, c)));
+        const selectableTypes = getSelectableTileTypesForCurrentPlayer();
+        const canPlaceOnCell = (r, c) => selectableTypes.some((type) => !!getPlacementContext(p, r, c, type));
+        if (!p.hasPlacedFirstTile) {
+          p.adjacentFirst
+            .filter(([r, c]) => inBounds(app.config.size, r, c) && canPlaceOnCell(r, c))
+            .forEach(([r, c]) => validSet.add(key(r, c)));
+        }
         else {
-          const one = validSubsequentCell(p);
-          if (one) validSet.add(key(one[0], one[1]));
+          validSubsequentCells(p).forEach(([r, c]) => validSet.add(key(r, c)));
         }
       }
 
@@ -3315,6 +3509,12 @@
             btn.classList.add("start", `start-p${cell.startOwner + 1}`);
           }
           btn.dataset.rc = `${r},${c}`;
+          const overloadTarget = isOverloadVariantEnabled() && p?.alive && p.hasPlacedFirstTile
+            ? getTileLeftFromPlayer(p)
+            : null;
+          if (overloadTarget && overloadTarget[0] === r && overloadTarget[1] === c) {
+            btn.classList.add("current-player-cell");
+          }
           if (validSet.has(key(r, c))) {
             btn.classList.add("valid");
             btn.addEventListener("mouseenter", () => showHoverTileMenu(btn, r, c));
@@ -3501,7 +3701,7 @@
 
     setupBindings();
     renderTutorialCard();
-    el.bothPoolField.classList.toggle("hidden", el.jumpSelection.value !== "both");
+    syncVariantControls();
     try {
       setMenuCollapsed(localStorage.getItem(MENU_STATE_KEY) === "1");
     } catch (err) {
