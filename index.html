@@ -2730,7 +2730,9 @@
         return;
       }
 
-      const valid = validSubsequentCells(p, tileType).some(([vr, vc]) => vr === r && vc === c);
+      const valid = placement.mode === "overload"
+        ? true
+        : validSubsequentCells(p, tileType).some(([vr, vc]) => vr === r && vc === c);
       if (!valid) return;
 
       createUndoSnapshot();
@@ -3496,9 +3498,10 @@
         getLessonThreePresetMarkers().map((marker) => [key(marker.r, marker.c), marker.label])
       );
       const p = currentPlayer();
+      let canPlaceOnCell = () => false;
       if (!app.gameOver && p?.alive) {
-        const selectableTypes = getSelectableTileTypesForCurrentPlayer();
-        const canPlaceOnCell = (r, c) => selectableTypes.some((type) => !!getPlacementContext(p, r, c, type));
+        const selectedType = app.selectedTile;
+        canPlaceOnCell = (r, c) => canUseTile(p, selectedType) && !!getPlacementContext(p, r, c, selectedType);
         if (!p.hasPlacedFirstTile) {
           p.adjacentFirst
             .filter(([r, c]) => inBounds(app.config.size, r, c) && canPlaceOnCell(r, c))
@@ -3522,7 +3525,7 @@
           const overloadTarget = isOverloadVariantEnabled() && p?.alive && p.hasPlacedFirstTile
             ? getTileLeftFromPlayer(p)
             : null;
-          if (overloadTarget && overloadTarget[0] === r && overloadTarget[1] === c) {
+          if (overloadTarget && overloadTarget[0] === r && overloadTarget[1] === c && canPlaceOnCell(r, c)) {
             btn.classList.add("current-player-cell");
           }
           if (validSet.has(key(r, c))) {
