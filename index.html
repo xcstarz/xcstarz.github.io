@@ -16,6 +16,9 @@
       --grid: #2a3e66;
     }
     * { box-sizing: border-box; }
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
     body {
       margin: 0;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
@@ -683,6 +686,7 @@
     .board-wrap {
       padding: 12px;
       overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .board-stack {
       position: relative;
@@ -1001,10 +1005,112 @@
     @media (max-width: 900px) {
       .main-shell {
         grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 10px;
       }
       .app-nav {
-        position: static;
+        position: sticky;
+        top: 10px;
+        z-index: 20;
         height: auto;
+        padding: 10px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+      .app-nav-header {
+        width: 100%;
+      }
+      .app-nav-title {
+        margin: 0;
+        font-size: 20px;
+      }
+      .app-nav-toggle {
+        min-height: 42px;
+      }
+      .app-nav-btn {
+        flex: 1 1 0;
+        min-height: 44px;
+        justify-content: center;
+        text-align: center;
+      }
+      body.menu-collapsed .main-shell {
+        --nav-width: 0px;
+        gap: 10px;
+      }
+      body.menu-collapsed .app-nav {
+        width: auto;
+        min-width: 0;
+        height: auto;
+        min-height: 0;
+        padding: 10px;
+        gap: 8px;
+        border-color: #2b3448;
+        background: linear-gradient(180deg, #101722, #0c131e);
+        overflow: visible;
+      }
+      body.menu-collapsed .app-nav-header {
+        position: static;
+        transform: none;
+      }
+      body.menu-collapsed .app-nav-title,
+      body.menu-collapsed .app-nav-toggle-label,
+      body.menu-collapsed .app-nav-btn-label {
+        display: block;
+        opacity: 1;
+        width: auto;
+        max-width: none;
+        margin: 0;
+        pointer-events: auto;
+      }
+      body.menu-collapsed .app-nav-btn {
+        opacity: 1;
+        width: auto;
+        min-height: 44px;
+        max-height: none;
+        padding: 8px 12px;
+        margin: 0;
+        border: 1px solid #29354f;
+        pointer-events: auto;
+      }
+      body.menu-collapsed .app-nav-toggle {
+        width: auto;
+        min-width: 0;
+        padding: 8px 10px;
+        border-left: 1px solid #4566a4;
+        border-top-left-radius: 8px;
+        border-bottom-left-radius: 8px;
+        border-top-right-radius: 8px;
+        border-bottom-right-radius: 8px;
+        box-shadow: none;
+      }
+      .setup {
+        margin: 20px auto;
+        padding: 16px;
+      }
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+      .game {
+        gap: 10px;
+      }
+      .board-wrap {
+        padding: 8px;
+      }
+      .game-sidebar {
+        padding: 10px;
+      }
+      .selected-tile-preview {
+        min-height: 120px;
+      }
+      .elimination-box {
+        width: min(92vw, 460px);
+        padding: 24px 20px;
+      }
+      .elimination-box h2 {
+        font-size: 24px;
+        margin-bottom: 20px;
       }
       .tutorial-demo-grid {
         grid-template-columns: 1fr;
@@ -1013,6 +1119,78 @@
       .tutorial-board { min-height: 280px; }
       .tutorial-title { font-size: 22px; }
       .tutorial-step { font-size: 18px; }
+    }
+    @media (max-width: 640px) {
+      .main-shell {
+        padding: 8px;
+        gap: 8px;
+      }
+      .app-nav {
+        top: 8px;
+        padding: 8px;
+      }
+      .app-nav-title {
+        font-size: 18px;
+      }
+      .app-nav-btn,
+      .app-nav-toggle {
+        font-size: 13px;
+      }
+      select,
+      input[type="text"],
+      button {
+        min-height: 42px;
+        font-size: 14px;
+      }
+      .setup {
+        margin: 10px auto;
+        padding: 14px;
+      }
+      .chip {
+        font-size: 11px;
+      }
+      .tutorial-panel {
+        padding: 8px;
+      }
+      .tutorial-content {
+        padding: 12px 14px 8px;
+      }
+      .tutorial-bottom {
+        margin: 0 14px 14px;
+        padding: 10px;
+      }
+      .tutorial-grid {
+        grid-template-columns: repeat(5, 58px);
+        grid-template-rows: repeat(5, 58px);
+        gap: 8px;
+      }
+      .lesson-tile {
+        width: 58px;
+        height: 58px;
+        border-radius: 12px;
+      }
+      .lesson-tile-art {
+        font-size: 24px;
+      }
+      .lesson-tile[data-tile-type="rule"] .lesson-tile-art svg,
+      .lesson-tile-art svg {
+        width: 38px;
+        height: 38px;
+      }
+      .lesson-piece {
+        width: 42px;
+        height: 42px;
+      }
+      .lesson-piece svg {
+        width: 30px;
+        height: 30px;
+      }
+      .cell-hover-menu {
+        min-width: 170px;
+      }
+      .cell-hover-menu.entry-mode {
+        min-width: min(92vw, 280px);
+      }
     }
   </style>
 </head>
@@ -1178,11 +1356,11 @@
               <div id="tutorialDefaultVisual" class="tutorial-default-visual">
                 <div class="tutorial-grid">
                   <!-- 9 Active lessons -->
-                  <button class="lesson-tile" data-lesson-idx="0" data-tile-type="rule" data-tile-text="1" type="button" aria-label="Tutorial Lesson 1: The Basics"><div class="lesson-tile-art"></div></button>
-                  <button class="lesson-tile" data-lesson-idx="1" data-tile-type="rule" data-tile-text="2" type="button" aria-label="Tutorial Lesson 2: Movement and Dead Zones"><div class="lesson-tile-art"></div></button>
-                  <button class="lesson-tile" data-lesson-idx="2" data-tile-type="straightaway" data-tile-rot="0" type="button" aria-label="Start Lesson 3: Straightaway Tile"><div class="lesson-tile-art"></div></button>
-                  <button class="lesson-tile" data-lesson-idx="3" data-tile-type="uturn" data-tile-rot="1" type="button" aria-label="Start Lesson 4: U-Turn Tile"><div class="lesson-tile-art"></div></button>
-                  <button class="lesson-tile" data-lesson-idx="4" data-tile-type="diagonal" data-tile-rot="2" type="button" aria-label="Tutorial Lesson 5: Diagonals and Weaves"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="0" data-tile-type="rule" data-tile-text="1" type="button" aria-label="Start Tutorial lesson 1: The basics"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="1" data-tile-type="rule" data-tile-text="2" type="button" aria-label="Start Tutorial lesson 2: Movement and dead zones"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="2" data-tile-type="straightaway" data-tile-rot="0" type="button" aria-label="Start Tutorial lesson 3: The straightaway tile"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="3" data-tile-type="uturn" data-tile-rot="1" type="button" aria-label="Start Tutorial lesson 4: The centrifugal and U-turn tiles"><div class="lesson-tile-art"></div></button>
+                  <button class="lesson-tile" data-lesson-idx="4" data-tile-type="diagonal" data-tile-rot="2" type="button" aria-label="Start Tutorial lesson 5: Diagonals and weaves"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="5" data-tile-type="diagonal" data-tile-rot="0" type="button" aria-label="Start Lesson 6: Diagonal Tile"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="6" data-tile-type="weave" data-tile-rot="1" type="button" aria-label="Start Lesson 7: Weave Tile"><div class="lesson-tile-art"></div></button>
                   <button class="lesson-tile" data-lesson-idx="7" data-tile-type="jump" data-tile-rot="2" type="button" aria-label="Start Lesson 8: Jump Tile"><div class="lesson-tile-art"></div></button>
@@ -1216,6 +1394,15 @@
     const DEAD_ZONES_7 = new Set(["2,2","2,4","3,3","4,2","4,4"]);
     const BOARD_CELL_SIZE = 60;
     const TUTORIAL_BOARD_CELL_SIZE = 40;
+    function getBoardCellSize() {
+      const boardSize = app.config?.size || Number(el.boardSize?.value || 13);
+      const viewportWidth = window.innerWidth || 1280;
+      if (viewportWidth <= 420) return boardSize >= 13 ? 42 : 48;
+      if (viewportWidth <= 640) return boardSize >= 13 ? 46 : 52;
+      if (viewportWidth <= 900) return boardSize >= 13 ? 50 : 56;
+      return BOARD_CELL_SIZE;
+    }
+
     const BOARD_CELL_GAP = 0;
     const BOARD_FRAME = 2; // 1px border + 1px padding on each side
     const MENU_STATE_KEY = "tilePathMenuCollapsed";
@@ -1324,7 +1511,7 @@
     };
     const tutorialLessons = [
       {
-        title: "Tutorial Lesson 1: The Basics",
+        title: "Tutorial lesson 1: The basics",
         step: "Lesson 1 of 9",
         selectedTile: "straightaway",
         tutorialOptions: {
@@ -1334,7 +1521,7 @@
         playNotice: "1. Select a tile by clicking on it and place it on a green cell.\n2. Scroll down and select an entrance.",
       },
       {
-        title: "Tutorial Lesson 2: Movement and Dead Zones",
+        title: "Tutorial lesson 2: Movement and dead zones",
         step: "Lesson 2 of 9",
         selectedTile: "centrifugal",
         presetId: "lesson2-movement-and-dead-zones",
@@ -1342,7 +1529,7 @@
         playNotice: "1. In this case, the two players are going toward the same cell. Each player must immediately move to the end of the path. Place a centrifugal tile. A win screen should pop up.",
       },
       {
-        title: "The Straightaway Tile",
+        title: "Tutorial lesson 3: The straightaway tile",
         step: "Lesson 3 of 9",
         selectedTile: "straightaway",
         presetId: "lesson3-straightaway-tile",
@@ -1350,7 +1537,7 @@
         playNotice: "The straightaway is the most basic tile. Place it and choose the `W1` entrance to get to `1`. Player 2 is skipped every round in this lesson preset.",
       },
       {
-        title: "U-Turn Tile",
+        title: "Tutorial lesson 4: The centrifugal and U-turn tiles",
         step: "Lesson 4 of 9",
         selectedTile: "uturn",
         presetId: "lesson3-straightaway-tile",
@@ -1358,7 +1545,7 @@
         playNotice: "1. The centrifugal tile performs a sharp, ninety degree turn. Place it and choose the `W0` entrance to get to `1`.\n2. The U-turn tile curves back to an adjacent entrance of the same edge entered from. Place it down.\n3. Continue placing centrifugal and U-turn tiles until you get to `2`.\n4. Place tiles until you get to `3`. Place a weave at `3`.\n5. Place straightaways until you get to `4`. Place a centrifugal tile at `4` to reach the opponent's base.\n6. Lesson complete. Proceed to the next lesson.",
       },
       {
-        title: "Tutorial Lesson 5: Diagonals and Weaves",
+        title: "Tutorial lesson 5: Diagonals and weaves",
         step: "Lesson 5 of 9",
         selectedTile: "diagonal",
         presetId: "lesson3-straightaway-tile",
@@ -1526,6 +1713,10 @@
       document.addEventListener("pointermove", onDragMove);
       document.addEventListener("pointerup", onDragEnd);
       document.addEventListener("pointercancel", onDragEnd);
+      window.addEventListener("resize", () => {
+        if (!app.config || el.gameView.classList.contains("hidden")) return;
+        renderBoard();
+      });
       if (el.cellHoverMenu) {
         el.cellHoverMenu.addEventListener("mouseenter", cancelHoverMenuHide);
         el.cellHoverMenu.addEventListener("mouseleave", scheduleHoverMenuHide);
@@ -3489,7 +3680,8 @@
 
     function renderBoard() {
       const size = app.config.size;
-      el.board.style.gridTemplateColumns = `repeat(${size}, ${BOARD_CELL_SIZE}px)`;
+      const boardCellSize = getBoardCellSize();
+      el.board.style.gridTemplateColumns = `repeat(${size}, ${boardCellSize}px)`;
       el.board.innerHTML = "";
       hideHoverTileMenu(true);
 
@@ -3537,7 +3729,7 @@
           btn.onclick = () => onCellClick(r, c);
 
           if (cell.tile) {
-            btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, BOARD_CELL_SIZE)}</div>`;
+            btn.innerHTML = `<div class="tile-layer">${tileSvg(cell.tile, boardCellSize)}</div>`;
           }
           const marker = markerMap.get(key(r, c));
           if (marker) {
@@ -3559,15 +3751,17 @@
     }
 
     function boardPointForTrailPoint(state) {
+      const cellSize = getBoardCellSize();
       const { ax, ay } = state;
       return [
-        BOARD_FRAME + state.col * (BOARD_CELL_SIZE + BOARD_CELL_GAP) + ax * BOARD_CELL_SIZE,
-        BOARD_FRAME + state.row * (BOARD_CELL_SIZE + BOARD_CELL_GAP) + ay * BOARD_CELL_SIZE,
+        BOARD_FRAME + state.col * (cellSize + BOARD_CELL_GAP) + ax * cellSize,
+        BOARD_FRAME + state.row * (cellSize + BOARD_CELL_GAP) + ay * cellSize,
       ];
     }
 
     function renderPlayerTrails() {
-      const span = app.config.size * BOARD_CELL_SIZE + (app.config.size - 1) * BOARD_CELL_GAP + BOARD_FRAME * 2;
+      const cellSize = getBoardCellSize();
+      const span = app.config.size * cellSize + (app.config.size - 1) * BOARD_CELL_GAP + BOARD_FRAME * 2;
       el.trailLayer.setAttribute("viewBox", `0 0 ${span} ${span}`);
       el.trailLayer.setAttribute("width", `${span}`);
       el.trailLayer.setAttribute("height", `${span}`);
