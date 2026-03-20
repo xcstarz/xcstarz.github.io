@@ -1208,6 +1208,10 @@
         <span class="app-nav-btn-icon" aria-hidden="true">P</span>
         <span class="app-nav-btn-label">Play</span>
       </button>
+      <button id="tabComputerBtn" class="app-nav-btn" type="button" aria-label="Play against computer">
+        <span class="app-nav-btn-icon" aria-hidden="true">C</span>
+        <span class="app-nav-btn-label">Computer</span>
+      </button>
       <button id="tabTutorialBtn" class="app-nav-btn" type="button" aria-label="Tutorial">
         <span class="app-nav-btn-icon" aria-hidden="true">T</span>
         <span class="app-nav-btn-label">Tutorial</span>
@@ -1217,8 +1221,8 @@
       <div id="playTabPanel" class="tab-panel">
         <div class="app">
           <div id="setupView" class="setup card">
-            <h1>Tile Path Game</h1>
-            <p class="sub">Pass-and-play strategy game with path tiles, jump pads, and elimination traps.</p>
+            <h1 id="setupTitle">Tile Path Game</h1>
+            <p id="setupSubtext" class="sub">Pass-and-play strategy game with path tiles, jump pads, and elimination traps.</p>
             <div class="grid-2">
               <div class="field">
                 <label for="boardSize">Board Size</label>
@@ -1278,6 +1282,17 @@
                 <option value="on">On</option>
               </select>
             </div>
+            <div id="computerDifficultyField" class="field hidden" style="margin-top: 12px;">
+              <label for="computerDifficulty">Computer Difficulty</label>
+              <select id="computerDifficulty">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+              <div style="font-size:12px;color:#9eb8e6;margin-top:6px;">
+                Computer mode is always a 2-player match, and the computer controls Player 2.
+              </div>
+            </div>
             <div class="grid-2" style="margin-top: 12px;">
               <div class="field"><label for="p1Name">Player 1</label><input id="p1Name" type="text" value="Player 1"></div>
               <div class="field"><label for="p2Name">Player 2</label><input id="p2Name" type="text" value="Player 2"></div>
@@ -1334,6 +1349,10 @@
                   <div class="panel">
                     <h3>Variant</h3>
                     <div id="variantText" class="status"></div>
+                  </div>
+                  <div id="computerPanel" class="panel hidden">
+                    <h3>Computer</h3>
+                    <div id="computerText" class="status"></div>
                   </div>
                   <div class="panel">
                     <h3>Players</h3>
@@ -1447,6 +1466,9 @@
       hoverTilePickerEnabled: false,
       hoverMenuHideTimer: null,
       undoStack: [],
+      setupMode: "play",
+      aiThinking: false,
+      computerTurnTimer: null,
     };
 
     const el = {
@@ -1494,9 +1516,16 @@
       menuToggleIcon: document.getElementById("menuToggleIcon"),
       menuToggleLabel: document.getElementById("menuToggleLabel"),
       tabPlayBtn: document.getElementById("tabPlayBtn"),
+      tabComputerBtn: document.getElementById("tabComputerBtn"),
       tabTutorialBtn: document.getElementById("tabTutorialBtn"),
       playTabPanel: document.getElementById("playTabPanel"),
       tutorialTabPanel: document.getElementById("tutorialTabPanel"),
+      setupTitle: document.getElementById("setupTitle"),
+      setupSubtext: document.getElementById("setupSubtext"),
+      computerDifficultyField: document.getElementById("computerDifficultyField"),
+      computerDifficulty: document.getElementById("computerDifficulty"),
+      computerPanel: document.getElementById("computerPanel"),
+      computerText: document.getElementById("computerText"),
       tutorialBubbleBtn: null,
       tutorialNextBtn: document.getElementById("tutorialNextBtn"),
       tutorialStepText: document.getElementById("tutorialStepText"),
@@ -1609,12 +1638,47 @@
       if (el.tutorialShell) el.tutorialShell.classList.toggle("tutorial-embedded-live", useTutorialHost);
     }
 
+    function clearComputerTurnTimer() {
+      if (!app.computerTurnTimer) return;
+      clearTimeout(app.computerTurnTimer);
+      app.computerTurnTimer = null;
+    }
+
+    function syncSetupModeUI() {
+      const isComputerMode = app.setupMode === "computer";
+      if (el.setupTitle) el.setupTitle.textContent = isComputerMode ? "Tile Path Game vs Computer" : "Tile Path Game";
+      if (el.setupSubtext) {
+        el.setupSubtext.textContent = isComputerMode
+          ? "Play a 2-player match against the computer and pick how sharp it plays."
+          : "Pass-and-play strategy game with path tiles, jump pads, and elimination traps.";
+      }
+      if (el.computerDifficultyField) {
+        el.computerDifficultyField.classList.toggle("hidden", !isComputerMode);
+      }
+      if (el.playerCount) {
+        if (isComputerMode) el.playerCount.value = "2";
+        el.playerCount.disabled = isComputerMode;
+      }
+      if (el.threePlayerCornerField) {
+        el.threePlayerCornerField.classList.toggle("hidden", isComputerMode || el.playerCount.value !== "3");
+      }
+      if (isComputerMode && el.p2Name && (!el.p2Name.value || el.p2Name.value === "Player 2")) {
+        el.p2Name.value = "Computer";
+      }
+    }
+
     function setTab(tabName) {
-      const isPlay = tabName !== "tutorial";
+      if (tabName === "play" || tabName === "computer") {
+        app.setupMode = tabName;
+        syncSetupModeUI();
+      }
+      const isTutorial = tabName === "tutorial";
+      const isPlay = !isTutorial;
       el.playTabPanel.classList.toggle("hidden", !isPlay);
       if (el.tutorialTabPanel) el.tutorialTabPanel.classList.toggle("hidden", isPlay);
-      el.tabPlayBtn.classList.toggle("active", isPlay);
-      if (el.tabTutorialBtn) el.tabTutorialBtn.classList.toggle("active", !isPlay);
+      el.tabPlayBtn.classList.toggle("active", !isTutorial && app.setupMode === "play");
+      if (el.tabComputerBtn) el.tabComputerBtn.classList.toggle("active", !isTutorial && app.setupMode === "computer");
+      if (el.tabTutorialBtn) el.tabTutorialBtn.classList.toggle("active", isTutorial);
       syncGameViewHost();
     }
 
@@ -1677,6 +1741,9 @@
         el.menuToggleBtn.addEventListener("click", () => setMenuCollapsed(!app.menuCollapsed));
       }
       el.tabPlayBtn.addEventListener("click", () => setTab("play"));
+      if (el.tabComputerBtn) {
+        el.tabComputerBtn.addEventListener("click", () => setTab("computer"));
+      }
       if (el.tabTutorialBtn) {
         el.tabTutorialBtn.addEventListener("click", () => setTab("tutorial"));
       }
@@ -1687,7 +1754,7 @@
         });
       });
       el.playerCount.addEventListener("change", () => {
-        el.threePlayerCornerField.classList.toggle("hidden", el.playerCount.value !== "3");
+        el.threePlayerCornerField.classList.toggle("hidden", app.setupMode === "computer" || el.playerCount.value !== "3");
       });
       el.jumpSelection.addEventListener("change", syncVariantControls);
       el.poolMode.addEventListener("change", syncVariantControls);
@@ -1697,13 +1764,15 @@
         el.undoBtn.addEventListener("click", undoLastMove);
       }
       el.newGameBtn.addEventListener("click", () => {
+        clearComputerTurnTimer();
+        app.aiThinking = false;
         app.tutorialMode = null;
         app.undoStack = [];
         setTutorialTopNotice("");
         syncGameViewHost();
         el.gameView.classList.add("hidden");
         el.setupView.classList.remove("hidden");
-        setTab("play");
+        setTab(app.setupMode === "computer" ? "computer" : "play");
         updateUndoButtons();
       });
 
@@ -1767,9 +1836,8 @@
         .filter((id) => Number.isInteger(id));
     }
 
-    function createUndoSnapshot() {
-      if (!app.config || app.gameOver) return;
-      const snapshot = {
+    function captureGameSnapshot() {
+      return {
         config: cloneStateValue(app.config),
         board: cloneStateValue(app.board),
         players: cloneStateValue(app.players),
@@ -1787,13 +1855,19 @@
         hoverTilePickerEnabled: !!app.hoverTilePickerEnabled,
         tutorialLessonIndex,
       };
+    }
+
+    function createUndoSnapshot() {
+      if (!app.config || app.gameOver) return;
+      const snapshot = captureGameSnapshot();
       app.undoStack.push(snapshot);
       if (app.undoStack.length > 60) app.undoStack.shift();
       updateUndoButtons();
     }
 
-    function restoreSnapshot(snapshot) {
+    function restoreSnapshot(snapshot, options = {}) {
       if (!snapshot) return;
+      const shouldRender = options.render !== false;
       app.config = cloneStateValue(snapshot.config);
       app.board = cloneStateValue(snapshot.board);
       app.players = cloneStateValue(snapshot.players);
@@ -1812,10 +1886,13 @@
       app.tutorialMode = cloneStateValue(snapshot.tutorialMode);
       app.hoverTilePickerEnabled = !!snapshot.hoverTilePickerEnabled;
       app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
+      app.aiThinking = false;
+      clearComputerTurnTimer();
       tutorialLessonIndex = Number.isInteger(snapshot.tutorialLessonIndex)
         ? snapshot.tutorialLessonIndex
         : tutorialLessonIndex;
 
+      if (!shouldRender) return;
       hideHoverTileMenu(true);
       el.eliminationOverlay.classList.add("hidden");
       el.winOverlay.classList.add("hidden");
@@ -1829,6 +1906,7 @@
       syncGameViewHost();
       renderAll();
       updateUndoButtons();
+      scheduleComputerTurnIfNeeded();
     }
 
     function undoLastMove() {
@@ -2128,15 +2206,18 @@
 
     function readGameOptionsFromControls() {
       const variantMode = el.variantMode?.value || "standard";
+      const computerEnabled = app.setupMode === "computer";
       return {
         size: Number(el.boardSize.value),
-        playerCount: Number(el.playerCount.value),
+        playerCount: computerEnabled ? 2 : Number(el.playerCount.value),
         jumpSelection: variantMode === "overload" ? "both" : el.jumpSelection.value,
         poolMode: variantMode === "overload" ? "combined" : el.poolMode.value,
         variantMode,
         hoverTilePickerEnabled: el.hoverTilePickerEnabled?.value === "on",
         names: [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value],
         deadCorner: Number(el.deadCornerSelect.value),
+        computerEnabled,
+        computerDifficulty: el.computerDifficulty?.value || "medium",
       };
     }
 
@@ -2146,6 +2227,9 @@
       if (el.variantMode) el.variantMode.value = options.variantMode || "standard";
       el.jumpSelection.value = options.jumpSelection;
       el.poolMode.value = options.poolMode;
+      if (el.computerDifficulty && options.computerDifficulty) {
+        el.computerDifficulty.value = options.computerDifficulty;
+      }
       if (el.hoverTilePickerEnabled) {
         el.hoverTilePickerEnabled.value = options.hoverTilePickerEnabled ? "on" : "off";
       }
@@ -2156,7 +2240,8 @@
         });
       }
       if (typeof options.deadCorner === "number") el.deadCornerSelect.value = String(options.deadCorner);
-      el.threePlayerCornerField.classList.toggle("hidden", el.playerCount.value !== "3");
+      el.threePlayerCornerField.classList.toggle("hidden", app.setupMode === "computer" || el.playerCount.value !== "3");
+      syncSetupModeUI();
       syncVariantControls();
     }
 
@@ -2263,6 +2348,8 @@
         poolMode: "separate",
         variantMode: "standard",
         hoverTilePickerEnabled: el.hoverTilePickerEnabled?.value === "on",
+        computerEnabled: false,
+        computerDifficulty: el.computerDifficulty?.value || "medium",
         names: [
           el.p1Name.value || "Player 1",
           el.p2Name.value || "Player 2",
@@ -2620,7 +2707,10 @@
       const variantMode = options.variantMode || "standard";
       const jumpSelection = variantMode === "overload" ? "both" : options.jumpSelection;
       const poolMode = variantMode === "overload" ? "combined" : options.poolMode;
-      const names = options.names || [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value];
+      const names = [...(options.names || [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value])];
+      const computerEnabled = !!options.computerEnabled && !options.tutorialMode;
+      const computerDifficulty = options.computerDifficulty || "medium";
+      if (computerEnabled && (!names[1] || names[1] === "Player 2")) names[1] = "Computer";
 
       const activeCorners = [];
       let deadCorner = null;
@@ -2633,7 +2723,18 @@
         activeCorners.push(...CORNERS);
       }
 
-      app.config = { size, playerCount, jumpSelection, poolMode, variantMode, activeCorners };
+      clearComputerTurnTimer();
+      app.aiThinking = false;
+      app.config = {
+        size,
+        playerCount,
+        jumpSelection,
+        poolMode,
+        variantMode,
+        activeCorners,
+        computerEnabled,
+        computerDifficulty,
+      };
       app.board = Array.from({ length: size }, (_, r) =>
         Array.from({ length: size }, (_, c) => ({ r, c, tile: null, dead: false, startOwner: null }))
       );
@@ -2684,6 +2785,7 @@
           id: i,
           name: names[i] || `Player ${i + 1}`,
           color: COLORS[i],
+          isComputer: computerEnabled && i === 1,
           corner,
           baseCells: getBaseCells(size, corner),
           adjacentFirst: getAdjacentToBase(size, corner),
@@ -2709,9 +2811,13 @@
       });
 
       log(`Game started: ${size}×${size}, ${playerCount} players, jump mode "${jumpSelection}"${variantMode === "overload" ? ', variant "overload"' : ""}.`);
+      if (computerEnabled) {
+        log(`Computer opponent enabled on ${computerDifficulty} difficulty.`);
+      }
       el.setupView.classList.add("hidden");
       el.gameView.classList.remove("hidden");
       renderAll();
+      scheduleComputerTurnIfNeeded();
     }
 
     function log(msg) {
@@ -2899,10 +3005,216 @@
       return result;
     }
 
+    function isComputerControlledPlayer(player = currentPlayer()) {
+      return !!player?.isComputer && !!app.config?.computerEnabled && !app.tutorialMode;
+    }
+
+    function getLivePlayer(playerOrId) {
+      if (Number.isInteger(playerOrId)) {
+        return app.players.find((player) => player.id === playerOrId) || null;
+      }
+      if (playerOrId && Number.isInteger(playerOrId.id)) {
+        return app.players.find((player) => player.id === playerOrId.id) || null;
+      }
+      return null;
+    }
+
+    function executePlannedMove(player, move, options = {}) {
+      player = getLivePlayer(player);
+      if (!player || app.gameOver || !player.alive || !move) return false;
+      const shouldRecordUndo = options.recordUndo !== false;
+      const shouldRender = options.render !== false;
+      const shouldRecordTutorial = options.recordTutorial !== false;
+      app.selectedTile = move.tileType;
+      const placement = getPlacementContext(player, move.r, move.c, move.tileType);
+      if (!placement) return false;
+
+      if (!player.hasPlacedFirstTile) {
+        const isValidCell = validFirstTurnCells(player, move.tileType)
+          .some(([vr, vc]) => vr === move.r && vc === move.c);
+        const entries = getFirstTurnEntryChoices(player, move.r, move.c);
+        if (!isValidCell || !entries.includes(move.entry)) return false;
+        if (shouldRecordUndo) createUndoSnapshot();
+        if (!applyPlacement(player, move.r, move.c, move.tileType, placement)) return false;
+        if (shouldRecordTutorial) {
+          recordLessonSixPlacement(player, move.r, move.c, move.tileType, { entry: move.entry, isFirstTurn: true });
+        }
+        player.startPlacement = { r: move.r, c: move.c, entry: move.entry };
+        executeFirstTurnMovement(player, move.r, move.c, move.entry);
+        player.hasPlacedFirstTile = true;
+        app.pendingFirstPlacement = null;
+        el.entrySelectWrap.classList.add("hidden");
+        finalizeRemainingPlayersOutcome();
+        postTurnAdvance({ render: shouldRender });
+        return true;
+      }
+
+      const isValidMove = placement.mode === "overload"
+        ? true
+        : validSubsequentCells(player, move.tileType).some(([vr, vc]) => vr === move.r && vc === move.c);
+      if (!isValidMove) return false;
+      if (shouldRecordUndo) createUndoSnapshot();
+      if (!applyPlacement(player, move.r, move.c, move.tileType, placement)) return false;
+      if (app.tutorialMode?.lessonIdx === 0 && player.id === 0 && player.hasPlacedFirstTile) {
+        app.tutorialMode.lessonOneComplete = true;
+      }
+      if (shouldRecordTutorial) {
+        recordLessonSixPlacement(player, move.r, move.c, move.tileType);
+      }
+      resolveAfterPlacement(move.r, move.c, placement.mode);
+      postTurnAdvance({ render: shouldRender });
+      return true;
+    }
+
+    function collectLegalMoves(player) {
+      player = getLivePlayer(player);
+      if (!player || !player.alive || app.gameOver) return [];
+      const moves = [];
+      const tileTypes = getSelectableTileTypesForPlayer(player);
+      tileTypes.forEach((tileType) => {
+        if (!player.hasPlacedFirstTile) {
+          validFirstTurnCells(player, tileType).forEach(([r, c]) => {
+            getFirstTurnEntryChoices(player, r, c).forEach((entry) => {
+              moves.push({ tileType, r, c, entry });
+            });
+          });
+          return;
+        }
+        validSubsequentCells(player, tileType).forEach(([r, c]) => {
+          moves.push({ tileType, r, c });
+        });
+      });
+      return moves;
+    }
+
+    function manhattanDistance(aRow, aCol, bRow, bCol) {
+      return Math.abs(aRow - bRow) + Math.abs(aCol - bCol);
+    }
+
+    function distanceToNearestOpponentBase(player) {
+      player = getLivePlayer(player);
+      if (!player || player.row == null || player.col == null) return app.config?.size || 0;
+      let best = Infinity;
+      app.players.forEach((other) => {
+        if (!other || other.id === player.id || !other.alive) return;
+        other.baseCells.forEach(([r, c]) => {
+          best = Math.min(best, manhattanDistance(player.row, player.col, r, c));
+        });
+      });
+      return Number.isFinite(best) ? best : app.config?.size || 0;
+    }
+
+    function evaluateStateForPlayer(playerId) {
+      const player = app.players.find((candidate) => candidate.id === playerId);
+      const opponents = app.players.filter((candidate) => candidate.id !== playerId);
+      if (!player) return -Infinity;
+      if (app.gameOver) {
+        if (app.winner === playerId) return 100000;
+        if (app.winner == null) return 0;
+        return -100000;
+      }
+      if (!player.alive) return -50000;
+      let score = 0;
+      const aliveOpponents = opponents.filter((opponent) => opponent.alive);
+      score += aliveOpponents.length === 0 ? 30000 : 0;
+      score += aliveOpponents.reduce((total, opponent) => total + (opponent.alive ? 0 : 4000), 0);
+      score += player.hasPlacedFirstTile ? 90 : -60;
+      score += collectLegalMoves(player).length * 28;
+      score -= distanceToNearestOpponentBase(player) * 14;
+      aliveOpponents.forEach((opponent) => {
+        score -= collectLegalMoves(opponent).length * 16;
+        if (opponent.row != null && opponent.col != null) {
+          score += manhattanDistance(opponent.row, opponent.col, player.row ?? 0, player.col ?? 0);
+        }
+      });
+      return score;
+    }
+
+    function scoreMoveForComputer(playerId, move, difficulty = "medium") {
+      const snapshot = captureGameSnapshot();
+      const actingPlayer = app.players.find((candidate) => candidate.id === playerId);
+      let score = -Infinity;
+      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+        const baseScore = evaluateStateForPlayer(playerId);
+        if (difficulty === "hard" && !app.gameOver) {
+          const responder = currentPlayer();
+          const replyMoves = collectLegalMoves(responder);
+          if (responder && responder.id !== playerId && replyMoves.length) {
+            let worstReplyScore = Infinity;
+            replyMoves.forEach((reply) => {
+              const replySnapshot = captureGameSnapshot();
+              const replyPlayer = currentPlayer();
+              if (replyPlayer && executePlannedMove(replyPlayer, reply, { recordUndo: false, render: false, recordTutorial: false })) {
+                worstReplyScore = Math.min(worstReplyScore, evaluateStateForPlayer(playerId));
+              }
+              restoreSnapshot(replySnapshot, { render: false });
+            });
+            score = Number.isFinite(worstReplyScore)
+              ? worstReplyScore * 0.85 + baseScore * 0.15
+              : baseScore;
+          } else {
+            score = baseScore;
+          }
+        } else {
+          score = baseScore;
+        }
+      }
+      restoreSnapshot(snapshot, { render: false });
+      return score;
+    }
+
+    function chooseComputerMove(player, difficulty = app.config?.computerDifficulty || "medium") {
+      player = getLivePlayer(player);
+      const legalMoves = collectLegalMoves(player);
+      if (!legalMoves.length) return null;
+      if (difficulty === "easy") {
+        return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+      }
+      let bestScore = -Infinity;
+      let bestMoves = [];
+      legalMoves.forEach((move) => {
+        const score = scoreMoveForComputer(player.id, move, difficulty);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMoves = [move];
+          return;
+        }
+        if (score === bestScore) bestMoves.push(move);
+      });
+      if (!bestMoves.length) return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+      return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    }
+
+    function scheduleComputerTurnIfNeeded() {
+      clearComputerTurnTimer();
+      if (!app.config || app.gameOver || app.aiThinking) return;
+      const player = currentPlayer();
+      if (!isComputerControlledPlayer(player)) return;
+      const playerId = player.id;
+      app.aiThinking = true;
+      renderAll();
+      app.computerTurnTimer = setTimeout(() => {
+        app.computerTurnTimer = null;
+        if (app.gameOver) {
+          app.aiThinking = false;
+          renderAll();
+          return;
+        }
+        const move = chooseComputerMove(playerId);
+        app.aiThinking = false;
+        const activePlayer = getLivePlayer(playerId);
+        if (!activePlayer || !move) {
+          renderAll();
+          return;
+        }
+        executePlannedMove(activePlayer, move);
+      }, 420);
+    }
+
     function attemptPlaceAtCell(r, c, tileType) {
       if (app.gameOver) return;
       const p = currentPlayer();
-      if (!p || !p.alive) return;
+      if (!p || !p.alive || isComputerControlledPlayer(p) || app.aiThinking) return;
       if (!canUseTile(p, tileType)) return;
       const placement = getPlacementContext(p, r, c, tileType);
       if (!placement) return;
@@ -2921,19 +3233,7 @@
         return;
       }
 
-      const valid = placement.mode === "overload"
-        ? true
-        : validSubsequentCells(p, tileType).some(([vr, vc]) => vr === r && vc === c);
-      if (!valid) return;
-
-      createUndoSnapshot();
-      if (!applyPlacement(p, r, c, tileType, placement)) return;
-      if (app.tutorialMode?.lessonIdx === 0 && p.id === 0 && p.hasPlacedFirstTile) {
-        app.tutorialMode.lessonOneComplete = true;
-      }
-      recordLessonSixPlacement(p, r, c, tileType);
-      resolveAfterPlacement(r, c, placement.mode);
-      postTurnAdvance();
+      executePlannedMove(p, { tileType, r, c });
     }
 
     function onCellClick(r, c) {
@@ -2943,23 +3243,19 @@
 
     function completeFirstTurnPlacement(player, r, c, tileType, entry, placement = getPlacementContext(player, r, c, tileType)) {
       if (!player || app.gameOver) return;
-      createUndoSnapshot();
-      if (!applyPlacement(player, r, c, tileType, placement)) return;
-      recordLessonSixPlacement(player, r, c, tileType, { entry, isFirstTurn: true });
-      player.startPlacement = { r, c, entry };
-      executeFirstTurnMovement(player, r, c, entry);
-      player.hasPlacedFirstTile = true;
-      app.pendingFirstPlacement = null;
-      el.entrySelectWrap.classList.add("hidden");
-      finalizeRemainingPlayersOutcome();
-      postTurnAdvance();
+      if (!placement) return;
+      executePlannedMove(player, { tileType, r, c, entry });
     }
 
-    function getSelectableTileTypesForCurrentPlayer() {
-      const p = currentPlayer();
+    function getSelectableTileTypesForPlayer(player = currentPlayer()) {
+      const p = getLivePlayer(player);
       if (!p || !p.alive || app.gameOver) return [];
       return Object.keys(TILE_LABELS)
         .filter((type) => tileIsEnabledForSelection(type) && canUseTile(p, type));
+    }
+
+    function getSelectableTileTypesForCurrentPlayer() {
+      return getSelectableTileTypesForPlayer(currentPlayer());
     }
 
     function cancelHoverMenuHide() {
@@ -3410,7 +3706,6 @@
       app.winShown = false;
       app.tieShown = false;
       app.pendingFirstPlacement = null;
-      app.eliminationQueue = [];
       el.entrySelectWrap.classList.add("hidden");
       el.winOverlay.classList.add("hidden");
       if (app.drag.active) {
@@ -3426,7 +3721,6 @@
       app.winner = null;
       app.tieShown = false;
       app.pendingFirstPlacement = null;
-      app.eliminationQueue = [];
       el.entrySelectWrap.classList.add("hidden");
       if (app.drag.active) {
         if (app.drag.ghost) app.drag.ghost.remove();
@@ -3450,7 +3744,8 @@
       }
     }
 
-    function postTurnAdvance() {
+    function postTurnAdvance(options = {}) {
+      const shouldRender = options.render !== false;
       if (!app.gameOver) {
         const skipPlayerTwo = shouldSkipPlayerTwoTutorialTurns();
         let idx = app.currentPlayerIdx;
@@ -3470,10 +3765,12 @@
           if (anyAliveIdx !== -1) app.currentPlayerIdx = anyAliveIdx;
         }
       }
+      if (!shouldRender) return;
       renderAll();
       showNextElimination();
       showTieOverlayIfReady();
       showWinnerOverlayIfReady();
+      scheduleComputerTurnIfNeeded();
     }
 
     function showTieOverlayIfReady() {
@@ -3569,6 +3866,7 @@
       renderTiles();
       renderSelectedTilePreview();
       renderVariant();
+      renderComputerPanel();
       renderBoard();
       renderStatus();
       renderPlayers();
@@ -3618,6 +3916,7 @@
         `Jump: ${app.config.jumpSelection}${app.config.jumpSelection === "both" ? ` (${app.config.poolMode})` : ""}`,
       ];
       if (app.config.variantMode === "overload") chips.push("Variant: overload");
+      if (app.config.computerEnabled) chips.push(`Computer: ${app.config.computerDifficulty}`);
       chips.forEach(t => {
         const d = document.createElement("div");
         d.className = "chip";
@@ -3635,6 +3934,20 @@
       el.variantText.textContent = "Standard rules.";
     }
 
+    function renderComputerPanel() {
+      if (!el.computerPanel || !el.computerText) return;
+      const enabled = !!app.config?.computerEnabled;
+      el.computerPanel.classList.toggle("hidden", !enabled);
+      if (!enabled) return;
+      const player = app.players.find((candidate) => candidate.isComputer);
+      const state = app.aiThinking && isComputerControlledPlayer()
+        ? "Thinking..."
+        : isComputerControlledPlayer()
+          ? "Ready to move."
+          : "Waiting for your turn.";
+      el.computerText.innerHTML = `${player?.name || "Computer"} is controlling Player 2.<br>Difficulty: ${app.config.computerDifficulty}.<br>${state}`;
+    }
+
     function tileIsEnabledForSelection(type) {
       if (type !== "jump" && type !== "diagonalJump") return true;
       const js = app.config.jumpSelection;
@@ -3648,12 +3961,13 @@
       el.tileGrid.innerHTML = "";
       const p = currentPlayer();
       const types = Object.keys(TILE_LABELS);
+      const computerTurn = app.aiThinking || isComputerControlledPlayer(p);
       types.forEach(type => {
         const b = document.createElement("button");
         b.className = "tile-btn" + (app.selectedTile === type ? " selected" : "");
         const enabledByMode = tileIsEnabledForSelection(type);
         const enabledByPool = p && canUseTile(p, type);
-        b.disabled = app.gameOver || !enabledByMode || !enabledByPool;
+        b.disabled = app.gameOver || computerTurn || !enabledByMode || !enabledByPool;
         b.onclick = () => { app.selectedTile = type; renderAll(); };
         b.draggable = false;
         if (!b.disabled) {
@@ -3690,8 +4004,9 @@
         getLessonThreePresetMarkers().map((marker) => [key(marker.r, marker.c), marker.label])
       );
       const p = currentPlayer();
+      const computerTurn = app.aiThinking || isComputerControlledPlayer(p);
       let canPlaceOnCell = () => false;
-      if (!app.gameOver && p?.alive) {
+      if (!app.gameOver && p?.alive && !computerTurn) {
         const selectedType = app.selectedTile;
         canPlaceOnCell = (r, c) => canUseTile(p, selectedType) && !!getPlacementContext(p, r, c, selectedType);
         if (!p.hasPlacedFirstTile) {
@@ -3725,7 +4040,7 @@
             btn.addEventListener("mouseenter", () => showHoverTileMenu(btn, r, c));
             btn.addEventListener("mouseleave", scheduleHoverMenuHide);
           }
-          btn.disabled = app.gameOver;
+          btn.disabled = app.gameOver || computerTurn;
           btn.onclick = () => onCellClick(r, c);
 
           if (cell.tile) {
@@ -3791,7 +4106,8 @@
     }
 
     function renderStatus() {
-      if (!el.statusText || !el.winnerText || el.statusText.classList.contains("hidden")) return;
+      if (!el.statusText || !el.winnerText) return;
+      el.statusText.classList.remove("hidden");
       const p = currentPlayer();
       if (app.gameOver) {
         el.statusText.innerHTML = "Game over.";
@@ -3807,9 +4123,15 @@
           const pending = app.pendingFirstPlacement
             ? `Step 2/2: Pick entry for tile at (${app.pendingFirstPlacement.r},${app.pendingFirstPlacement.c})`
             : "Step 1/2: Click any green cell adjacent to your base";
-          el.statusText.innerHTML = `Turn: ${turnText}<br>First move: ${pending}`;
+          if (app.aiThinking || isComputerControlledPlayer(p)) {
+            el.statusText.innerHTML = `Turn: ${turnText}<br>Computer is choosing its opening move.`;
+          } else {
+            el.statusText.innerHTML = `Turn: ${turnText}<br>First move: ${pending}`;
+          }
         } else if (isTutorialLessonOneFollowUpTurn(p)) {
           el.statusText.innerHTML = `Turn: ${turnText}<br>Choose a tile and place it in front of your entrance. The red line shows the path you took.`;
+        } else if (app.aiThinking || isComputerControlledPlayer(p)) {
+          el.statusText.innerHTML = `Turn: ${turnText}<br>Computer is thinking about its next tile.`;
         } else {
           el.statusText.innerHTML = `Turn: ${turnText}<br>Phase: Place tile in front of your entrance`;
         }
@@ -3826,7 +4148,8 @@
         else if (app.config.jumpSelection === "diagonal") jumps = `diag:${p.diagonalJumpLeft}`;
         else if (app.config.jumpSelection === "both") jumps = app.config.poolMode === "combined"
           ? `combined:${p.combinedJumpLeft}` : `jump:${p.jumpLeft}, diag:${p.diagonalJumpLeft}`;
-        return `${p.name} — ${life}, ${pos}${jumps ? `, ${jumps}` : ""}`;
+        const controller = p.isComputer ? "computer" : "human";
+        return `${p.name} — ${controller}, ${life}, ${pos}${jumps ? `, ${jumps}` : ""}`;
       });
       el.playersText.innerHTML = lines.join("<br>");
     }
@@ -3907,6 +4230,7 @@
     }
 
     setupBindings();
+    syncSetupModeUI();
     renderTutorialCard();
     syncVariantControls();
     try {
