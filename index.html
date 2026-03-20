@@ -3515,6 +3515,9 @@
       const player = app.players.find((candidate) => candidate.id === playerId);
       const opponents = app.players.filter((candidate) => candidate.id !== playerId);
       if (!player) return -Infinity;
+      const style = normalizeOracleStyle(app.config?.oracleStyle || "balanced");
+      const styleAttack = style === "aggressive" ? 1.2 : style === "defensive" ? 0.88 : 1;
+      const styleDefense = style === "aggressive" ? 0.9 : style === "defensive" ? 1.2 : 1;
       if (app.gameOver) {
         if (app.winner === playerId) return 100000;
         // Oracle should prefer pressing for wins over settling for draws.
@@ -3530,12 +3533,12 @@
       score += player.hasPlacedFirstTile ? 90 : -60;
       score += collectLegalMoves(player).length * 28;
       score += ownJumpPool * 24;
-      score -= distanceToNearestOpponentBase(player) * 24;
+      score -= distanceToNearestOpponentBase(player) * 24 * styleAttack;
       aliveOpponents.forEach((opponent) => {
         const oppJumpPool = (opponent.jumpLeft || 0) + (opponent.diagonalJumpLeft || 0) + (opponent.combinedJumpLeft || 0);
         score -= collectLegalMoves(opponent).length * 16;
         score -= oppJumpPool * 20;
-        score += distanceToPlayerBase(opponent, player) * 12;
+        score += distanceToPlayerBase(opponent, player) * 12 * styleDefense;
       });
       return score;
     }
@@ -5129,7 +5132,7 @@
       ];
       if (app.config.variantMode === "overload") chips.push("Variant: overload");
       if (app.config.computerEnabled) chips.push(`Computer: ${app.config.computerDifficulty}`);
-      if (app.config.computerEnabled && app.config.computerDifficulty === "oracle") {
+      if (app.config.computerEnabled) {
         chips.push(`Oracle style: ${app.config.oracleStyle || "balanced"}`);
       }
       chips.forEach(t => {
@@ -5160,9 +5163,7 @@
         : isComputerControlledPlayer()
           ? "Ready to move."
           : "Waiting for your turn.";
-      const styleText = app.config.computerDifficulty === "oracle"
-        ? `<br>Style: ${app.config.oracleStyle || "balanced"}.`
-        : "";
+      const styleText = `<br>Style: ${app.config.oracleStyle || "balanced"}.`;
       el.computerText.innerHTML = `${player?.name || "Computer"} is controlling Player 2.<br>Difficulty: ${app.config.computerDifficulty}.${styleText}<br>${state}`;
     }
 
