@@ -1471,6 +1471,7 @@
       setupMode: "play",
       aiThinking: false,
       computerTurnTimer: null,
+      suppressOverlays: false,
     };
 
     const el = {
@@ -1887,6 +1888,7 @@
       app.overlayMode = snapshot.overlayMode || null;
       app.tutorialMode = cloneStateValue(snapshot.tutorialMode);
       app.hoverTilePickerEnabled = !!snapshot.hoverTilePickerEnabled;
+      app.suppressOverlays = false;
       app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
       app.aiThinking = false;
       clearComputerTurnTimer();
@@ -3027,45 +3029,51 @@
       const shouldRecordUndo = options.recordUndo !== false;
       const shouldRender = options.render !== false;
       const shouldRecordTutorial = options.recordTutorial !== false;
-      app.selectedTile = move.tileType;
-      const placement = getPlacementContext(player, move.r, move.c, move.tileType);
-      if (!placement) return false;
+      const previousSuppressOverlays = app.suppressOverlays;
+      if (!shouldRender) app.suppressOverlays = true;
+      try {
+        app.selectedTile = move.tileType;
+        const placement = getPlacementContext(player, move.r, move.c, move.tileType);
+        if (!placement) return false;
 
-      if (!player.hasPlacedFirstTile) {
-        const isValidCell = validFirstTurnCells(player, move.tileType)
-          .some(([vr, vc]) => vr === move.r && vc === move.c);
-        const entries = getFirstTurnEntryChoices(player, move.r, move.c);
-        if (!isValidCell || !entries.includes(move.entry)) return false;
+        if (!player.hasPlacedFirstTile) {
+          const isValidCell = validFirstTurnCells(player, move.tileType)
+            .some(([vr, vc]) => vr === move.r && vc === move.c);
+          const entries = getFirstTurnEntryChoices(player, move.r, move.c);
+          if (!isValidCell || !entries.includes(move.entry)) return false;
+          if (shouldRecordUndo) createUndoSnapshot();
+          if (!applyPlacement(player, move.r, move.c, move.tileType, placement)) return false;
+          if (shouldRecordTutorial) {
+            recordLessonSixPlacement(player, move.r, move.c, move.tileType, { entry: move.entry, isFirstTurn: true });
+          }
+          player.startPlacement = { r: move.r, c: move.c, entry: move.entry };
+          executeFirstTurnMovement(player, move.r, move.c, move.entry);
+          player.hasPlacedFirstTile = true;
+          app.pendingFirstPlacement = null;
+          el.entrySelectWrap.classList.add("hidden");
+          finalizeRemainingPlayersOutcome();
+          postTurnAdvance({ render: shouldRender });
+          return true;
+        }
+
+        const isValidMove = placement.mode === "overload"
+          ? true
+          : validSubsequentCells(player, move.tileType).some(([vr, vc]) => vr === move.r && vc === move.c);
+        if (!isValidMove) return false;
         if (shouldRecordUndo) createUndoSnapshot();
         if (!applyPlacement(player, move.r, move.c, move.tileType, placement)) return false;
-        if (shouldRecordTutorial) {
-          recordLessonSixPlacement(player, move.r, move.c, move.tileType, { entry: move.entry, isFirstTurn: true });
+        if (app.tutorialMode?.lessonIdx === 0 && player.id === 0 && player.hasPlacedFirstTile) {
+          app.tutorialMode.lessonOneComplete = true;
         }
-        player.startPlacement = { r: move.r, c: move.c, entry: move.entry };
-        executeFirstTurnMovement(player, move.r, move.c, move.entry);
-        player.hasPlacedFirstTile = true;
-        app.pendingFirstPlacement = null;
-        el.entrySelectWrap.classList.add("hidden");
-        finalizeRemainingPlayersOutcome();
+        if (shouldRecordTutorial) {
+          recordLessonSixPlacement(player, move.r, move.c, move.tileType);
+        }
+        resolveAfterPlacement(move.r, move.c, placement.mode);
         postTurnAdvance({ render: shouldRender });
         return true;
+      } finally {
+        app.suppressOverlays = previousSuppressOverlays;
       }
-
-      const isValidMove = placement.mode === "overload"
-        ? true
-        : validSubsequentCells(player, move.tileType).some(([vr, vc]) => vr === move.r && vc === move.c);
-      if (!isValidMove) return false;
-      if (shouldRecordUndo) createUndoSnapshot();
-      if (!applyPlacement(player, move.r, move.c, move.tileType, placement)) return false;
-      if (app.tutorialMode?.lessonIdx === 0 && player.id === 0 && player.hasPlacedFirstTile) {
-        app.tutorialMode.lessonOneComplete = true;
-      }
-      if (shouldRecordTutorial) {
-        recordLessonSixPlacement(player, move.r, move.c, move.tileType);
-      }
-      resolveAfterPlacement(move.r, move.c, placement.mode);
-      postTurnAdvance({ render: shouldRender });
-      return true;
     }
 
     function collectLegalMoves(player) {
@@ -3822,6 +3830,7 @@
     }
 
     function showNextElimination() {
+      if (app.suppressOverlays) return;
       if (app.eliminationQueue.length === 0) {
         showWinnerOverlayIfReady();
         return;
@@ -3935,6 +3944,7 @@
     }
 
     function showTieOverlayIfReady() {
+      if (app.suppressOverlays) return;
       if (!app.gameOver || app.winner != null || app.tieShown) return;
       if (app.eliminationQueue.length > 0) return;
       if (!el.eliminationOverlay.classList.contains("hidden")) return;
@@ -3952,6 +3962,7 @@
     }
 
     function showWinnerOverlayIfReady() {
+      if (app.suppressOverlays) return;
       if (!app.gameOver || app.winner == null || app.winShown) return;
       if (app.eliminationQueue.length > 0) return;
       if (!el.eliminationOverlay.classList.contains("hidden")) return;
