@@ -1514,8 +1514,13 @@
                 <option value="easy">Easy</option>
                 <option value="medium" selected>Medium</option>
                 <option value="hard">Hard</option>
-                <option value="expert">Expert (up to 5 moves)</option>
-                <option value="oracle">Oracle (up to 10 moves)</option>
+                <option value="oracle">Oracle (perfect play)</option>
+              </select>
+              <label for="oracleStyle" style="margin-top:8px;">Oracle Style</label>
+              <select id="oracleStyle">
+                <option value="balanced" selected>Balanced</option>
+                <option value="aggressive">Aggressive</option>
+                <option value="defensive">Defensive</option>
               </select>
               <div style="font-size:12px;color:#9eb8e6;margin-top:6px;">
                 Computer mode is always a 2-player match, and the computer controls Player 2.
@@ -1726,6 +1731,7 @@
       aiThinking: false,
       computerTurnTimer: null,
       suppressOverlays: false,
+      benchmarkMode: false,
     };
 
     const el = {
@@ -1781,6 +1787,7 @@
       setupSubtext: document.getElementById("setupSubtext"),
       computerDifficultyField: document.getElementById("computerDifficultyField"),
       computerDifficulty: document.getElementById("computerDifficulty"),
+      oracleStyle: document.getElementById("oracleStyle"),
       computerPanel: document.getElementById("computerPanel"),
       computerText: document.getElementById("computerText"),
       tutorialBubbleBtn: null,
@@ -2476,7 +2483,19 @@
         deadCorner: Number(el.deadCornerSelect.value),
         computerEnabled,
         computerDifficulty: el.computerDifficulty?.value || "medium",
+        oracleStyle: el.oracleStyle?.value || "balanced",
       };
+    }
+
+    function normalizeComputerDifficulty(level) {
+      if (level === "expert") return "oracle";
+      if (level === "easy" || level === "medium" || level === "hard" || level === "oracle") return level;
+      return "medium";
+    }
+
+    function normalizeOracleStyle(style) {
+      if (style === "aggressive" || style === "balanced" || style === "defensive") return style;
+      return "balanced";
     }
 
     function applyGameOptionsToControls(options) {
@@ -2486,7 +2505,10 @@
       el.jumpSelection.value = options.jumpSelection;
       el.poolMode.value = options.poolMode;
       if (el.computerDifficulty && options.computerDifficulty) {
-        el.computerDifficulty.value = options.computerDifficulty;
+        el.computerDifficulty.value = normalizeComputerDifficulty(options.computerDifficulty);
+      }
+      if (el.oracleStyle && options.oracleStyle) {
+        el.oracleStyle.value = normalizeOracleStyle(options.oracleStyle);
       }
       if (el.hoverTilePickerEnabled) {
         el.hoverTilePickerEnabled.value = options.hoverTilePickerEnabled ? "on" : "off";
@@ -2608,6 +2630,7 @@
         hoverTilePickerEnabled: el.hoverTilePickerEnabled?.value === "on",
         computerEnabled: false,
         computerDifficulty: el.computerDifficulty?.value || "medium",
+        oracleStyle: el.oracleStyle?.value || "balanced",
         names: [
           el.p1Name.value || "Player 1",
           el.p2Name.value || "Player 2",
@@ -2967,7 +2990,8 @@
       const poolMode = variantMode === "overload" ? "combined" : options.poolMode;
       const names = [...(options.names || [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value])];
       const computerEnabled = !!options.computerEnabled && !options.tutorialMode;
-      const computerDifficulty = options.computerDifficulty || "medium";
+      const computerDifficulty = normalizeComputerDifficulty(options.computerDifficulty);
+      const oracleStyle = normalizeOracleStyle(options.oracleStyle);
       if (computerEnabled && (!names[1] || names[1] === "Player 2")) names[1] = "Computer";
 
       const activeCorners = [];
@@ -2992,6 +3016,7 @@
         activeCorners,
         computerEnabled,
         computerDifficulty,
+        oracleStyle,
       };
       app.board = Array.from({ length: size }, (_, r) =>
         Array.from({ length: size }, (_, c) => ({ r, c, tile: null, dead: false, startOwner: null }))
@@ -3071,6 +3096,9 @@
       log(`Game started: ${size}×${size}, ${playerCount} players, jump mode "${jumpSelection}"${variantMode === "overload" ? ', variant "overload"' : ""}.`);
       if (computerEnabled) {
         log(`Computer opponent enabled on ${computerDifficulty} difficulty.`);
+        if (computerDifficulty === "oracle") {
+          log(`Oracle style set to ${oracleStyle}.`);
+        }
       }
       el.setupView.classList.add("hidden");
       el.gameView.classList.remove("hidden");
@@ -3079,6 +3107,7 @@
     }
 
     function log(msg) {
+      if (app.benchmarkMode) return;
       app.logs.unshift(`${new Date().toLocaleTimeString()}  ${msg}`);
       if (app.logs.length > 80) app.logs.pop();
     }
@@ -3368,30 +3397,399 @@
       return Number.isFinite(best) ? best : app.config?.size || 0;
     }
 
+    function distanceToPlayerBase(sourcePlayer, targetPlayer) {
+      sourcePlayer = getLivePlayer(sourcePlayer);
+      targetPlayer = getLivePlayer(targetPlayer);
+      if (!sourcePlayer || !targetPlayer || sourcePlayer.row == null || sourcePlayer.col == null) {
+        return app.config?.size || 0;
+      }
+      let best = Infinity;
+      targetPlayer.baseCells.forEach(([r, c]) => {
+        best = Math.min(best, manhattanDistance(sourcePlayer.row, sourcePlayer.col, r, c));
+      });
+      return Number.isFinite(best) ? best : app.config?.size || 0;
+    }
+
+    function distanceFromPositionToBaseCells(row, col, baseCells) {
+      if (!Number.isInteger(row) || !Number.isInteger(col) || !Array.isArray(baseCells) || !baseCells.length) {
+        return app.config?.size || 0;
+      }
+      let best = Infinity;
+      baseCells.forEach(([r, c]) => {
+        best = Math.min(best, manhattanDistance(row, col, r, c));
+      });
+      return Number.isFinite(best) ? best : app.config?.size || 0;
+    }
+
+    function distanceFromPositionToNearestOpponentBase(playerId, row, col) {
+      if (!Number.isInteger(row) || !Number.isInteger(col)) return app.config?.size || 0;
+      let best = Infinity;
+      app.players.forEach((candidate) => {
+        if (!candidate || candidate.id === playerId) return;
+        candidate.baseCells.forEach(([baseRow, baseCol]) => {
+          best = Math.min(best, manhattanDistance(row, col, baseRow, baseCol));
+        });
+      });
+      return Number.isFinite(best) ? best : app.config?.size || 0;
+    }
+
+    function getOracleStyleTuning(style = app.config?.oracleStyle || "balanced") {
+      const normalized = normalizeOracleStyle(style);
+      if (normalized === "aggressive") {
+        return {
+          attackWeight: 48,
+          defenseWeight: 22,
+          tacticalScale: 1.2,
+          earlyDepth: 13,
+          earlyBreadth: 24,
+          earlyTimeMs: 14500,
+          midDepth: 15,
+          midBreadth: 30,
+          midTimeMs: 18500,
+          endgameTimeMs: 25000,
+          gauntletKeep: 10,
+        };
+      }
+      if (normalized === "defensive") {
+        return {
+          attackWeight: 30,
+          defenseWeight: 36,
+          tacticalScale: 0.95,
+          earlyDepth: 11,
+          earlyBreadth: 20,
+          earlyTimeMs: 10500,
+          midDepth: 13,
+          midBreadth: 24,
+          midTimeMs: 13500,
+          endgameTimeMs: 18000,
+          gauntletKeep: 8,
+        };
+      }
+      return {
+        attackWeight: 38,
+        defenseWeight: 28,
+        tacticalScale: 1,
+        earlyDepth: 12,
+        earlyBreadth: 22,
+        earlyTimeMs: 12000,
+        midDepth: 14,
+        midBreadth: 28,
+        midTimeMs: 15000,
+        endgameTimeMs: 22000,
+        gauntletKeep: 8,
+      };
+    }
+
+    function projectPlayerAlongExistingTiles(player, maxSteps = 32) {
+      player = getLivePlayer(player);
+      if (!player || !player.alive || !player.hasPlacedFirstTile) {
+        return { status: "idle", steps: 0, row: player?.row ?? null, col: player?.col ?? null };
+      }
+      if (!Number.isInteger(player.row) || !Number.isInteger(player.col) || !Number.isInteger(player.entrance)) {
+        return { status: "idle", steps: 0, row: player.row, col: player.col };
+      }
+      let row = player.row;
+      let col = player.col;
+      let entrance = player.entrance;
+      const seen = new Set();
+      let steps = 0;
+      while (steps < maxSteps) {
+        const stateKey = `${row},${col},${entrance}`;
+        if (seen.has(stateKey)) return { status: "loop", steps, row, col };
+        seen.add(stateKey);
+        const cell = app.board[row]?.[col];
+        if (!cell?.tile) return { status: "stopped", steps, row, col };
+        const exit = getExitEntrance(cell.tile, entrance);
+        const next = jumpOrAdjacent(row, col, entrance, exit, cell.tile.type, cell.tile.rot || 0, player);
+        steps++;
+        if (next.win) return { status: "win", steps, row: null, col: null };
+        if (next.eliminated) return { status: "dead", steps, row: null, col: null };
+        row = next.row;
+        col = next.col;
+        entrance = next.entrance;
+      }
+      return { status: "capped", steps, row, col };
+    }
+
     function evaluateStateForPlayer(playerId) {
       const player = app.players.find((candidate) => candidate.id === playerId);
       const opponents = app.players.filter((candidate) => candidate.id !== playerId);
       if (!player) return -Infinity;
       if (app.gameOver) {
         if (app.winner === playerId) return 100000;
-        if (app.winner == null) return 0;
+        // Oracle should prefer pressing for wins over settling for draws.
+        if (app.winner == null) return -350;
         return -100000;
       }
       if (!player.alive) return -50000;
       let score = 0;
       const aliveOpponents = opponents.filter((opponent) => opponent.alive);
+      const ownJumpPool = (player.jumpLeft || 0) + (player.diagonalJumpLeft || 0) + (player.combinedJumpLeft || 0);
       score += aliveOpponents.length === 0 ? 30000 : 0;
       score += aliveOpponents.reduce((total, opponent) => total + (opponent.alive ? 0 : 4000), 0);
       score += player.hasPlacedFirstTile ? 90 : -60;
       score += collectLegalMoves(player).length * 28;
-      score -= distanceToNearestOpponentBase(player) * 14;
+      score += ownJumpPool * 24;
+      score -= distanceToNearestOpponentBase(player) * 24;
       aliveOpponents.forEach((opponent) => {
+        const oppJumpPool = (opponent.jumpLeft || 0) + (opponent.diagonalJumpLeft || 0) + (opponent.combinedJumpLeft || 0);
         score -= collectLegalMoves(opponent).length * 16;
-        if (opponent.row != null && opponent.col != null) {
-          score += manhattanDistance(opponent.row, opponent.col, player.row ?? 0, player.col ?? 0);
-        }
+        score -= oppJumpPool * 20;
+        score += distanceToPlayerBase(opponent, player) * 12;
       });
       return score;
+    }
+
+    function evaluateStateForOracle(playerId) {
+      const baseScore = evaluateStateForPlayer(playerId);
+      const player = app.players.find((candidate) => candidate.id === playerId);
+      if (!player || !player.alive || app.gameOver) return baseScore;
+      const tuning = getOracleStyleTuning();
+      const aliveOpponents = app.players.filter((candidate) => candidate.id !== playerId && candidate.alive);
+      let pressure = 0;
+      pressure -= distanceToNearestOpponentBase(player) * tuning.attackWeight;
+      const ownProjection = projectPlayerAlongExistingTiles(player);
+      if (ownProjection.status === "win") {
+        pressure += 1500;
+      } else if (ownProjection.status === "dead") {
+        pressure -= 900;
+      } else if (Number.isInteger(ownProjection.row) && Number.isInteger(ownProjection.col)) {
+        const projectedDistance = distanceFromPositionToNearestOpponentBase(playerId, ownProjection.row, ownProjection.col);
+        pressure += (distanceToNearestOpponentBase(player) - projectedDistance) * 70;
+        pressure += ownProjection.steps * 10;
+      }
+      aliveOpponents.forEach((opponent) => {
+        pressure += distanceToPlayerBase(opponent, player) * tuning.defenseWeight;
+        const oppProjection = projectPlayerAlongExistingTiles(opponent);
+        if (oppProjection.status === "win") {
+          pressure -= 1200;
+        } else if (oppProjection.status === "dead") {
+          pressure += 700;
+        } else if (Number.isInteger(oppProjection.row) && Number.isInteger(oppProjection.col)) {
+          const before = distanceFromPositionToBaseCells(opponent.row, opponent.col, player.baseCells);
+          const after = distanceFromPositionToBaseCells(oppProjection.row, oppProjection.col, player.baseCells);
+          pressure += (after - before) * 54;
+        }
+      });
+      return baseScore + pressure;
+    }
+
+    function evaluateStateForSearch(playerId, searchConfig) {
+      if (searchConfig?.profile === "oracle") return evaluateStateForOracle(playerId);
+      return evaluateStateForPlayer(playerId);
+    }
+
+    function captureOracleTacticalContext(playerId) {
+      const player = app.players.find((candidate) => candidate.id === playerId);
+      if (!player) return null;
+      const occupiedCells = new Set();
+      app.board.forEach((row, r) => {
+        row.forEach((cell, c) => {
+          if (cell?.tile) occupiedCells.add(`${r},${c}`);
+        });
+      });
+      const opponentBaseDistances = new Map();
+      app.players.forEach((candidate) => {
+        if (!candidate || candidate.id === playerId || !candidate.alive) return;
+        opponentBaseDistances.set(
+          candidate.id,
+          distanceFromPositionToBaseCells(candidate.row, candidate.col, player.baseCells)
+        );
+      });
+      return {
+        occupiedCells,
+        ownBaseCells: [...player.baseCells],
+        ownDistanceToEnemyBase: distanceToNearestOpponentBase(player),
+        opponentBaseDistances,
+      };
+    }
+
+    function scoreOracleTacticalDelta(playerId, context) {
+      if (!context) return 0;
+      const tuning = getOracleStyleTuning();
+      let bonus = 0;
+      const player = app.players.find((candidate) => candidate.id === playerId);
+      if (player?.alive) {
+        const afterDistance = distanceToNearestOpponentBase(player);
+        bonus += (context.ownDistanceToEnemyBase - afterDistance) * 130 * tuning.tacticalScale;
+        if (Array.isArray(player.trail) && player.trail.length) {
+          const rewardedPlacedTiles = new Set();
+          let bestProgressDistance = context.ownDistanceToEnemyBase;
+          player.trail.forEach((point) => {
+            const key = `${point.row},${point.col}`;
+            if (!context.occupiedCells.has(key) || rewardedPlacedTiles.has(key)) return;
+            const pointDistance = distanceFromPositionToNearestOpponentBase(playerId, point.row, point.col);
+            if (pointDistance < bestProgressDistance) {
+              const improvement = bestProgressDistance - pointDistance;
+              bonus += (18 + improvement * 22) * tuning.tacticalScale;
+              bestProgressDistance = pointDistance;
+              rewardedPlacedTiles.add(key);
+            }
+          });
+        }
+      }
+      context.opponentBaseDistances.forEach((beforeDistance, opponentId) => {
+        const opponent = app.players.find((candidate) => candidate.id === opponentId);
+        if (!opponent || !opponent.alive) {
+          bonus += 950;
+          return;
+        }
+        const afterDistance = distanceFromPositionToBaseCells(opponent.row, opponent.col, context.ownBaseCells);
+        const pushback = afterDistance - beforeDistance;
+        if (pushback > 0) {
+          // Tune down tiny one-cell regressions to avoid passive "nudge" play.
+          const pushBonus = pushback === 1 ? 26 : 26 + (pushback - 1) * 88;
+          bonus += pushBonus * tuning.tacticalScale;
+        } else if (pushback < 0) {
+          // Strongly punish letting opponent move closer to our base.
+          bonus += pushback * 112 * tuning.tacticalScale;
+        }
+      });
+      return bonus;
+    }
+
+    function scoreOracleMoveByOpponentBestReply(playerId, move, replyCap = 12) {
+      const snapshot = captureGameSnapshot();
+      let score = -Infinity;
+      const actingPlayer = app.players.find((candidate) => candidate.id === playerId);
+      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+        if (app.gameOver && app.winner === playerId) {
+          score = 2000000;
+        } else {
+          const responder = currentPlayer();
+          if (!responder || responder.id === playerId || !responder.alive) {
+            score = evaluateStateForOracle(playerId);
+          } else {
+            let replies = collectLegalMoves(responder);
+            if (replies.length > replyCap) {
+              replies = rankMovesForLookahead(
+                responder.id,
+                responder.id,
+                replies,
+                true,
+                replyCap,
+                "oracle"
+              );
+            }
+            if (!replies.length) {
+              score = evaluateStateForOracle(playerId);
+            } else {
+              let worstForOracle = Infinity;
+              for (const reply of replies) {
+                const replySnapshot = captureGameSnapshot();
+                const replyPlayer = currentPlayer();
+                if (replyPlayer && executePlannedMove(replyPlayer, reply, { recordUndo: false, render: false, recordTutorial: false })) {
+                  worstForOracle = Math.min(worstForOracle, evaluateStateForOracle(playerId));
+                }
+                restoreSnapshot(replySnapshot, { render: false });
+              }
+              score = Number.isFinite(worstForOracle) ? worstForOracle : evaluateStateForOracle(playerId);
+            }
+          }
+        }
+      }
+      restoreSnapshot(snapshot, { render: false });
+      return score;
+    }
+
+    function pruneOracleMovesByOpponentReply(player, moves, keepCount = 16, replyCap = 12) {
+      if (!Array.isArray(moves) || !moves.length) return [];
+      if (moves.length <= keepCount) return [...moves];
+      const scored = moves.map((move) => ({
+        move,
+        score: scoreOracleMoveByOpponentBestReply(player.id, move, replyCap),
+      }));
+      scored.sort((a, b) => b.score - a.score);
+      return scored.slice(0, keepCount).map((entry) => entry.move);
+    }
+
+    function chooseOracleMoveForSimulation(player) {
+      const legalMoves = collectLegalMoves(player);
+      if (!legalMoves.length) return null;
+      const tuning = getOracleStyleTuning();
+      for (const move of legalMoves) {
+        if (moveCausesImmediateWin(player.id, move)) return move;
+      }
+      const nonSuicidalMoves = legalMoves.filter((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
+      const survivalPool = nonSuicidalMoves.length ? nonSuicidalMoves : legalMoves;
+      const safeMoves = survivalPool.filter((move) => !moveAllowsOpponentImmediateWin(player.id, move));
+      const movePool = safeMoves.length ? safeMoves : survivalPool;
+      const openCells = estimateRemainingTurnDepth();
+      if (openCells <= 10) {
+        return chooseMoveWithDeepLookahead(player, Math.min(openCells, 6), 10, 450, movePool, "oracle");
+      }
+      return chooseMoveWithDeepLookahead(player, Math.max(4, tuning.earlyDepth - 8), 10, 260, movePool, "oracle");
+    }
+
+    function simulateOracleMirrorFromCurrentState(playerId, options = {}) {
+      const maxTurns = Number.isInteger(options.maxTurns) ? options.maxTurns : 48;
+      const forceNextPlayerId = Number.isInteger(options.forceNextPlayerId) ? options.forceNextPlayerId : null;
+      if (forceNextPlayerId != null) {
+        const forcedIdx = app.players.findIndex((candidate) => candidate.id === forceNextPlayerId && candidate.alive);
+        if (forcedIdx >= 0) app.currentPlayerIdx = forcedIdx;
+      }
+      let turns = 0;
+      while (!app.gameOver && turns < maxTurns) {
+        const actor = currentPlayer();
+        if (!actor || !actor.alive) break;
+        const move = chooseOracleMoveForSimulation(actor);
+        if (!move) break;
+        if (!executePlannedMove(actor, move, { recordUndo: false, render: false, recordTutorial: false })) break;
+        turns++;
+      }
+      if (app.gameOver) {
+        if (app.winner === playerId) return 1.2 + (maxTurns - turns) * 0.01;
+        if (app.winner == null) return 0;
+        return -1.2 - (maxTurns - turns) * 0.01;
+      }
+      return Math.max(-1, Math.min(1, evaluateStateForOracle(playerId) / 12000));
+    }
+
+    function scoreOracleMoveByGauntlet(playerId, move) {
+      const snapshot = captureGameSnapshot();
+      let score = -Infinity;
+      const actingPlayer = app.players.find((candidate) => candidate.id === playerId);
+      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+        if (app.gameOver && app.winner === playerId) {
+          score = 5000000;
+        } else {
+          const opponent = currentPlayer();
+          const opponentId = Number.isInteger(opponent?.id) ? opponent.id : null;
+          // Phase 1: oracle-vs-oracle from exact post-move state.
+          const phase1 = simulateOracleMirrorFromCurrentState(playerId, { maxTurns: 44 });
+          // Phase 2: winner oracle plays as opponent side.
+          restoreSnapshot(snapshot, { render: false });
+          const replayPlayer = app.players.find((candidate) => candidate.id === playerId);
+          if (replayPlayer) executePlannedMove(replayPlayer, move, { recordUndo: false, render: false, recordTutorial: false });
+          const phase2 = simulateOracleMirrorFromCurrentState(playerId, { maxTurns: 44, forceNextPlayerId: opponentId });
+          // Phase 3: winner oracle plays as player side.
+          restoreSnapshot(snapshot, { render: false });
+          const replayPlayer2 = app.players.find((candidate) => candidate.id === playerId);
+          if (replayPlayer2) executePlannedMove(replayPlayer2, move, { recordUndo: false, render: false, recordTutorial: false });
+          const phase3 = simulateOracleMirrorFromCurrentState(playerId, { maxTurns: 44, forceNextPlayerId: playerId });
+          score = phase1 * 0.58 + phase2 * 0.25 + phase3 * 0.17;
+        }
+      }
+      restoreSnapshot(snapshot, { render: false });
+      return score;
+    }
+
+    function chooseOracleMoveByGauntlet(player, moves) {
+      if (!Array.isArray(moves) || !moves.length) return null;
+      const tuning = getOracleStyleTuning();
+      const cappedMoves = moves.length > 8
+        ? rankMovesForLookahead(player.id, player.id, moves, true, tuning.gauntletKeep, "oracle")
+        : [...moves];
+      let bestMove = null;
+      let bestScore = -Infinity;
+      cappedMoves.forEach((move) => {
+        const score = scoreOracleMoveByGauntlet(player.id, move);
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = move;
+        }
+      });
+      return bestMove;
     }
 
     function scoreMoveForComputer(playerId, move, difficulty = "medium") {
@@ -3427,47 +3825,163 @@
       return score;
     }
 
-    function evaluateImmediateMoveForPlayerPerspective(playerId, actingPlayerId, move) {
+    function evaluateImmediateMoveForPlayerPerspective(playerId, actingPlayerId, move, profile = "default") {
       const snapshot = captureGameSnapshot();
       let score = -Infinity;
       const actingPlayer = app.players.find((candidate) => candidate.id === actingPlayerId);
+      const oracleContext = profile === "oracle" ? captureOracleTacticalContext(playerId) : null;
       if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
-        score = evaluateStateForPlayer(playerId);
+        if (profile === "oracle") {
+          score = evaluateStateForOracle(playerId) + scoreOracleTacticalDelta(playerId, oracleContext);
+        } else {
+          score = evaluateStateForPlayer(playerId);
+        }
       }
       restoreSnapshot(snapshot, { render: false });
       return score;
     }
 
-    function rankMovesForLookahead(playerId, actingPlayerId, moves, maximize, maxMovesPerNode) {
+    function moveKey(move) {
+      if (!move) return "null";
+      return `${move.tileType}:${move.r},${move.c}:${Number.isInteger(move.entry) ? move.entry : "x"}`;
+    }
+
+    function recordKillerMove(searchConfig, ply, move) {
+      if (!searchConfig?.killerMovesByPly || !move) return;
+      const key = moveKey(move);
+      const list = searchConfig.killerMovesByPly.get(ply) || [];
+      if (list.includes(key)) return;
+      list.unshift(key);
+      if (list.length > 2) list.pop();
+      searchConfig.killerMovesByPly.set(ply, list);
+    }
+
+    function updateHistoryHeuristic(searchConfig, move, depthRemaining) {
+      if (!searchConfig?.historyHeuristic || !move) return;
+      const key = moveKey(move);
+      const previous = searchConfig.historyHeuristic.get(key) || 0;
+      searchConfig.historyHeuristic.set(key, previous + Math.max(1, depthRemaining * depthRemaining));
+    }
+
+    function orderingBonus(searchConfig, move, ply) {
+      if (!searchConfig || !move) return 0;
+      const key = moveKey(move);
+      let bonus = 0;
+      if (searchConfig.pvMoveKey && key === searchConfig.pvMoveKey) bonus += 12000;
+      const killerList = searchConfig.killerMovesByPly?.get(ply) || [];
+      if (killerList.includes(key)) bonus += 4000;
+      bonus += (searchConfig.historyHeuristic?.get(key) || 0) * 24;
+      return bonus;
+    }
+
+    function rankMovesForLookahead(playerId, actingPlayerId, moves, maximize, maxMovesPerNode, profile = "default", searchConfig = null, ply = 0) {
       if (!Array.isArray(moves) || !moves.length) return [];
-      const scored = moves.map((move) => ({
-        move,
-        score: evaluateImmediateMoveForPlayerPerspective(playerId, actingPlayerId, move),
-      }));
+      const scored = moves.map((move) => {
+        const positional = evaluateImmediateMoveForPlayerPerspective(playerId, actingPlayerId, move, profile);
+        const ordered = orderingBonus(searchConfig, move, ply);
+        return { move, score: positional + ordered };
+      });
       scored.sort((a, b) => maximize ? b.score - a.score : a.score - b.score);
       return scored.slice(0, maxMovesPerNode).map((entry) => entry.move);
+    }
+
+    function hashMix32(seed, value) {
+      let h = (seed ^ (value + 0x9e3779b9 + ((seed << 6) >>> 0) + (seed >>> 2))) >>> 0;
+      h ^= h >>> 16;
+      h = Math.imul(h, 0x85ebca6b) >>> 0;
+      h ^= h >>> 13;
+      h = Math.imul(h, 0xc2b2ae35) >>> 0;
+      return (h ^ (h >>> 16)) >>> 0;
+    }
+
+    function tileTypeCode(tileType) {
+      if (tileType === "straightaway") return 1;
+      if (tileType === "uturn") return 2;
+      if (tileType === "centrifugal") return 3;
+      if (tileType === "diagonal") return 4;
+      if (tileType === "weave") return 5;
+      if (tileType === "jump") return 6;
+      if (tileType === "diagonalJump") return 7;
+      return 0;
+    }
+
+    function buildLookaheadStateKey(playerId, depthRemaining) {
+      const actor = currentPlayer();
+      let h = 2166136261 >>> 0;
+      h = hashMix32(h, (playerId + 17) * 97);
+      h = hashMix32(h, (depthRemaining + 31) * 131);
+      h = hashMix32(h, ((actor?.id ?? -1) + 53) * 151);
+      h = hashMix32(h, (app.currentPlayerIdx + 61) * 173);
+      h = hashMix32(h, app.gameOver ? 1 : 0);
+      h = hashMix32(h, Number.isInteger(app.winner) ? app.winner + 7 : 0);
+      app.players.forEach((p) => {
+        h = hashMix32(h, p.id + 101);
+        h = hashMix32(h, p.alive ? 1 : 0);
+        h = hashMix32(h, p.hasPlacedFirstTile ? 1 : 0);
+        h = hashMix32(h, Number.isInteger(p.row) ? p.row + 257 : 0);
+        h = hashMix32(h, Number.isInteger(p.col) ? p.col + 353 : 0);
+        h = hashMix32(h, Number.isInteger(p.entrance) ? p.entrance + 449 : 0);
+        h = hashMix32(h, (p.jumpLeft || 0) + 557);
+        h = hashMix32(h, (p.diagonalJumpLeft || 0) + 653);
+        h = hashMix32(h, (p.combinedJumpLeft || 0) + 751);
+      });
+      app.board.forEach((row, r) => {
+        row.forEach((cell, c) => {
+          if (!cell.tile) return;
+          h = hashMix32(h, r + 811);
+          h = hashMix32(h, c + 887);
+          h = hashMix32(h, tileTypeCode(cell.tile.type) + 953);
+          h = hashMix32(h, (cell.tile.ownerId ?? -1) + 1039);
+          h = hashMix32(h, (cell.tile.rot || 0) + 1129);
+        });
+      });
+      return `${playerId}|${depthRemaining}|${h}`;
+    }
+
+    function terminalScoreForLookahead(playerId, depthRemaining) {
+      if (!app.gameOver) return null;
+      if (app.winner === playerId) return 1000000 + depthRemaining;
+      if (app.winner == null) return -500;
+      return -1000000 - depthRemaining;
     }
 
     function minimaxLookahead(playerId, depthRemaining, alpha, beta, searchConfig) {
       if (Date.now() >= searchConfig.deadlineMs) {
         searchConfig.timedOut = true;
-        return evaluateStateForPlayer(playerId);
+        return evaluateStateForSearch(playerId, searchConfig);
       }
-      if (depthRemaining <= 0 || app.gameOver) return evaluateStateForPlayer(playerId);
+      const terminalScore = terminalScoreForLookahead(playerId, depthRemaining);
+      if (terminalScore != null) return terminalScore;
+      if (depthRemaining <= 0) return evaluateStateForSearch(playerId, searchConfig);
       const actor = currentPlayer();
-      if (!actor || !actor.alive) return evaluateStateForPlayer(playerId);
+      if (!actor || !actor.alive) return evaluateStateForSearch(playerId, searchConfig);
+      const stateKey = buildLookaheadStateKey(playerId, depthRemaining);
+      if (searchConfig.transposition?.has(stateKey)) {
+        return searchConfig.transposition.get(stateKey);
+      }
 
       let legalMoves = collectLegalMoves(actor);
-      if (!legalMoves.length) return evaluateStateForPlayer(playerId);
+      if (!legalMoves.length) return evaluateStateForSearch(playerId, searchConfig);
       const maximize = actor.id === playerId;
-      legalMoves = rankMovesForLookahead(
-        playerId,
-        actor.id,
-        legalMoves,
-        maximize,
-        searchConfig.maxMovesPerNode
-      );
-      if (!legalMoves.length) return evaluateStateForPlayer(playerId);
+      const ply = (searchConfig.rootDepth || depthRemaining) - depthRemaining;
+      if (Number.isFinite(searchConfig.maxMovesPerNode)) {
+        legalMoves = rankMovesForLookahead(
+          playerId,
+          actor.id,
+          legalMoves,
+          maximize,
+          searchConfig.maxMovesPerNode,
+          searchConfig.profile || "default",
+          searchConfig,
+          ply
+        );
+        if (!legalMoves.length) return evaluateStateForSearch(playerId, searchConfig);
+      } else {
+        legalMoves = [...legalMoves].sort((a, b) => {
+          const delta = orderingBonus(searchConfig, b, ply) - orderingBonus(searchConfig, a, ply);
+          return maximize ? delta : -delta;
+        });
+      }
 
       if (maximize) {
         let best = -Infinity;
@@ -3484,7 +3998,14 @@
             alpha = Math.max(alpha, score);
           }
           restoreSnapshot(snapshot, { render: false });
-          if (beta <= alpha) break;
+          if (beta <= alpha) {
+            recordKillerMove(searchConfig, ply, move);
+            updateHistoryHeuristic(searchConfig, move, depthRemaining);
+            break;
+          }
+        }
+        if (!searchConfig.timedOut && Number.isFinite(best)) {
+          searchConfig.transposition?.set(stateKey, best);
         }
         return best;
       }
@@ -3503,17 +4024,30 @@
           beta = Math.min(beta, score);
         }
         restoreSnapshot(snapshot, { render: false });
-        if (beta <= alpha) break;
+        if (beta <= alpha) {
+          recordKillerMove(searchConfig, ply, move);
+          updateHistoryHeuristic(searchConfig, move, depthRemaining);
+          break;
+        }
+      }
+      if (!searchConfig.timedOut && Number.isFinite(best)) {
+        searchConfig.transposition?.set(stateKey, best);
       }
       return best;
     }
 
-    function chooseMoveWithDeepLookahead(player, maxDepth, maxMovesPerNode, timeBudgetMs) {
-      const legalMoves = collectLegalMoves(player);
+    function chooseMoveWithDeepLookahead(player, maxDepth, maxMovesPerNode, timeBudgetMs, rootMoves = null, profile = "default") {
+      const legalMoves = Array.isArray(rootMoves) && rootMoves.length
+        ? rootMoves
+        : collectLegalMoves(player);
       if (!legalMoves.length) return null;
       const deadlineMs = Date.now() + timeBudgetMs;
-      let bestMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+      let bestMove = legalMoves[0];
       let bestMoves = [bestMove];
+      const transposition = new Map();
+      const historyHeuristic = new Map();
+      const killerMovesByPly = new Map();
+      let pvMoveKey = moveKey(bestMove);
 
       for (let depth = 1; depth <= maxDepth; depth++) {
         if (Date.now() >= deadlineMs) break;
@@ -3523,9 +4057,15 @@
           maxMovesPerNode,
           deadlineMs,
           timedOut: false,
+          transposition,
+          profile,
+          historyHeuristic,
+          killerMovesByPly,
+          pvMoveKey,
+          rootDepth: depth,
         };
-
-        for (const move of legalMoves) {
+        const orderedRootMoves = [...legalMoves].sort((a, b) => orderingBonus(searchConfig, b, 0) - orderingBonus(searchConfig, a, 0));
+        for (const move of orderedRootMoves) {
           if (Date.now() >= deadlineMs) {
             searchConfig.timedOut = true;
             break;
@@ -3550,11 +4090,89 @@
         // Keep the deepest fully/mostly completed depth result before timeout.
         if (depthBestMoves.length) {
           bestMoves = depthBestMoves;
-          bestMove = depthBestMoves[Math.floor(Math.random() * depthBestMoves.length)];
+          bestMove = depthBestMoves[0];
+          pvMoveKey = moveKey(bestMove);
         }
         if (searchConfig.timedOut) break;
       }
       return bestMove;
+    }
+
+    function estimateRemainingTurnDepth() {
+      if (!app.board?.length) return 10;
+      let openCells = 0;
+      app.board.forEach((row) => {
+        row.forEach((cell) => {
+          if (!cell.tile) openCells++;
+        });
+      });
+      // Each non-overload turn places one tile, so open cells are a practical upper bound.
+      return Math.max(1, openCells);
+    }
+
+    function moveCausesImmediateWin(playerId, move) {
+      const snapshot = captureGameSnapshot();
+      let won = false;
+      const actingPlayer = app.players.find((candidate) => candidate.id === playerId);
+      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+        won = app.gameOver && app.winner === playerId;
+      }
+      restoreSnapshot(snapshot, { render: false });
+      return won;
+    }
+
+    function moveAllowsOpponentImmediateWin(playerId, move) {
+      const snapshot = captureGameSnapshot();
+      let blunder = false;
+      const actingPlayer = app.players.find((candidate) => candidate.id === playerId);
+      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+        const responder = currentPlayer();
+        if (responder && responder.id !== playerId && responder.alive) {
+          const replies = collectLegalMoves(responder);
+          for (const reply of replies) {
+            if (moveCausesImmediateWin(responder.id, reply)) {
+              blunder = true;
+              break;
+            }
+          }
+        }
+      }
+      restoreSnapshot(snapshot, { render: false });
+      return blunder;
+    }
+
+    function chooseOracleMove(player) {
+      const legalMoves = collectLegalMoves(player);
+      if (!legalMoves.length) return null;
+      const tuning = getOracleStyleTuning();
+
+      // Tactical priority: always take immediate wins when available.
+      for (const move of legalMoves) {
+        if (moveCausesImmediateWin(player.id, move)) return move;
+      }
+      // Oracle must never commit immediate suicide unless all legal moves do.
+      const nonSuicidalMoves = legalMoves.filter((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
+      const survivalPool = nonSuicidalMoves.length ? nonSuicidalMoves : legalMoves;
+      const safeMoves = survivalPool.filter((move) => !moveAllowsOpponentImmediateWin(player.id, move));
+      const movePool = safeMoves.length ? safeMoves : survivalPool;
+
+      const openCells = estimateRemainingTurnDepth();
+      if (openCells <= 10) {
+        // Endgame: search exact/full-width as far as possible.
+        return chooseMoveWithDeepLookahead(player, openCells, Infinity, tuning.endgameTimeMs, movePool, "oracle");
+      }
+      if (openCells <= 18) {
+        const opponentAwarePool = pruneOracleMovesByOpponentReply(player, movePool, 16, 12);
+        const gauntletChoice = chooseOracleMoveByGauntlet(player, opponentAwarePool);
+        if (gauntletChoice) return gauntletChoice;
+        // Midgame: larger beam with deeper tactical horizon.
+        return chooseMoveWithDeepLookahead(player, tuning.midDepth, tuning.midBreadth, tuning.midTimeMs, opponentAwarePool, "oracle");
+      }
+      const opponentAwarePool = pruneOracleMovesByOpponentReply(player, movePool, 14, 10);
+      const gauntletChoice = chooseOracleMoveByGauntlet(player, opponentAwarePool);
+      if (gauntletChoice) return gauntletChoice;
+      // Opening/early midgame: strong search while keeping enough depth.
+      return chooseMoveWithDeepLookahead(player, tuning.earlyDepth, tuning.earlyBreadth, tuning.earlyTimeMs, opponentAwarePool, "oracle");
     }
 
     function doesMoveImmediatelyEliminatePlayer(playerId, move) {
@@ -3580,11 +4198,8 @@
         const movePool = Math.random() < 0.82 ? saferMoves : legalMoves;
         return movePool[Math.floor(Math.random() * movePool.length)];
       }
-      if (difficulty === "expert") {
-        return chooseMoveWithDeepLookahead(player, 5, 9, 1000);
-      }
       if (difficulty === "oracle") {
-        return chooseMoveWithDeepLookahead(player, 10, 6, 1800);
+        return chooseOracleMove(player);
       }
       let bestScore = -Infinity;
       let bestMoves = [];
@@ -3599,6 +4214,177 @@
       });
       if (!bestMoves.length) return legalMoves[Math.floor(Math.random() * legalMoves.length)];
       return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    }
+
+    function withPreservedGameState(task) {
+      const snapshot = app.config ? captureGameSnapshot() : null;
+      const priorSetupMode = app.setupMode;
+      const priorBenchmarkMode = app.benchmarkMode;
+      clearComputerTurnTimer();
+      app.aiThinking = false;
+      try {
+        return task();
+      } finally {
+        clearComputerTurnTimer();
+        app.aiThinking = false;
+        app.benchmarkMode = priorBenchmarkMode;
+        app.setupMode = priorSetupMode;
+        if (snapshot) {
+          restoreSnapshot(snapshot, { render: false });
+          renderAll();
+          scheduleComputerTurnIfNeeded();
+        }
+      }
+    }
+
+    function runSingleAIMatch(options = {}) {
+      const p1Difficulty = options.p1Difficulty || "oracle";
+      const p2Difficulty = options.p2Difficulty || "hard";
+      const oracleStyle = normalizeOracleStyle(options.oracleStyle || "balanced");
+      const maxTurns = Number.isInteger(options.maxTurns) ? options.maxTurns : 160;
+      const gameOptions = {
+        size: Number(options.size) || 7,
+        playerCount: 2,
+        jumpSelection: options.jumpSelection || "both",
+        poolMode: options.poolMode || "separate",
+        variantMode: options.variantMode || "standard",
+        hoverTilePickerEnabled: false,
+        names: ["AI-1", "AI-2", "Player 3", "Player 4"],
+        deadCorner: 0,
+        computerEnabled: false,
+        computerDifficulty: "medium",
+        oracleStyle,
+      };
+      startGame(gameOptions);
+      let turns = 0;
+      while (!app.gameOver && turns < maxTurns) {
+        const actor = currentPlayer();
+        if (!actor || !actor.alive) break;
+        const diff = actor.id === 0 ? p1Difficulty : p2Difficulty;
+        const move = chooseComputerMove(actor.id, diff);
+        if (!move) break;
+        const actorRef = getLivePlayer(actor.id);
+        if (!actorRef) break;
+        if (!executePlannedMove(actorRef, move, { recordUndo: false, render: false, recordTutorial: false })) break;
+        turns++;
+      }
+      if (!app.gameOver) setTie();
+      return {
+        winner: app.winner,
+        turns,
+        tie: app.winner == null,
+      };
+    }
+
+    function runOracleBenchmark(options = {}) {
+      return withPreservedGameState(() => {
+        const games = Number.isInteger(options.games) ? options.games : 40;
+        const oracleStyle = normalizeOracleStyle(options.oracleStyle || app.config?.oracleStyle || "balanced");
+        const p1Difficulty = options.p1Difficulty || "oracle";
+        const p2Difficulty = options.p2Difficulty || "hard";
+        app.benchmarkMode = true;
+        const stats = {
+          games: 0,
+          p1Wins: 0,
+          p2Wins: 0,
+          ties: 0,
+          totalTurns: 0,
+          oracleStyle,
+          p1Difficulty,
+          p2Difficulty,
+        };
+        for (let i = 0; i < games; i++) {
+          const result = runSingleAIMatch({ ...options, p1Difficulty, p2Difficulty, oracleStyle });
+          stats.games++;
+          stats.totalTurns += result.turns;
+          if (result.tie) stats.ties++;
+          else if (result.winner === 0) stats.p1Wins++;
+          else if (result.winner === 1) stats.p2Wins++;
+        }
+        stats.avgTurns = stats.games ? Number((stats.totalTurns / stats.games).toFixed(2)) : 0;
+        console.table(stats);
+        return stats;
+      });
+    }
+
+    function loadOracleRegressionSnapshots() {
+      try {
+        const raw = localStorage.getItem("tilePathOracleRegressionSnapshots");
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (err) {
+        return [];
+      }
+    }
+
+    function saveOracleRegressionSnapshots(snapshots) {
+      try {
+        localStorage.setItem("tilePathOracleRegressionSnapshots", JSON.stringify(snapshots));
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+
+    function saveOracleRegressionSnapshot(name = `snapshot-${Date.now()}`) {
+      if (!app.config || app.gameOver) return { ok: false, reason: "No active non-terminal game state." };
+      const player = currentPlayer();
+      if (!player || !player.alive) return { ok: false, reason: "No active player." };
+      const legal = collectLegalMoves(player);
+      if (!legal.length) return { ok: false, reason: "No legal moves in current state." };
+      const immediateWinExists = legal.some((move) => moveCausesImmediateWin(player.id, move));
+      const nonSuicidalExists = legal.some((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
+      const baselineMove = chooseOracleMove(player);
+      const snapshot = captureGameSnapshot();
+      const cases = loadOracleRegressionSnapshots();
+      cases.push({
+        name,
+        createdAt: new Date().toISOString(),
+        actorId: player.id,
+        immediateWinExists,
+        nonSuicidalExists,
+        baselineMoveKey: baselineMove ? moveKey(baselineMove) : null,
+        snapshot,
+      });
+      const ok = saveOracleRegressionSnapshots(cases);
+      return { ok, count: cases.length };
+    }
+
+    function runOracleRegressionSuite() {
+      return withPreservedGameState(() => {
+        const cases = loadOracleRegressionSnapshots();
+        const report = {
+          total: cases.length,
+          passed: 0,
+          failed: 0,
+          failures: [],
+        };
+        cases.forEach((testCase) => {
+          restoreSnapshot(testCase.snapshot, { render: false });
+          const idx = app.players.findIndex((p) => p.id === testCase.actorId && p.alive);
+          if (idx >= 0) app.currentPlayerIdx = idx;
+          const player = currentPlayer();
+          let caseOk = true;
+          const chosenMove = player ? chooseOracleMove(player) : null;
+          if (!chosenMove) {
+            caseOk = false;
+            report.failures.push({ name: testCase.name, reason: "No oracle move." });
+          } else {
+            if (testCase.immediateWinExists && !moveCausesImmediateWin(player.id, chosenMove)) {
+              caseOk = false;
+              report.failures.push({ name: testCase.name, reason: "Failed immediate-win requirement." });
+            }
+            if (testCase.nonSuicidalExists && doesMoveImmediatelyEliminatePlayer(player.id, chosenMove)) {
+              caseOk = false;
+              report.failures.push({ name: testCase.name, reason: "Chose suicidal move despite safe alternatives." });
+            }
+          }
+          if (caseOk) report.passed++;
+          else report.failed++;
+        });
+        console.table(report);
+        return report;
+      });
     }
 
     function scheduleComputerTurnIfNeeded() {
@@ -4343,6 +5129,9 @@
       ];
       if (app.config.variantMode === "overload") chips.push("Variant: overload");
       if (app.config.computerEnabled) chips.push(`Computer: ${app.config.computerDifficulty}`);
+      if (app.config.computerEnabled && app.config.computerDifficulty === "oracle") {
+        chips.push(`Oracle style: ${app.config.oracleStyle || "balanced"}`);
+      }
       chips.forEach(t => {
         const d = document.createElement("div");
         d.className = "chip";
@@ -4371,7 +5160,10 @@
         : isComputerControlledPlayer()
           ? "Ready to move."
           : "Waiting for your turn.";
-      el.computerText.innerHTML = `${player?.name || "Computer"} is controlling Player 2.<br>Difficulty: ${app.config.computerDifficulty}.<br>${state}`;
+      const styleText = app.config.computerDifficulty === "oracle"
+        ? `<br>Style: ${app.config.oracleStyle || "balanced"}.`
+        : "";
+      el.computerText.innerHTML = `${player?.name || "Computer"} is controlling Player 2.<br>Difficulty: ${app.config.computerDifficulty}.${styleText}<br>${state}`;
     }
 
     function tileIsEnabledForSelection(type) {
@@ -4693,6 +5485,10 @@
         ${jumpCircle}
       </svg>`;
     }
+
+    window.runOracleBenchmark = runOracleBenchmark;
+    window.saveOracleRegressionSnapshot = saveOracleRegressionSnapshot;
+    window.runOracleRegressionSuite = runOracleRegressionSuite;
 
     setupBindings();
     syncSetupModeUI();
