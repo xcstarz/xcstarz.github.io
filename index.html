@@ -1516,7 +1516,7 @@
                 <option value="hard">Hard</option>
                 <option value="oracle">Oracle (perfect play)</option>
               </select>
-              <label for="oracleStyle" style="margin-top:8px;">Oracle Style</label>
+              <label for="oracleStyle" style="margin-top:8px;">Computer Style</label>
               <select id="oracleStyle">
                 <option value="balanced" selected>Balanced</option>
                 <option value="aggressive">Aggressive</option>
@@ -5133,7 +5133,7 @@
       if (app.config.variantMode === "overload") chips.push("Variant: overload");
       if (app.config.computerEnabled) chips.push(`Computer: ${app.config.computerDifficulty}`);
       if (app.config.computerEnabled) {
-        chips.push(`Oracle style: ${app.config.oracleStyle || "balanced"}`);
+        chips.push(`Computer style: ${app.config.oracleStyle || "balanced"}`);
       }
       chips.forEach(t => {
         const d = document.createElement("div");
