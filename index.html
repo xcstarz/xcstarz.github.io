@@ -3886,7 +3886,13 @@
 
     function checkPositionDraw() {
       if (app.gameOver || app.winner != null) return;
-      const alive = app.players.filter(p => p.alive && p.row != null);
+      const alive = app.players.filter((p) =>
+        p.alive &&
+        p.hasPlacedFirstTile &&
+        Number.isInteger(p.row) &&
+        Number.isInteger(p.col) &&
+        Number.isInteger(p.entrance)
+      );
       for (let i = 0; i < alive.length; i++) {
         for (let j = i + 1; j < alive.length; j++) {
           const a = alive[i], b = alive[j];
