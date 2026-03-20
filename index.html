@@ -18,6 +18,8 @@
     * { box-sizing: border-box; }
     html {
       -webkit-text-size-adjust: 100%;
+      width: 100%;
+      overflow-x: hidden;
     }
     body {
       margin: 0;
@@ -25,6 +27,9 @@
       background: radial-gradient(1200px 800px at 20% -10%, #1a2b52, #0b1220 60%);
       color: var(--text);
       min-height: 100vh;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
     }
     .main-shell {
       --nav-width: 220px;
@@ -178,6 +183,12 @@
       box-shadow: 0 10px 24px rgba(0, 0, 0, .3);
     }
     .tab-panel { min-width: 0; }
+    .tab-panel-wrap,
+    .app {
+      min-width: 0;
+      width: 100%;
+      max-width: 100%;
+    }
     .tutorial-panel {
       max-width: 1400px;
       margin: 0 auto;
@@ -687,10 +698,12 @@
       padding: 12px;
       overflow: auto;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
     }
     .board-stack {
       position: relative;
       width: max-content;
+      min-width: 100%;
       margin: 0 auto;
     }
     .cell-hover-menu {
@@ -784,7 +797,8 @@
     }
     .trail-layer {
       position: absolute;
-      inset: 0;
+      left: 0;
+      top: 0;
       pointer-events: none;
       z-index: 3;
     }
@@ -816,6 +830,11 @@
       position: absolute;
       inset: 0;
       pointer-events: none;
+    }
+    .board .tile-layer > svg {
+      display: block;
+      width: 100%;
+      height: 100%;
     }
     .tutorial-path-marker {
       position: absolute;
@@ -1007,6 +1026,9 @@
         grid-template-columns: 1fr;
         gap: 10px;
         padding: 10px;
+        width: 100%;
+        max-width: 100%;
+        overflow-x: clip;
       }
       .app-nav {
         position: sticky;
@@ -1031,6 +1053,7 @@
       }
       .app-nav-btn {
         flex: 1 1 0;
+        min-width: 0;
         min-height: 44px;
         justify-content: center;
         text-align: center;
@@ -1094,12 +1117,28 @@
       }
       .game {
         gap: 10px;
+        min-width: 0;
+      }
+      .board .tile-layer > svg {
+        width: calc(100% + 6px);
+        height: calc(100% + 6px);
+        margin-left: -1px;
+        margin-top: -1px;
+      }
+      .board .tile-layer > svg line,
+      .board .tile-layer > svg path {
+        stroke-width: 1.6px !important;
       }
       .board-wrap {
         padding: 8px;
+        min-width: 0;
+        max-width: 100%;
+        overflow-x: auto;
       }
       .game-sidebar {
         padding: 10px;
+        min-width: 0;
+        max-width: 100%;
       }
       .selected-tile-preview {
         min-height: 120px;
@@ -1136,18 +1175,41 @@
       .app-nav-toggle {
         font-size: 13px;
       }
+      .app-nav-btn {
+        padding: 8px 10px;
+        gap: 6px;
+      }
+      .app-nav-btn-icon {
+        width: 14px;
+        flex: 0 0 14px;
+        font-size: 11px;
+      }
+      .app-nav-btn-label {
+        font-size: 12px;
+      }
       select,
       input[type="text"],
       button {
         min-height: 42px;
-        font-size: 14px;
+        font-size: 16px;
       }
       .setup {
         margin: 10px auto;
         padding: 14px;
       }
+      #setupTitle {
+        font-size: 30px;
+        line-height: 1.1;
+      }
       .chip {
         font-size: 11px;
+      }
+      .panel {
+        padding: 10px;
+      }
+      .status,
+      .log {
+        font-size: 13px;
       }
       .tutorial-panel {
         padding: 8px;
@@ -1190,6 +1252,170 @@
       }
       .cell-hover-menu.entry-mode {
         min-width: min(92vw, 280px);
+      }
+    }
+    @media (max-width: 480px) {
+      .main-shell {
+        padding: 6px;
+        gap: 6px;
+        width: 100%;
+        max-width: 100%;
+      }
+      .app-nav {
+        top: 6px;
+        padding: 6px;
+        border-radius: 10px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-items: stretch;
+      }
+      .app-nav-header {
+        grid-column: 1 / -1;
+      }
+      .app-nav-title {
+        font-size: 16px;
+      }
+      .app-nav-toggle {
+        min-height: 40px;
+        padding: 6px 8px;
+      }
+      .app-nav-btn {
+        width: 100%;
+        min-height: 40px;
+        padding: 6px 8px;
+        justify-content: center;
+      }
+      .app-nav-btn-icon {
+        width: auto;
+        flex: 0 0 auto;
+      }
+      .app-nav-btn-label {
+        display: block;
+        font-size: 11px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .setup {
+        margin: 8px auto;
+        padding: 12px;
+        border-radius: 12px;
+      }
+      #setupTitle {
+        font-size: 28px;
+      }
+      .sub {
+        margin-bottom: 14px;
+      }
+      .field {
+        gap: 6px;
+      }
+      .field label {
+        font-size: 13px;
+      }
+      .board-wrap,
+      .game-sidebar {
+        padding: 8px;
+      }
+      .tile-grid {
+        gap: 6px;
+      }
+      .tile-btn {
+        min-height: 78px;
+        padding: 6px 5px;
+      }
+      .panel h3 {
+        font-size: 13px;
+      }
+      .status {
+        line-height: 1.35;
+      }
+      .elimination-box {
+        width: min(94vw, 420px);
+        padding: 20px 16px;
+      }
+      .elimination-box h2 {
+        font-size: 22px;
+        margin-bottom: 16px;
+      }
+    }
+    @media (max-width: 430px) {
+      .tab-panel-wrap,
+      .tab-panel,
+      .app,
+      .setup,
+      .game,
+      .card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+      }
+      .main-shell {
+        padding: 4px;
+        gap: 4px;
+        width: 100%;
+        max-width: 100%;
+      }
+      .app-nav {
+        top: 4px;
+        padding: 5px;
+        gap: 6px;
+        overflow: visible;
+      }
+      .app-nav-header {
+        gap: 6px;
+      }
+      .app-nav-toggle {
+        min-height: 38px;
+        padding: 6px;
+        font-size: 12px;
+      }
+      .app-nav-btn {
+        flex: 1 1 auto;
+        min-width: 0;
+        min-height: 38px;
+        padding: 6px;
+        border-radius: 7px;
+      }
+      .app-nav-btn-label {
+        min-width: 0;
+      }
+      .setup {
+        margin: 6px auto;
+        padding: 10px;
+      }
+      #setupTitle {
+        font-size: 26px;
+      }
+      .sub {
+        font-size: 16px;
+        line-height: 1.3;
+      }
+      .board-wrap,
+      .game-sidebar {
+        padding: 6px;
+      }
+      .board-wrap {
+        padding: 2px;
+      }
+      .board {
+        --cell-size: 52px;
+      }
+      .token {
+        width: 20px;
+        height: 20px;
+      }
+      .panel {
+        padding: 8px;
+      }
+      .panel h3 {
+        font-size: 12px;
+      }
+      .selected-tile-preview {
+        min-height: 110px;
+      }
+      .log {
+        max-height: 150px;
       }
     }
   </style>
@@ -1418,10 +1644,38 @@
     function getBoardCellSize() {
       const boardSize = app.config?.size || Number(el.boardSize?.value || 13);
       const viewportWidth = window.innerWidth || 1280;
-      if (viewportWidth <= 420) return boardSize >= 13 ? 42 : 48;
-      if (viewportWidth <= 640) return boardSize >= 13 ? 46 : 52;
-      if (viewportWidth <= 900) return boardSize >= 13 ? 50 : 56;
-      return BOARD_CELL_SIZE;
+      let baseSize = BOARD_CELL_SIZE;
+      if (viewportWidth <= 420) baseSize = boardSize >= 13 ? 42 : 48;
+      else if (viewportWidth <= 640) baseSize = boardSize >= 13 ? 46 : 52;
+      else if (viewportWidth <= 900) baseSize = boardSize >= 13 ? 50 : 56;
+
+      // Fit to the actual board container first to avoid horizontal scrolling
+      // caused by nested paddings and responsive shell gaps.
+      let availableWidth = 0;
+      if (el.boardWrap) {
+        const styles = window.getComputedStyle(el.boardWrap);
+        const padX =
+          (parseFloat(styles.paddingLeft) || 0) +
+          (parseFloat(styles.paddingRight) || 0);
+        const measuredWidth = Math.max(0, el.boardWrap.clientWidth - padX);
+        // Ignore unrealistically small measurements from hidden/collapsed states.
+        if (measuredWidth >= 300 || viewportWidth <= 360) {
+          availableWidth = measuredWidth;
+        }
+      }
+      if (!availableWidth) {
+        const horizontalGutter = viewportWidth <= 430 ? 18 : viewportWidth <= 640 ? 24 : 32;
+        availableWidth = Math.max(320, viewportWidth - horizontalGutter);
+      }
+      const fitCellSize = Math.floor(
+        (availableWidth - BOARD_FRAME * 2 - (boardSize - 1) * BOARD_CELL_GAP) / boardSize
+      );
+      // Keep cells large enough for touch targets on phones; rely on board-wrap
+      // horizontal scrolling instead of shrinking cells too aggressively.
+      const minCellSize = viewportWidth <= 430
+        ? (boardSize >= 13 ? 30 : 36)
+        : (boardSize >= 13 ? 28 : 34);
+      return Math.max(minCellSize, Math.min(baseSize, fitCellSize));
     }
 
     const BOARD_CELL_GAP = 0;
@@ -4167,6 +4421,7 @@
     function renderBoard() {
       const size = app.config.size;
       const boardCellSize = getBoardCellSize();
+      el.board.style.setProperty("--cell-size", `${boardCellSize}px`);
       el.board.style.gridTemplateColumns = `repeat(${size}, ${boardCellSize}px)`;
       el.board.innerHTML = "";
       hideHoverTileMenu(true);
@@ -4234,34 +4489,72 @@
           el.board.appendChild(btn);
         }
       }
-      renderPlayerTrails();
+      renderPlayerTrails(boardCellSize);
     }
 
-    function boardPointForTrailPoint(state) {
-      const cellSize = getBoardCellSize();
+    function boardPointForTrailPoint(state, metrics) {
       const { ax, ay } = state;
+      const key = `${state.row},${state.col}`;
+      const cellRect = metrics.cellRects.get(key);
+      if (cellRect) {
+        return [
+          cellRect.left - metrics.boardLeft + ax * cellRect.width + metrics.offsetX,
+          cellRect.top - metrics.boardTop + ay * cellRect.height + metrics.offsetY,
+        ];
+      }
+      const cellSize = metrics.fallbackCellSize;
       return [
-        BOARD_FRAME + state.col * (cellSize + BOARD_CELL_GAP) + ax * cellSize,
-        BOARD_FRAME + state.row * (cellSize + BOARD_CELL_GAP) + ay * cellSize,
+        BOARD_FRAME + state.col * (cellSize + BOARD_CELL_GAP) + ax * cellSize + metrics.offsetX,
+        BOARD_FRAME + state.row * (cellSize + BOARD_CELL_GAP) + ay * cellSize + metrics.offsetY,
       ];
     }
 
-    function renderPlayerTrails() {
-      const cellSize = getBoardCellSize();
-      const span = app.config.size * cellSize + (app.config.size - 1) * BOARD_CELL_GAP + BOARD_FRAME * 2;
-      el.trailLayer.setAttribute("viewBox", `0 0 ${span} ${span}`);
-      el.trailLayer.setAttribute("width", `${span}`);
-      el.trailLayer.setAttribute("height", `${span}`);
+    function renderPlayerTrails(cellSize = getBoardCellSize()) {
+      if (!el.boardStack) return;
+      const stackRect = el.boardStack.getBoundingClientRect();
+      const boardRect = el.board.getBoundingClientRect();
+      const spanX = Math.max(1, boardRect.width);
+      const spanY = Math.max(1, boardRect.height);
+      const cellRects = new Map();
+      el.board.querySelectorAll(".cell[data-rc]").forEach((cell) => {
+        const rc = cell.dataset.rc;
+        if (!rc) return;
+        cellRects.set(rc, cell.getBoundingClientRect());
+      });
+      const metrics = {
+        boardLeft: boardRect.left,
+        boardTop: boardRect.top,
+        cellRects,
+        fallbackCellSize: cellSize,
+        offsetX: 0,
+        // Mobile browsers can rasterize thin SVG strokes slightly high relative
+        // to per-cell SVGs; nudge trails down for visual centering.
+        offsetY: window.innerWidth <= 900 ? 0.5 : 0,
+      };
+
+      const left = boardRect.left - stackRect.left;
+      const top = boardRect.top - stackRect.top;
+      el.trailLayer.style.left = `${left}px`;
+      el.trailLayer.style.top = `${top}px`;
+      el.trailLayer.style.width = `${spanX}px`;
+      el.trailLayer.style.height = `${spanY}px`;
+      el.trailLayer.setAttribute("viewBox", `0 0 ${spanX} ${spanY}`);
+      el.trailLayer.setAttribute("width", `${spanX}`);
+      el.trailLayer.setAttribute("height", `${spanY}`);
       el.trailLayer.innerHTML = "";
+      const strokeWidth = window.innerWidth <= 900 ? 2.2 : 4;
 
       app.players.forEach(p => {
         if (!p.hasPlacedFirstTile || p.trail.length < 2) return;
-        const points = p.trail.map(boardPointForTrailPoint).map(([x, y]) => `${x},${y}`).join(" ");
+        const points = p.trail
+          .map((trailPoint) => boardPointForTrailPoint(trailPoint, metrics))
+          .map(([x, y]) => `${x},${y}`)
+          .join(" ");
         const polyline = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
         polyline.setAttribute("points", points);
         polyline.setAttribute("fill", "none");
         polyline.setAttribute("stroke", playerColorHex(p.color));
-        polyline.setAttribute("stroke-width", "4");
+        polyline.setAttribute("stroke-width", `${strokeWidth}`);
         polyline.setAttribute("stroke-linecap", "round");
         polyline.setAttribute("stroke-linejoin", "round");
         polyline.setAttribute("opacity", "1");
