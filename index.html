@@ -1288,6 +1288,8 @@
                 <option value="easy">Easy</option>
                 <option value="medium" selected>Medium</option>
                 <option value="hard">Hard</option>
+                <option value="expert">Expert (up to 5 moves)</option>
+                <option value="oracle">Oracle (up to 10 moves)</option>
               </select>
               <div style="font-size:12px;color:#9eb8e6;margin-top:6px;">
                 Computer mode is always a 2-player match, and the computer controls Player 2.
@@ -3163,12 +3165,164 @@
       return score;
     }
 
+    function evaluateImmediateMoveForPlayerPerspective(playerId, actingPlayerId, move) {
+      const snapshot = captureGameSnapshot();
+      let score = -Infinity;
+      const actingPlayer = app.players.find((candidate) => candidate.id === actingPlayerId);
+      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+        score = evaluateStateForPlayer(playerId);
+      }
+      restoreSnapshot(snapshot, { render: false });
+      return score;
+    }
+
+    function rankMovesForLookahead(playerId, actingPlayerId, moves, maximize, maxMovesPerNode) {
+      if (!Array.isArray(moves) || !moves.length) return [];
+      const scored = moves.map((move) => ({
+        move,
+        score: evaluateImmediateMoveForPlayerPerspective(playerId, actingPlayerId, move),
+      }));
+      scored.sort((a, b) => maximize ? b.score - a.score : a.score - b.score);
+      return scored.slice(0, maxMovesPerNode).map((entry) => entry.move);
+    }
+
+    function minimaxLookahead(playerId, depthRemaining, alpha, beta, searchConfig) {
+      if (Date.now() >= searchConfig.deadlineMs) {
+        searchConfig.timedOut = true;
+        return evaluateStateForPlayer(playerId);
+      }
+      if (depthRemaining <= 0 || app.gameOver) return evaluateStateForPlayer(playerId);
+      const actor = currentPlayer();
+      if (!actor || !actor.alive) return evaluateStateForPlayer(playerId);
+
+      let legalMoves = collectLegalMoves(actor);
+      if (!legalMoves.length) return evaluateStateForPlayer(playerId);
+      const maximize = actor.id === playerId;
+      legalMoves = rankMovesForLookahead(
+        playerId,
+        actor.id,
+        legalMoves,
+        maximize,
+        searchConfig.maxMovesPerNode
+      );
+      if (!legalMoves.length) return evaluateStateForPlayer(playerId);
+
+      if (maximize) {
+        let best = -Infinity;
+        for (const move of legalMoves) {
+          if (Date.now() >= searchConfig.deadlineMs) {
+            searchConfig.timedOut = true;
+            break;
+          }
+          const snapshot = captureGameSnapshot();
+          const actingPlayer = app.players.find((candidate) => candidate.id === actor.id);
+          if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+            const score = minimaxLookahead(playerId, depthRemaining - 1, alpha, beta, searchConfig);
+            best = Math.max(best, score);
+            alpha = Math.max(alpha, score);
+          }
+          restoreSnapshot(snapshot, { render: false });
+          if (beta <= alpha) break;
+        }
+        return best;
+      }
+
+      let best = Infinity;
+      for (const move of legalMoves) {
+        if (Date.now() >= searchConfig.deadlineMs) {
+          searchConfig.timedOut = true;
+          break;
+        }
+        const snapshot = captureGameSnapshot();
+        const actingPlayer = app.players.find((candidate) => candidate.id === actor.id);
+        if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+          const score = minimaxLookahead(playerId, depthRemaining - 1, alpha, beta, searchConfig);
+          best = Math.min(best, score);
+          beta = Math.min(beta, score);
+        }
+        restoreSnapshot(snapshot, { render: false });
+        if (beta <= alpha) break;
+      }
+      return best;
+    }
+
+    function chooseMoveWithDeepLookahead(player, maxDepth, maxMovesPerNode, timeBudgetMs) {
+      const legalMoves = collectLegalMoves(player);
+      if (!legalMoves.length) return null;
+      const deadlineMs = Date.now() + timeBudgetMs;
+      let bestMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
+      let bestMoves = [bestMove];
+
+      for (let depth = 1; depth <= maxDepth; depth++) {
+        if (Date.now() >= deadlineMs) break;
+        let depthBestScore = -Infinity;
+        let depthBestMoves = [];
+        const searchConfig = {
+          maxMovesPerNode,
+          deadlineMs,
+          timedOut: false,
+        };
+
+        for (const move of legalMoves) {
+          if (Date.now() >= deadlineMs) {
+            searchConfig.timedOut = true;
+            break;
+          }
+          const snapshot = captureGameSnapshot();
+          const actingPlayer = app.players.find((candidate) => candidate.id === player.id);
+          let score = -Infinity;
+          if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+            score = minimaxLookahead(player.id, depth - 1, -Infinity, Infinity, searchConfig);
+          }
+          restoreSnapshot(snapshot, { render: false });
+
+          if (score > depthBestScore) {
+            depthBestScore = score;
+            depthBestMoves = [move];
+          } else if (score === depthBestScore) {
+            depthBestMoves.push(move);
+          }
+          if (searchConfig.timedOut) break;
+        }
+
+        // Keep the deepest fully/mostly completed depth result before timeout.
+        if (depthBestMoves.length) {
+          bestMoves = depthBestMoves;
+          bestMove = depthBestMoves[Math.floor(Math.random() * depthBestMoves.length)];
+        }
+        if (searchConfig.timedOut) break;
+      }
+      return bestMove;
+    }
+
+    function doesMoveImmediatelyEliminatePlayer(playerId, move) {
+      const snapshot = captureGameSnapshot();
+      let eliminated = true;
+      const actingPlayer = app.players.find((candidate) => candidate.id === playerId);
+      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+        const updatedPlayer = app.players.find((candidate) => candidate.id === playerId);
+        eliminated = !updatedPlayer || !updatedPlayer.alive;
+      }
+      restoreSnapshot(snapshot, { render: false });
+      return eliminated;
+    }
+
     function chooseComputerMove(player, difficulty = app.config?.computerDifficulty || "medium") {
       player = getLivePlayer(player);
       const legalMoves = collectLegalMoves(player);
       if (!legalMoves.length) return null;
       if (difficulty === "easy") {
-        return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+        const saferMoves = legalMoves.filter((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
+        if (!saferMoves.length) return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+        // Keep easy mode imperfect: strongly prefer safer moves, but sometimes still play any random legal move.
+        const movePool = Math.random() < 0.82 ? saferMoves : legalMoves;
+        return movePool[Math.floor(Math.random() * movePool.length)];
+      }
+      if (difficulty === "expert") {
+        return chooseMoveWithDeepLookahead(player, 5, 9, 1000);
+      }
+      if (difficulty === "oracle") {
+        return chooseMoveWithDeepLookahead(player, 10, 6, 1800);
       }
       let bestScore = -Infinity;
       let bestMoves = [];
@@ -3731,6 +3885,7 @@
     }
 
     function checkPositionDraw() {
+      if (app.gameOver || app.winner != null) return;
       const alive = app.players.filter(p => p.alive && p.row != null);
       for (let i = 0; i < alive.length; i++) {
         for (let j = i + 1; j < alive.length; j++) {
