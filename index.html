@@ -647,6 +647,20 @@
       padding: 6px 10px;
       font-size: 12px;
     }
+    input[type="range"].difficulty-slider {
+      width: 100%;
+      height: 18px;
+      accent-color: #7fa7ff;
+      cursor: pointer;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      touch-action: pan-x;
+    }
+    input[type="range"].difficulty-slider:focus-visible {
+      outline: 2px solid #8ab2ff;
+      outline-offset: 3px;
+    }
     button {
       cursor: pointer;
       background: linear-gradient(180deg, #28427e, #1f3568);
@@ -962,6 +976,68 @@
       line-height: 1.35;
       white-space: pre-wrap;
     }
+    .analysis-eval-bar {
+      position: relative;
+      height: 14px;
+      border: 1px solid #3a4f79;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ff6d7f 0%, #d8dde8 50%, #78adff 100%);
+      margin: 6px 0 10px;
+      overflow: hidden;
+    }
+    .analysis-eval-pointer {
+      position: absolute;
+      top: -2px;
+      width: 3px;
+      height: 18px;
+      border-radius: 2px;
+      background: #ffffff;
+      box-shadow: 0 0 4px rgba(0, 0, 0, .35);
+      transform: translateX(-50%);
+      left: 50%;
+    }
+    .analysis-moves {
+      max-height: 200px;
+      overflow: auto;
+      border: 1px solid #2f4777;
+      border-radius: 8px;
+      background: #0c162c;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .analysis-move-row {
+      border-radius: 6px;
+      border: 1px solid #2e4269;
+      background: #101d38;
+      padding: 6px 7px;
+      font-size: 12px;
+      line-height: 1.35;
+      color: #d4e4ff;
+    }
+    .analysis-move-row.best { border-color: #4d86ff; }
+    .analysis-move-row.excellent { border-color: #57b6ff; }
+    .analysis-move-row.good { border-color: #5ecf9b; }
+    .analysis-move-row.inaccurate { border-color: #d7bf68; }
+    .analysis-move-row.mistake { border-color: #e7985f; }
+    .analysis-move-row.blunder { border-color: #ef6b6b; }
+    .analysis-move-row.missedwin { border-color: #f05cae; }
+    .analysis-move-row.selected {
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+      background: #14244a;
+    }
+    .analysis-move-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 700;
+      color: #ecf3ff;
+    }
+    .analysis-move-detail {
+      color: #acc2ea;
+      margin-top: 2px;
+    }
     .winner {
       font-size: 14px;
       font-weight: 700;
@@ -1189,6 +1265,7 @@
       }
       select,
       input[type="text"],
+      input[type="range"].difficulty-slider,
       button {
         min-height: 42px;
         font-size: 16px;
@@ -1510,12 +1587,16 @@
             </div>
             <div id="computerDifficultyField" class="field hidden" style="margin-top: 12px;">
               <label for="computerDifficulty">Computer Difficulty</label>
-              <select id="computerDifficulty">
-                <option value="easy">Easy</option>
-                <option value="medium" selected>Medium</option>
-                <option value="hard">Hard</option>
-                <option value="oracle">Oracle (perfect play)</option>
+              <input id="computerDifficulty" class="difficulty-slider" type="range" min="0" max="9" step="0.01" value="3">
+              <div id="computerDifficultyLabel" style="font-size:12px;color:#9eb8e6;margin-top:6px;">Medium (3/9)</div>
+              <label for="adaptiveDifficulty" style="margin-top:8px;">Adaptive Difficulty</label>
+              <select id="adaptiveDifficulty">
+                <option value="off" selected>Off</option>
+                <option value="on">On</option>
               </select>
+              <div style="font-size:12px;color:#9eb8e6;margin-top:6px;">
+                When enabled, the computer adjusts one level after each game based on the winner.
+              </div>
               <label for="oracleStyle" style="margin-top:8px;">Computer Style</label>
               <select id="oracleStyle">
                 <option value="balanced" selected>Balanced</option>
@@ -1565,6 +1646,7 @@
                 <div class="game-sidebar card">
                   <div style="display:flex; gap:8px; margin-bottom: 10px;">
                     <button id="undoBtn" type="button" disabled>Undo</button>
+                    <button id="gameAnalysisBtn" type="button" class="hidden">Game Analysis</button>
                     <button id="newGameBtn">New Game</button>
                   </div>
                   <div id="statusText" class="status hidden"></div>
@@ -1586,6 +1668,14 @@
                   <div id="computerPanel" class="panel hidden">
                     <h3>Computer</h3>
                     <div id="computerText" class="status"></div>
+                  </div>
+                  <div id="analysisPanel" class="panel hidden">
+                    <h3>Game Analysis</h3>
+                    <div id="analysisEvalSummary" class="status"></div>
+                    <div id="analysisEvalBar" class="analysis-eval-bar">
+                      <div id="analysisEvalPointer" class="analysis-eval-pointer"></div>
+                    </div>
+                    <div id="analysisMoves" class="analysis-moves"></div>
                   </div>
                   <div class="panel">
                     <h3>Players</h3>
@@ -1637,6 +1727,7 @@
     </div>
   </div>
 
+  <script src="wasm/oracle_engine.js"></script>
   <script>
     const COLORS = ["p1", "p2", "p3", "p4"];
     const CORNERS = ["TL", "TR", "BR", "BL"];
@@ -1732,6 +1823,18 @@
       computerTurnTimer: null,
       suppressOverlays: false,
       benchmarkMode: false,
+      searchMode: false,
+      adaptiveTurnCounter: 0,
+      moveHistory: [],
+      analysisHistory: [],
+      analysisEvalScore: 0,
+      analysisEvalPercent: 50,
+      analysisEvalText: "Even",
+      analysisVisible: false,
+      analysisReady: false,
+      analysisBusy: false,
+      analysisSelectedMoveIdx: -1,
+      analysisBaseSnapshot: null,
     };
 
     const el = {
@@ -1767,6 +1870,7 @@
       p4Name: document.getElementById("p4Name"),
       startBtn: document.getElementById("startBtn"),
       undoBtn: document.getElementById("undoBtn"),
+      gameAnalysisBtn: document.getElementById("gameAnalysisBtn"),
       newGameBtn: document.getElementById("newGameBtn"),
       eliminationOverlay: document.getElementById("eliminationOverlay"),
       elimText: document.getElementById("elimText"),
@@ -1787,9 +1891,16 @@
       setupSubtext: document.getElementById("setupSubtext"),
       computerDifficultyField: document.getElementById("computerDifficultyField"),
       computerDifficulty: document.getElementById("computerDifficulty"),
+      computerDifficultyLabel: document.getElementById("computerDifficultyLabel"),
+      adaptiveDifficulty: document.getElementById("adaptiveDifficulty"),
       oracleStyle: document.getElementById("oracleStyle"),
       computerPanel: document.getElementById("computerPanel"),
       computerText: document.getElementById("computerText"),
+      analysisPanel: document.getElementById("analysisPanel"),
+      analysisEvalSummary: document.getElementById("analysisEvalSummary"),
+      analysisEvalBar: document.getElementById("analysisEvalBar"),
+      analysisEvalPointer: document.getElementById("analysisEvalPointer"),
+      analysisMoves: document.getElementById("analysisMoves"),
       tutorialBubbleBtn: null,
       tutorialNextBtn: document.getElementById("tutorialNextBtn"),
       tutorialStepText: document.getElementById("tutorialStepText"),
@@ -1908,6 +2019,238 @@
       app.computerTurnTimer = null;
     }
 
+    const oracleWasm = {
+      ready: false,
+      loading: false,
+      module: null,
+      wrappers: null,
+      error: null,
+    };
+
+    async function loadOracleWasmModule() {
+      if (oracleWasm.ready) return oracleWasm.module;
+      if (oracleWasm.loading) return null;
+      if (typeof createOracleWasmModule !== "function") {
+        oracleWasm.error = new Error("Oracle wasm factory is unavailable.");
+        return null;
+      }
+      oracleWasm.loading = true;
+      try {
+        const module = await createOracleWasmModule({
+          locateFile: (path) => `wasm/${path}`,
+        });
+        oracleWasm.module = module;
+        oracleWasm.wrappers = {
+          version: module.cwrap("oracle_module_version", "number", []),
+          benchmark: module.cwrap("oracle_benchmark_nodes", "number", ["number"]),
+          chooseBestOpening: module.cwrap(
+            "oracle_choose_best_opening_move",
+            "number",
+            ["number", "number", "number", "number", "number", "number"]
+          ),
+        };
+        oracleWasm.ready = true;
+        oracleWasm.error = null;
+        return module;
+      } catch (err) {
+        oracleWasm.error = err;
+        console.warn("Oracle wasm failed to load.", err);
+        return null;
+      } finally {
+        oracleWasm.loading = false;
+      }
+    }
+
+    function getOracleWasmStatus() {
+      return {
+        ready: oracleWasm.ready,
+        loading: oracleWasm.loading,
+        error: oracleWasm.error ? String(oracleWasm.error) : null,
+        version: oracleWasm.ready && oracleWasm.wrappers ? oracleWasm.wrappers.version() : null,
+      };
+    }
+
+    async function runOracleWasmBenchmark(iterations = 2000000) {
+      const module = await loadOracleWasmModule();
+      if (!module || !oracleWasm.wrappers) return null;
+      const safeIterations = Math.max(1, Number(iterations) || 1);
+      const start = performance.now();
+      const processed = oracleWasm.wrappers.benchmark(safeIterations);
+      const elapsedMs = performance.now() - start;
+      const result = {
+        version: oracleWasm.wrappers.version(),
+        processed,
+        elapsedMs: Number(elapsedMs.toFixed(2)),
+        nodesPerSecond: Math.round(processed / Math.max(0.001, elapsedMs / 1000)),
+      };
+      console.table([result]);
+      return result;
+    }
+
+    function chooseBestOpeningMoveWithOracleWasm(moves, opponentBaseCell, boardSize = app.config?.size || 7) {
+      if (!oracleWasm.ready || !oracleWasm.module || !oracleWasm.wrappers) return null;
+      if (!Array.isArray(moves) || !moves.length || !Array.isArray(opponentBaseCell) || opponentBaseCell.length < 2) return null;
+      const rowsPtr = oracleWasm.module._malloc(moves.length * 4);
+      const colsPtr = oracleWasm.module._malloc(moves.length * 4);
+      try {
+        moves.forEach((move, idx) => {
+          oracleWasm.module.HEAP32[(rowsPtr >> 2) + idx] = Number(move?.r) || 0;
+          oracleWasm.module.HEAP32[(colsPtr >> 2) + idx] = Number(move?.c) || 0;
+        });
+        const bestIdx = oracleWasm.wrappers.chooseBestOpening(
+          Number(boardSize) || 7,
+          moves.length,
+          rowsPtr,
+          colsPtr,
+          Number(opponentBaseCell[0]) || 0,
+          Number(opponentBaseCell[1]) || 0
+        );
+        return moves[bestIdx] || null;
+      } finally {
+        oracleWasm.module._free(rowsPtr);
+        oracleWasm.module._free(colsPtr);
+      }
+    }
+
+    const COMPUTER_MAX_DIFFICULTY_TIER = 9;
+    const COMPUTER_DIFFICULTY_TIER_META = [
+      { tier: 0, id: "easy", label: "Easy", base: "easy" },
+      { tier: 1, id: "easy-medium-1", label: "Easy+ (blend)", base: "easy" },
+      { tier: 2, id: "easy-medium-2", label: "Easy/Medium", base: "medium" },
+      { tier: 3, id: "medium", label: "Medium", base: "medium" },
+      { tier: 4, id: "medium-hard-1", label: "Medium+ (blend)", base: "medium" },
+      { tier: 5, id: "medium-hard-2", label: "Medium/Hard", base: "hard" },
+      { tier: 6, id: "hard", label: "Hard", base: "hard" },
+      { tier: 7, id: "hard-oracle-1", label: "Hard/Oracle (top-2 mix)", base: "hard" },
+      { tier: 8, id: "hard-oracle-2", label: "Oracle- (top-3 mix)", base: "hard" },
+      { tier: 9, id: "oracle", label: "Oracle (strongest available)", base: "oracle" },
+    ];
+
+    function normalizeComputerDifficultyTier(value, fallbackTier = 3) {
+      const numeric = Number(value);
+      if (!Number.isFinite(numeric)) return fallbackTier;
+      return Math.max(0, Math.min(COMPUTER_MAX_DIFFICULTY_TIER, Math.round(numeric)));
+    }
+
+    function getDifficultyTierMeta(value) {
+      const tier = normalizeComputerDifficultyTier(value);
+      return COMPUTER_DIFFICULTY_TIER_META[tier] || COMPUTER_DIFFICULTY_TIER_META[3];
+    }
+
+    function sliderValueToDifficultyTier(value) {
+      return normalizeComputerDifficultyTier(value, 3);
+    }
+
+    function sliderValueToDifficulty(value) {
+      return getDifficultyTierMeta(sliderValueToDifficultyTier(value)).base;
+    }
+
+    function difficultyToSliderValue(difficulty) {
+      const normalized = normalizeComputerDifficulty(difficulty);
+      if (normalized === "easy") return "0";
+      if (normalized === "hard") return "6";
+      if (normalized === "oracle") return "9";
+      return "3";
+    }
+
+    function getDifficultyLabelText(valueOrTier) {
+      if (typeof valueOrTier === "string" && !/^-?\d+(\.\d+)?$/.test(valueOrTier)) {
+        const normalized = normalizeComputerDifficulty(valueOrTier);
+        if (normalized === "oracle") return "Oracle (strongest available)";
+        return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+      }
+      return getDifficultyTierMeta(valueOrTier).label;
+    }
+
+    function updateComputerDifficultyLabel() {
+      if (!el.computerDifficultyLabel || !el.computerDifficulty) return;
+      const tier = sliderValueToDifficultyTier(el.computerDifficulty.value);
+      const difficulty = sliderValueToDifficulty(tier);
+      const label = `${getDifficultyLabelText(tier)} (${tier}/9)`;
+      el.computerDifficultyLabel.textContent = label;
+      const current = Number(el.computerDifficulty.value || 0);
+      const min = Number(el.computerDifficulty.min || 0);
+      const max = Number(el.computerDifficulty.max || COMPUTER_MAX_DIFFICULTY_TIER);
+      const ratio = max > min ? ((current - min) / (max - min)) : 0;
+      const progress = Math.max(0, Math.min(100, ratio * 100));
+      el.computerDifficulty.style.backgroundSize = `${progress}% 100%`;
+      el.computerDifficulty.setAttribute("aria-valuetext", `${label} (${difficulty})`);
+    }
+
+    function getEffectiveAdaptiveDifficultyTier(baseTier) {
+      return normalizeComputerDifficultyTier(baseTier, baseTier);
+    }
+
+    function refreshComputerEffectiveDifficultyForTurn() {
+      if (!app.config?.computerEnabled) return;
+      const baseTier = normalizeComputerDifficultyTier(app.config.computerDifficultyTier ?? 3, 3);
+      let effectiveTier = getEffectiveAdaptiveDifficultyTier(baseTier);
+      let adaptiveUrgency = 0;
+      if (app.config.adaptiveDifficultyEnabled) {
+        const computer = app.players.find((candidate) => candidate?.isComputer && candidate.alive);
+        const human = app.players.find((candidate) => candidate && !candidate.isComputer && candidate.alive);
+        let targetTier = baseTier;
+        if (computer && human) {
+          const advantage = evaluateStateForPlayer(computer.id) - evaluateStateForPlayer(human.id);
+          // Turn-only adaptation: respond aggressively to current board pressure.
+          if (advantage < -2800) {
+            targetTier = Math.max(targetTier, 9);
+            adaptiveUrgency = 3;
+          } else if (advantage < -1800) {
+            targetTier = Math.max(targetTier, 9);
+            adaptiveUrgency = 2;
+          } else if (advantage < -1000) {
+            targetTier = Math.max(targetTier, 9);
+            adaptiveUrgency = 2;
+          } else if (advantage < -500) {
+            targetTier = Math.max(targetTier, 8);
+            adaptiveUrgency = 1;
+          } else if (advantage < -200) targetTier = Math.max(targetTier, 6);
+          else if (advantage > 2600) targetTier = Math.max(0, baseTier - 2);
+          else if (advantage > 1000) targetTier = Math.max(0, baseTier - 1);
+
+          // Emergency bump: if human has an immediate winning move available, force near-oracle.
+          const humanMoves = collectLegalMoves(human);
+          const humanCanWinNow = humanMoves.some((move) => moveCausesImmediateWin(human.id, move));
+          const twoTurnThreatCacheKey = `${app.adaptiveTurnCounter}:${app.currentPlayerIdx}:${human.id}:${computer.id}:${estimateRemainingTurnDepth()}`;
+          let humanCanForceWinInTwo = false;
+          if (app.config.adaptiveTwoTurnThreatCacheKey === twoTurnThreatCacheKey) {
+            humanCanForceWinInTwo = !!app.config.adaptiveTwoTurnThreatCacheValue;
+          } else {
+            // Limit cost in very early game; this detector is most useful in tactical middlegame/endgame.
+            const openCells = estimateRemainingTurnDepth();
+            humanCanForceWinInTwo = openCells <= 24 && playerCanForceWinWithinTwoTurns(human.id, computer.id);
+            app.config.adaptiveTwoTurnThreatCacheKey = twoTurnThreatCacheKey;
+            app.config.adaptiveTwoTurnThreatCacheValue = humanCanForceWinInTwo;
+          }
+          if (humanCanWinNow) {
+            targetTier = Math.max(targetTier, 9);
+            adaptiveUrgency = 3;
+          } else if (humanCanForceWinInTwo) {
+            targetTier = Math.max(targetTier, 9);
+            adaptiveUrgency = Math.max(adaptiveUrgency, 2);
+          }
+        }
+        effectiveTier = normalizeComputerDifficultyTier(targetTier, baseTier);
+      }
+      app.config.computerEffectiveTier = effectiveTier;
+      app.config.computerEffectiveDifficulty = getDifficultyTierMeta(effectiveTier).base;
+      app.config.computerDifficultyLabel = getDifficultyLabelText(baseTier);
+      app.config.computerEffectiveDifficultyLabel = getDifficultyLabelText(effectiveTier);
+      app.config.adaptiveUrgency = adaptiveUrgency;
+    }
+
+    function syncComputerSetupControls() {
+      const isComputerMode = app.setupMode === "computer";
+      const difficultyTier = sliderValueToDifficultyTier(el.computerDifficulty?.value || "3");
+      const isOracle = difficultyTier >= COMPUTER_MAX_DIFFICULTY_TIER;
+      updateComputerDifficultyLabel();
+      if (el.adaptiveDifficulty) {
+        el.adaptiveDifficulty.disabled = isOracle || !isComputerMode;
+        if (isOracle && el.adaptiveDifficulty.value !== "off") el.adaptiveDifficulty.value = "off";
+      }
+    }
+
     function syncSetupModeUI() {
       const isComputerMode = app.setupMode === "computer";
       if (el.setupTitle) el.setupTitle.textContent = isComputerMode ? "Tile Path Game vs Computer" : "Tile Path Game";
@@ -1929,6 +2272,7 @@
       if (isComputerMode && el.p2Name && (!el.p2Name.value || el.p2Name.value === "Player 2")) {
         el.p2Name.value = "Computer";
       }
+      syncComputerSetupControls();
     }
 
     function setTab(tabName) {
@@ -2023,9 +2367,16 @@
       el.jumpSelection.addEventListener("change", syncVariantControls);
       el.poolMode.addEventListener("change", syncVariantControls);
       if (el.variantMode) el.variantMode.addEventListener("change", syncVariantControls);
+      if (el.computerDifficulty) {
+        el.computerDifficulty.addEventListener("input", syncComputerSetupControls);
+        el.computerDifficulty.addEventListener("change", syncComputerSetupControls);
+      }
       el.startBtn.addEventListener("click", () => startGame());
       if (el.undoBtn) {
         el.undoBtn.addEventListener("click", undoLastMove);
+      }
+      if (el.gameAnalysisBtn) {
+        el.gameAnalysisBtn.addEventListener("click", toggleGameAnalysis);
       }
       el.newGameBtn.addEventListener("click", () => {
         clearComputerTurnTimer();
@@ -2101,6 +2452,20 @@
     }
 
     function captureGameSnapshot() {
+      if (app.searchMode) {
+        return {
+          searchOnly: true,
+          config: cloneStateValue(app.config),
+          board: cloneStateValue(app.board),
+          players: cloneStateValue(app.players),
+          currentPlayerIdx: app.currentPlayerIdx,
+          selectedTile: app.selectedTile,
+          gameOver: app.gameOver,
+          winner: app.winner,
+          pendingFirstPlacement: app.pendingFirstPlacement ? { ...app.pendingFirstPlacement } : null,
+          adaptiveTurnCounter: app.adaptiveTurnCounter,
+        };
+      }
       return {
         config: cloneStateValue(app.config),
         board: cloneStateValue(app.board),
@@ -2117,6 +2482,15 @@
         overlayMode: app.overlayMode,
         tutorialMode: cloneStateValue(app.tutorialMode),
         hoverTilePickerEnabled: !!app.hoverTilePickerEnabled,
+        adaptiveTurnCounter: app.adaptiveTurnCounter,
+        moveHistory: cloneStateValue(app.moveHistory || []),
+        analysisHistory: cloneStateValue(app.analysisHistory || []),
+        analysisEvalScore: Number(app.analysisEvalScore) || 0,
+        analysisEvalPercent: Number(app.analysisEvalPercent) || 50,
+        analysisEvalText: app.analysisEvalText || "Even",
+        analysisVisible: !!app.analysisVisible,
+        analysisReady: !!app.analysisReady,
+        analysisSelectedMoveIdx: Number.isInteger(app.analysisSelectedMoveIdx) ? app.analysisSelectedMoveIdx : -1,
         tutorialLessonIndex,
       };
     }
@@ -2140,6 +2514,14 @@
       app.gameOver = !!snapshot.gameOver;
       app.winner = Number.isInteger(snapshot.winner) ? snapshot.winner : null;
       app.pendingFirstPlacement = snapshot.pendingFirstPlacement ? { ...snapshot.pendingFirstPlacement } : null;
+      app.adaptiveTurnCounter = Number.isInteger(snapshot.adaptiveTurnCounter)
+        ? snapshot.adaptiveTurnCounter
+        : 0;
+      if (snapshot.searchOnly) {
+        if (!shouldRender) return;
+        renderAll();
+        return;
+      }
       app.logs = Array.isArray(snapshot.logs) ? [...snapshot.logs] : [];
       app.eliminationQueue = (snapshot.eliminationQueueIds || [])
         .map((id) => app.players.find((player) => player.id === id))
@@ -2149,6 +2531,21 @@
       app.overlayMode = snapshot.overlayMode || null;
       app.tutorialMode = cloneStateValue(snapshot.tutorialMode);
       app.hoverTilePickerEnabled = !!snapshot.hoverTilePickerEnabled;
+      app.moveHistory = Array.isArray(snapshot.moveHistory)
+        ? cloneStateValue(snapshot.moveHistory)
+        : [];
+      app.analysisHistory = Array.isArray(snapshot.analysisHistory)
+        ? cloneStateValue(snapshot.analysisHistory)
+        : [];
+      app.analysisEvalScore = Number.isFinite(snapshot.analysisEvalScore) ? snapshot.analysisEvalScore : 0;
+      app.analysisEvalPercent = Number.isFinite(snapshot.analysisEvalPercent) ? snapshot.analysisEvalPercent : 50;
+      app.analysisEvalText = typeof snapshot.analysisEvalText === "string" ? snapshot.analysisEvalText : "Even";
+      app.analysisVisible = !!snapshot.analysisVisible;
+      app.analysisReady = !!snapshot.analysisReady;
+      app.analysisSelectedMoveIdx = Number.isInteger(snapshot.analysisSelectedMoveIdx)
+        ? snapshot.analysisSelectedMoveIdx
+        : -1;
+      app.analysisBusy = false;
       app.suppressOverlays = false;
       app.drag = { active: false, tileType: null, ghost: null, hoveredCell: null };
       app.aiThinking = false;
@@ -2482,7 +2879,9 @@
         names: [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value],
         deadCorner: Number(el.deadCornerSelect.value),
         computerEnabled,
-        computerDifficulty: el.computerDifficulty?.value || "medium",
+        computerDifficultyTier: sliderValueToDifficultyTier(el.computerDifficulty?.value || "3"),
+        computerDifficulty: sliderValueToDifficulty(el.computerDifficulty?.value || "3"),
+        adaptiveDifficultyEnabled: el.adaptiveDifficulty?.value === "on",
         oracleStyle: el.oracleStyle?.value || "balanced",
       };
     }
@@ -2504,8 +2903,15 @@
       if (el.variantMode) el.variantMode.value = options.variantMode || "standard";
       el.jumpSelection.value = options.jumpSelection;
       el.poolMode.value = options.poolMode;
-      if (el.computerDifficulty && options.computerDifficulty) {
-        el.computerDifficulty.value = normalizeComputerDifficulty(options.computerDifficulty);
+      if (el.computerDifficulty) {
+        if (Number.isFinite(Number(options.computerDifficultyTier))) {
+          el.computerDifficulty.value = String(normalizeComputerDifficultyTier(options.computerDifficultyTier));
+        } else if (options.computerDifficulty) {
+          el.computerDifficulty.value = difficultyToSliderValue(options.computerDifficulty);
+        }
+      }
+      if (el.adaptiveDifficulty) {
+        el.adaptiveDifficulty.value = options.adaptiveDifficultyEnabled ? "on" : "off";
       }
       if (el.oracleStyle && options.oracleStyle) {
         el.oracleStyle.value = normalizeOracleStyle(options.oracleStyle);
@@ -2523,6 +2929,7 @@
       el.threePlayerCornerField.classList.toggle("hidden", app.setupMode === "computer" || el.playerCount.value !== "3");
       syncSetupModeUI();
       syncVariantControls();
+      syncComputerSetupControls();
     }
 
     function cycleTutorialLesson() {
@@ -2629,7 +3036,9 @@
         variantMode: "standard",
         hoverTilePickerEnabled: el.hoverTilePickerEnabled?.value === "on",
         computerEnabled: false,
-        computerDifficulty: el.computerDifficulty?.value || "medium",
+        computerDifficultyTier: sliderValueToDifficultyTier(el.computerDifficulty?.value || "3"),
+        computerDifficulty: sliderValueToDifficulty(el.computerDifficulty?.value || "3"),
+        adaptiveDifficultyEnabled: el.adaptiveDifficulty?.value === "on",
         oracleStyle: el.oracleStyle?.value || "balanced",
         names: [
           el.p1Name.value || "Player 1",
@@ -2990,7 +3399,18 @@
       const poolMode = variantMode === "overload" ? "combined" : options.poolMode;
       const names = [...(options.names || [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value])];
       const computerEnabled = !!options.computerEnabled && !options.tutorialMode;
-      const computerDifficulty = normalizeComputerDifficulty(options.computerDifficulty);
+      const requestedDifficultyTier = Number.isFinite(Number(options.computerDifficultyTier))
+        ? normalizeComputerDifficultyTier(options.computerDifficultyTier)
+        : normalizeComputerDifficultyTier(difficultyToSliderValue(options.computerDifficulty));
+      const computerDifficultyTier = requestedDifficultyTier;
+      const computerDifficulty = getDifficultyTierMeta(computerDifficultyTier).base;
+      const adaptiveDifficultyEnabled = !!options.adaptiveDifficultyEnabled && computerDifficultyTier < COMPUTER_MAX_DIFFICULTY_TIER;
+      const computerEffectiveTier = adaptiveDifficultyEnabled
+        ? getEffectiveAdaptiveDifficultyTier(computerDifficultyTier)
+        : computerDifficultyTier;
+      const computerEffectiveDifficulty = getDifficultyTierMeta(computerEffectiveTier).base;
+      const computerDifficultyLabel = getDifficultyLabelText(computerDifficultyTier);
+      const computerEffectiveDifficultyLabel = getDifficultyLabelText(computerEffectiveTier);
       const oracleStyle = normalizeOracleStyle(options.oracleStyle);
       if (computerEnabled && (!names[1] || names[1] === "Player 2")) names[1] = "Computer";
 
@@ -3015,7 +3435,13 @@
         variantMode,
         activeCorners,
         computerEnabled,
+        computerDifficultyTier,
         computerDifficulty,
+        computerDifficultyLabel,
+        computerEffectiveTier,
+        computerEffectiveDifficulty,
+        computerEffectiveDifficultyLabel,
+        adaptiveDifficultyEnabled,
         oracleStyle,
       };
       app.board = Array.from({ length: size }, (_, r) =>
@@ -3034,6 +3460,17 @@
       app.eliminationQueue = [];
       app.winShown = false;
       app.tieShown = false;
+      app.adaptiveTurnCounter = 0;
+      app.moveHistory = [];
+      app.analysisHistory = [];
+      app.analysisEvalScore = 0;
+      app.analysisEvalPercent = 50;
+      app.analysisEvalText = "Run Game Analysis to review Oracle moves.";
+      app.analysisVisible = false;
+      app.analysisReady = false;
+      app.analysisBusy = false;
+      app.analysisSelectedMoveIdx = -1;
+      app.analysisBaseSnapshot = null;
       app.overlayMode = null;
       app.tutorialMode = options.tutorialMode || null;
       setTutorialTopNotice(app.tutorialMode?.message || "");
@@ -3094,12 +3531,18 @@
       });
 
       log(`Game started: ${size}×${size}, ${playerCount} players, jump mode "${jumpSelection}"${variantMode === "overload" ? ', variant "overload"' : ""}.`);
+      refreshComputerEffectiveDifficultyForTurn();
       if (computerEnabled) {
-        log(`Computer opponent enabled on ${computerDifficulty} difficulty.`);
-        if (computerDifficulty === "oracle") {
+        log(`Computer opponent enabled on ${app.config.computerEffectiveDifficultyLabel || computerEffectiveDifficultyLabel}.`);
+        if (adaptiveDifficultyEnabled) {
+          log(`Adaptive difficulty is on (base: ${app.config.computerDifficultyLabel || computerDifficultyLabel}, updates each turn).`);
+        }
+        if ((app.config.computerEffectiveDifficulty || computerEffectiveDifficulty) === "oracle") {
           log(`Oracle style set to ${oracleStyle}.`);
+          log("Oracle uses exact search in small endgames and practical search elsewhere.");
         }
       }
+      app.analysisBaseSnapshot = captureGameSnapshot();
       el.setupView.classList.add("hidden");
       el.gameView.classList.remove("hidden");
       renderAll();
@@ -3107,7 +3550,7 @@
     }
 
     function log(msg) {
-      if (app.benchmarkMode) return;
+      if (app.benchmarkMode || app.searchMode) return;
       app.logs.unshift(`${new Date().toLocaleTimeString()}  ${msg}`);
       if (app.logs.length > 80) app.logs.pop();
     }
@@ -3335,6 +3778,7 @@
           app.pendingFirstPlacement = null;
           el.entrySelectWrap.classList.add("hidden");
           finalizeRemainingPlayersOutcome();
+          if (shouldRecordUndo) recordMoveForPostGameAnalysis(player.id, move);
           postTurnAdvance({ render: shouldRender });
           return true;
         }
@@ -3352,6 +3796,7 @@
           recordLessonSixPlacement(player, move.r, move.c, move.tileType);
         }
         resolveAfterPlacement(move.r, move.c, placement.mode);
+        if (shouldRecordUndo) recordMoveForPostGameAnalysis(player.id, move);
         postTurnAdvance({ render: shouldRender });
         return true;
       } finally {
@@ -4144,38 +4589,606 @@
       return blunder;
     }
 
-    function chooseOracleMove(player) {
-      const legalMoves = collectLegalMoves(player);
-      if (!legalMoves.length) return null;
-      const tuning = getOracleStyleTuning();
+    function playerCanForceWinWithinTwoTurns(playerId, opponentId) {
+      const player = getLivePlayer(playerId);
+      const opponent = getLivePlayer(opponentId);
+      if (!player || !opponent) return false;
+      const firstMoves = collectLegalMoves(player);
+      if (!firstMoves.length) return false;
 
-      // Tactical priority: always take immediate wins when available.
-      for (const move of legalMoves) {
-        if (moveCausesImmediateWin(player.id, move)) return move;
+      for (const firstMove of firstMoves) {
+        const firstSnapshot = captureGameSnapshot();
+        let winningLine = false;
+        const actingPlayer = app.players.find((candidate) => candidate.id === playerId && candidate.alive);
+        if (actingPlayer && executePlannedMove(actingPlayer, firstMove, { recordUndo: false, render: false, recordTutorial: false })) {
+          if (app.gameOver && app.winner === playerId) {
+            winningLine = true;
+          } else {
+            const responder = app.players.find((candidate) => candidate.id === opponentId && candidate.alive) || currentPlayer();
+            const replies = responder ? collectLegalMoves(responder) : [];
+            if (!replies.length) {
+              winningLine = app.gameOver && app.winner === playerId;
+            } else {
+              winningLine = true;
+              for (const reply of replies) {
+                const replySnapshot = captureGameSnapshot();
+                let canFinishAfterReply = false;
+                const liveResponder = app.players.find((candidate) => candidate.id === responder.id && candidate.alive);
+                if (liveResponder && executePlannedMove(liveResponder, reply, { recordUndo: false, render: false, recordTutorial: false })) {
+                  if (app.gameOver && app.winner === playerId) {
+                    canFinishAfterReply = true;
+                  } else {
+                    const livePlayer = app.players.find((candidate) => candidate.id === playerId && candidate.alive);
+                    if (livePlayer) {
+                      const followUps = collectLegalMoves(livePlayer);
+                      canFinishAfterReply = followUps.some((finishMove) => moveCausesImmediateWin(playerId, finishMove));
+                    }
+                  }
+                }
+                restoreSnapshot(replySnapshot, { render: false });
+                if (!canFinishAfterReply) {
+                  winningLine = false;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        restoreSnapshot(firstSnapshot, { render: false });
+        if (winningLine) return true;
       }
-      // Oracle must never commit immediate suicide unless all legal moves do.
+      return false;
+    }
+
+    function describeMoveForAnalysis(move) {
+      if (!move) return "Unknown move";
+      const tileName = TILE_LABELS[move.tileType] || move.tileType || "tile";
+      const entryText = Number.isInteger(move.entry) ? `, ${entranceName(move.entry)}` : "";
+      return `${tileName} @ (${move.r},${move.c}${entryText})`;
+    }
+
+    function getTwoPlayerOracleEvaluation() {
+      if (!app.config || app.config.playerCount !== 2 || app.players.length < 2) return null;
+      const p1 = app.players[0];
+      const p2 = app.players[1];
+      if (!p1 || !p2) return null;
+      const score = evaluateStateForOracle(p1.id) - evaluateStateForOracle(p2.id);
+      const clamped = Math.max(-120000, Math.min(120000, score));
+      const percent = Math.max(0, Math.min(100, 50 + Math.tanh(clamped / 6000) * 50));
+      const absScore = Math.abs(Math.round(clamped));
+      let text = "Even position";
+      if (absScore >= 80) {
+        text = clamped > 0
+          ? `${p1.name} advantage (+${absScore})`
+          : `${p2.name} advantage (+${absScore})`;
+      }
+      return { score: clamped, percent, text };
+    }
+
+    function refreshAnalysisEvaluationSummary() {
+      const evalState = getTwoPlayerOracleEvaluation();
+      if (!evalState) {
+        app.analysisEvalScore = 0;
+        app.analysisEvalPercent = 50;
+        app.analysisEvalText = "Analysis unavailable for this mode.";
+        return null;
+      }
+      app.analysisEvalScore = evalState.score;
+      app.analysisEvalPercent = evalState.percent;
+      app.analysisEvalText = evalState.text;
+      return evalState;
+    }
+
+    function classifyMoveQuality(scoreLoss, missedWin = false) {
+      if (missedWin) return "Missed win";
+      if (scoreLoss <= 40) return "Best move";
+      if (scoreLoss <= 180) return "Excellent";
+      if (scoreLoss <= 480) return "Good";
+      if (scoreLoss <= 980) return "Inaccurate";
+      if (scoreLoss <= 1900) return "Mistake";
+      return "Blunder";
+    }
+
+    function qualityToCssClass(quality) {
+      const normalized = String(quality || "").toLowerCase();
+      if (normalized === "best move") return "best";
+      if (normalized === "excellent") return "excellent";
+      if (normalized === "good") return "good";
+      if (normalized === "inaccurate") return "inaccurate";
+      if (normalized === "mistake") return "mistake";
+      if (normalized === "missed win") return "missedwin";
+      return "blunder";
+    }
+
+    function recordMoveForPostGameAnalysis(playerId, move) {
+      if (!Number.isInteger(playerId) || !move) return;
+      app.moveHistory.push({
+        playerId,
+        move: cloneStateValue(move),
+      });
+    }
+
+    function computeGameAnalysisReport() {
+      if (!app.analysisBaseSnapshot || !Array.isArray(app.moveHistory) || !app.moveHistory.length) return null;
+      return withPreservedGameState(() => {
+        restoreSnapshot(cloneStateValue(app.analysisBaseSnapshot), { render: false });
+        const entries = [];
+        for (let i = 0; i < app.moveHistory.length; i++) {
+          const record = app.moveHistory[i];
+          const actor = getLivePlayer(record.playerId) || currentPlayer();
+          if (!actor || !record?.move) break;
+          const playedMove = cloneStateValue(record.move);
+          const bestMove = chooseOracleMove(actor);
+          const bestScore = bestMove
+            ? evaluateImmediateMoveForPlayerPerspective(actor.id, actor.id, bestMove, "oracle")
+            : -Infinity;
+          const playedScore = evaluateImmediateMoveForPlayerPerspective(actor.id, actor.id, playedMove, "oracle");
+          const bestIsImmediateWin = !!bestMove && moveCausesImmediateWin(actor.id, bestMove);
+          const playedIsImmediateWin = moveCausesImmediateWin(actor.id, playedMove);
+          const scoreLoss = Math.max(0, Math.round(bestScore - playedScore));
+          const quality = classifyMoveQuality(scoreLoss, bestIsImmediateWin && !playedIsImmediateWin);
+          const executed = executePlannedMove(actor, playedMove, {
+            recordUndo: false,
+            render: false,
+            recordTutorial: false,
+            recordAnalysis: false,
+          });
+          if (!executed) break;
+          const evalState = getTwoPlayerOracleEvaluation() || { score: 0, percent: 50, text: "Even position" };
+          entries.push({
+            idx: i + 1,
+            playerName: actor.name,
+            moveText: describeMoveForAnalysis(playedMove),
+            bestMoveText: describeMoveForAnalysis(bestMove),
+            quality,
+            scoreLoss,
+            evalAfterText: evalState.text,
+            evalPercent: evalState.percent,
+            evalScore: evalState.score,
+          });
+        }
+        return {
+          entries,
+          selectedMoveIdx: entries.length ? entries.length - 1 : -1,
+        };
+      });
+    }
+
+    function toggleGameAnalysis() {
+      if (!app.gameOver || app.tutorialMode || app.config?.playerCount !== 2 || !app.moveHistory.length || app.analysisBusy) return;
+      if (app.analysisVisible && app.analysisReady) {
+        app.analysisVisible = false;
+        renderAll();
+        return;
+      }
+      app.analysisVisible = true;
+      if (app.analysisReady && app.analysisHistory.length === app.moveHistory.length) {
+        renderAll();
+        return;
+      }
+      app.analysisBusy = true;
+      app.analysisReady = false;
+      app.analysisHistory = [];
+      app.analysisSelectedMoveIdx = -1;
+      app.analysisEvalScore = 0;
+      app.analysisEvalPercent = 50;
+      app.analysisEvalText = "Analyzing with Oracle search. Exact in late endgames, practical elsewhere.";
+      renderAll();
+      setTimeout(() => {
+        const report = computeGameAnalysisReport();
+        app.analysisBusy = false;
+        app.analysisReady = !!report;
+        app.analysisHistory = report?.entries || [];
+        app.analysisSelectedMoveIdx = Number.isInteger(report?.selectedMoveIdx) ? report.selectedMoveIdx : -1;
+        const selected = app.analysisHistory[app.analysisSelectedMoveIdx] || null;
+        app.analysisEvalScore = selected?.evalScore ?? 0;
+        app.analysisEvalPercent = selected?.evalPercent ?? 50;
+        app.analysisEvalText = selected?.evalAfterText || (report ? "Even position" : "Analysis unavailable.");
+        renderAll();
+      }, 30);
+    }
+
+    function normalizeOracleValue(score, scale = 9000) {
+      const numeric = Number.isFinite(score) ? score : 0;
+      return Math.max(-1, Math.min(1, Math.tanh(numeric / scale)));
+    }
+
+    function pickWeightedMoveFromCandidates(moves, weights = [0.58, 0.24, 0.12, 0.06]) {
+      if (!Array.isArray(moves) || !moves.length) return null;
+      const effectiveWeights = moves.map((_, idx) => Math.max(0, Number(weights[idx]) || 0));
+      const totalWeight = effectiveWeights.reduce((sum, weight) => sum + weight, 0);
+      if (totalWeight <= 0) return moves[0];
+      let roll = Math.random() * totalWeight;
+      for (let i = 0; i < moves.length; i++) {
+        roll -= effectiveWeights[i];
+        if (roll <= 0) return moves[i];
+      }
+      return moves[0];
+    }
+
+    function getOracleMctsSearchConfig(openCells, style = app.config?.oracleStyle || "balanced") {
+      const normalized = normalizeOracleStyle(style);
+      const aggressive = normalized === "aggressive";
+      const defensive = normalized === "defensive";
+      if (openCells <= 8) {
+        return {
+          timeBudgetMs: aggressive ? 140 : defensive ? 110 : 125,
+          maxIterations: aggressive ? 96 : defensive ? 72 : 84,
+          rolloutDepth: aggressive ? 10 : defensive ? 8 : 9,
+          rootWidth: defensive ? 8 : 10,
+          childWidth: aggressive ? 6 : 5,
+          exploration: aggressive ? 1.26 : defensive ? 1.08 : 1.16,
+          priorWeight: aggressive ? 0.3 : defensive ? 0.2 : 0.25,
+          replySafetyDepth: 1,
+        };
+      }
+      if (openCells <= 16) {
+        return {
+          timeBudgetMs: aggressive ? 105 : defensive ? 80 : 92,
+          maxIterations: aggressive ? 76 : defensive ? 52 : 64,
+          rolloutDepth: aggressive ? 8 : defensive ? 6 : 7,
+          rootWidth: aggressive ? 12 : 10,
+          childWidth: aggressive ? 6 : 5,
+          exploration: aggressive ? 1.22 : defensive ? 1.05 : 1.13,
+          priorWeight: aggressive ? 0.28 : defensive ? 0.18 : 0.22,
+          replySafetyDepth: 1,
+        };
+      }
+      return {
+        timeBudgetMs: aggressive ? 82 : defensive ? 62 : 72,
+        maxIterations: aggressive ? 58 : defensive ? 38 : 48,
+        rolloutDepth: aggressive ? 6 : defensive ? 5 : 6,
+        rootWidth: aggressive ? 12 : 10,
+        childWidth: aggressive ? 5 : 4,
+        exploration: aggressive ? 1.18 : defensive ? 1.02 : 1.1,
+        priorWeight: aggressive ? 0.25 : defensive ? 0.16 : 0.2,
+        replySafetyDepth: 0,
+      };
+    }
+
+    function buildOracleMovePool(player, options = {}) {
+      player = getLivePlayer(player);
+      if (!player) return [];
+      const legalMoves = Array.isArray(options.moves) && options.moves.length
+        ? options.moves
+        : collectLegalMoves(player);
+      if (!legalMoves.length) return [];
+      if (options.checkImmediateWins !== false) {
+        for (const move of legalMoves) {
+          if (moveCausesImmediateWin(player.id, move)) return [move];
+        }
+      }
       const nonSuicidalMoves = legalMoves.filter((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
       const survivalPool = nonSuicidalMoves.length ? nonSuicidalMoves : legalMoves;
-      const safeMoves = survivalPool.filter((move) => !moveAllowsOpponentImmediateWin(player.id, move));
-      const movePool = safeMoves.length ? safeMoves : survivalPool;
+      const pruneLimit = Math.max(1, Math.min(
+        survivalPool.length,
+        Number.isInteger(options.pruneLimit) ? options.pruneLimit : survivalPool.length
+      ));
+      const rankedPool = survivalPool.length > pruneLimit
+        ? rankMovesForLookahead(player.id, player.id, survivalPool, true, pruneLimit, options.profile || "oracle")
+        : [...survivalPool];
+      if (!options.replySafetyCheck) return rankedPool;
+      const safeMoves = rankedPool.filter((move) => !moveAllowsOpponentImmediateWin(player.id, move));
+      return safeMoves.length ? safeMoves : rankedPool;
+    }
 
+    function chooseOracleRolloutMove(player, rootPlayerId, config) {
+      player = getLivePlayer(player);
+      if (!player) return null;
+      const movePool = buildOracleMovePool(player, {
+        pruneLimit: Math.max(3, player.id === rootPlayerId ? config.childWidth + 1 : config.childWidth),
+        replySafetyCheck: false,
+        profile: "oracle",
+      });
+      if (!movePool.length) return null;
+      if (movePool.length === 1) return movePool[0];
+      const ranked = rankMovesForLookahead(
+        player.id,
+        player.id,
+        movePool,
+        true,
+        Math.min(movePool.length, 4),
+        "oracle"
+      );
+      return pickWeightedMoveFromCandidates(
+        ranked.length ? ranked : movePool,
+        player.id === rootPlayerId ? [0.58, 0.24, 0.12, 0.06] : [0.5, 0.26, 0.16, 0.08]
+      );
+    }
+
+    function createOracleMctsNode(parent = null, move = null, depth = 0) {
+      return {
+        parent,
+        move,
+        depth,
+        actorId: null,
+        children: [],
+        unexpandedMoves: null,
+        visits: 0,
+        totalValue: 0,
+        priorValue: 0,
+      };
+    }
+
+    function populateOracleMctsNode(node, rootPlayerId, config) {
+      if (!node || node.unexpandedMoves !== null) return;
+      const actor = currentPlayer();
+      node.actorId = actor?.id ?? null;
+      if (!actor || !actor.alive || app.gameOver) {
+        node.unexpandedMoves = [];
+        return;
+      }
+      node.unexpandedMoves = buildOracleMovePool(actor, {
+        pruneLimit: node.depth <= 0 ? config.rootWidth : config.childWidth,
+        replySafetyCheck: node.depth <= config.replySafetyDepth,
+        profile: "oracle",
+      });
+    }
+
+    function selectOracleMctsChild(node, rootPlayerId, config) {
+      if (!node?.children?.length) return null;
+      const actorSign = node.actorId === rootPlayerId ? 1 : -1;
+      const explorationBase = Math.log(Math.max(2, node.visits));
+      let bestChild = null;
+      let bestScore = -Infinity;
+      node.children.forEach((child) => {
+        const meanValue = child.visits ? child.totalValue / child.visits : child.priorValue;
+        const bias = actorSign * child.priorValue * config.priorWeight / (child.visits + 1);
+        const exploration = config.exploration * Math.sqrt(explorationBase / Math.max(1, child.visits));
+        const score = actorSign * meanValue + bias + exploration;
+        if (score > bestScore) {
+          bestScore = score;
+          bestChild = child;
+        }
+      });
+      return bestChild;
+    }
+
+    function oracleTerminalValue(rootPlayerId, pliesPlayed = 0) {
+      if (!app.gameOver) return normalizeOracleValue(evaluateStateForOracle(rootPlayerId));
+      if (app.winner === rootPlayerId) return Math.max(0.76, 1 - pliesPlayed * 0.04);
+      if (app.winner == null) return 0;
+      return Math.min(-0.76, -1 + pliesPlayed * 0.04);
+    }
+
+    function simulateOracleMctsRollout(rootPlayerId, config) {
+      const maxPlies = Math.max(4, config.rolloutDepth);
+      let pliesPlayed = 0;
+      while (!app.gameOver && pliesPlayed < maxPlies) {
+        const actor = currentPlayer();
+        if (!actor || !actor.alive) break;
+        const move = chooseOracleRolloutMove(actor, rootPlayerId, config);
+        if (!move) break;
+        if (!executePlannedMove(actor, move, { recordUndo: false, render: false, recordTutorial: false })) break;
+        pliesPlayed++;
+      }
+      return oracleTerminalValue(rootPlayerId, pliesPlayed);
+    }
+
+    function chooseOracleMoveByMonteCarloTreeSearch(player, rootMoves = null) {
+      player = getLivePlayer(player);
+      if (!player) return null;
       const openCells = estimateRemainingTurnDepth();
-      if (openCells <= 10) {
-        // Endgame: search exact/full-width as far as possible.
-        return chooseMoveWithDeepLookahead(player, openCells, Infinity, tuning.endgameTimeMs, movePool, "oracle");
+      const config = getOracleMctsSearchConfig(openCells, app.config?.oracleStyle || "balanced");
+      const candidateMoves = Array.isArray(rootMoves) && rootMoves.length
+        ? [...rootMoves]
+        : buildOracleMovePool(player, {
+          pruneLimit: config.rootWidth,
+          replySafetyCheck: true,
+          profile: "oracle",
+        });
+      if (!candidateMoves.length) return null;
+      if (candidateMoves.length === 1) return candidateMoves[0];
+      if (openCells <= 4 && candidateMoves.length <= 6) {
+        return chooseMoveWithDeepLookahead(
+          player,
+          openCells,
+          Infinity,
+          Math.max(60, config.timeBudgetMs),
+          candidateMoves,
+          "oracle"
+        );
       }
-      if (openCells <= 18) {
-        const opponentAwarePool = pruneOracleMovesByOpponentReply(player, movePool, 16, 12);
-        const gauntletChoice = chooseOracleMoveByGauntlet(player, opponentAwarePool);
-        if (gauntletChoice) return gauntletChoice;
-        // Midgame: larger beam with deeper tactical horizon.
-        return chooseMoveWithDeepLookahead(player, tuning.midDepth, tuning.midBreadth, tuning.midTimeMs, opponentAwarePool, "oracle");
+
+      const rootSnapshot = captureGameSnapshot();
+      const rootNode = createOracleMctsNode(null, null, 0);
+      rootNode.actorId = player.id;
+      rootNode.unexpandedMoves = [...candidateMoves];
+      const deadlineMs = Date.now() + config.timeBudgetMs;
+      let iterations = 0;
+
+      while (iterations < config.maxIterations && Date.now() < deadlineMs) {
+        restoreSnapshot(rootSnapshot, { render: false });
+        let node = rootNode;
+
+        while (!app.gameOver) {
+          populateOracleMctsNode(node, player.id, config);
+          if (node.unexpandedMoves.length) {
+            const nextMove = node.unexpandedMoves.shift();
+            const actor = currentPlayer();
+            if (!actor || !executePlannedMove(actor, nextMove, { recordUndo: false, render: false, recordTutorial: false })) {
+              break;
+            }
+            const child = createOracleMctsNode(node, cloneStateValue(nextMove), node.depth + 1);
+            child.actorId = currentPlayer()?.id ?? null;
+            child.priorValue = normalizeOracleValue(evaluateStateForOracle(player.id));
+            node.children.push(child);
+            node = child;
+            break;
+          }
+
+          const selectedChild = selectOracleMctsChild(node, player.id, config);
+          const actor = currentPlayer();
+          if (!selectedChild || !actor || !executePlannedMove(actor, selectedChild.move, { recordUndo: false, render: false, recordTutorial: false })) {
+            break;
+          }
+          node = selectedChild;
+        }
+
+        const rolloutValue = simulateOracleMctsRollout(player.id, config);
+        for (let cursor = node; cursor; cursor = cursor.parent) {
+          cursor.visits += 1;
+          cursor.totalValue += rolloutValue;
+        }
+        iterations++;
       }
-      const opponentAwarePool = pruneOracleMovesByOpponentReply(player, movePool, 14, 10);
-      const gauntletChoice = chooseOracleMoveByGauntlet(player, opponentAwarePool);
-      if (gauntletChoice) return gauntletChoice;
-      // Opening/early midgame: strong search while keeping enough depth.
-      return chooseMoveWithDeepLookahead(player, tuning.earlyDepth, tuning.earlyBreadth, tuning.earlyTimeMs, opponentAwarePool, "oracle");
+
+      restoreSnapshot(rootSnapshot, { render: false });
+      const rankedChildren = [...rootNode.children].sort((a, b) => {
+        if (b.visits !== a.visits) return b.visits - a.visits;
+        return (b.totalValue / Math.max(1, b.visits)) - (a.totalValue / Math.max(1, a.visits));
+      });
+      return rankedChildren[0]?.move || candidateMoves[0];
+    }
+
+    function buildPerfectOracleStateKey(playerId) {
+      return buildLookaheadStateKey(playerId, -1);
+    }
+
+    function terminalScoreForPerfectOracle(playerId, ply = 0) {
+      if (!app.gameOver) return null;
+      if (app.winner === playerId) return 1000000 - ply;
+      if (app.winner == null) return 0;
+      return -1000000 + ply;
+    }
+
+    function orderMovesForPerfectOracle(playerId, actorId, legalMoves, maximize, searchConfig, ply = 0) {
+      if (!Array.isArray(legalMoves) || !legalMoves.length) return [];
+      const ordered = rankMovesForLookahead(
+        playerId,
+        actorId,
+        legalMoves,
+        maximize,
+        legalMoves.length,
+        "oracle",
+        searchConfig,
+        ply
+      );
+      if (!ordered.length) return [...legalMoves];
+      return ordered;
+    }
+
+    function perfectOracleMinimax(playerId, alpha, beta, searchConfig, ply = 0) {
+      const terminalScore = terminalScoreForPerfectOracle(playerId, ply);
+      if (terminalScore != null) return terminalScore;
+      const actor = currentPlayer();
+      if (!actor || !actor.alive) return evaluateStateForOracle(playerId);
+
+      const stateKey = buildPerfectOracleStateKey(playerId);
+      if (searchConfig.pathKeys.has(stateKey)) return 0;
+      if (searchConfig.transposition.has(stateKey)) return searchConfig.transposition.get(stateKey);
+
+      searchConfig.pathKeys.add(stateKey);
+      try {
+        let legalMoves = collectLegalMoves(actor);
+        if (!legalMoves.length) return evaluateStateForOracle(playerId);
+        const maximize = actor.id === playerId;
+        legalMoves = orderMovesForPerfectOracle(playerId, actor.id, legalMoves, maximize, searchConfig, ply);
+
+        if (maximize) {
+          let best = -Infinity;
+          for (const move of legalMoves) {
+            const snapshot = captureGameSnapshot();
+            const actingPlayer = app.players.find((candidate) => candidate.id === actor.id);
+            if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+              const score = perfectOracleMinimax(playerId, alpha, beta, searchConfig, ply + 1);
+              best = Math.max(best, score);
+              alpha = Math.max(alpha, score);
+            }
+            restoreSnapshot(snapshot, { render: false });
+            if (beta <= alpha) {
+              recordKillerMove(searchConfig, ply, move);
+              updateHistoryHeuristic(searchConfig, move, Math.max(1, searchConfig.historyDepthBase - ply));
+              break;
+            }
+          }
+          if (Number.isFinite(best)) searchConfig.transposition.set(stateKey, best);
+          return best;
+        }
+
+        let best = Infinity;
+        for (const move of legalMoves) {
+          const snapshot = captureGameSnapshot();
+          const actingPlayer = app.players.find((candidate) => candidate.id === actor.id);
+          if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+            const score = perfectOracleMinimax(playerId, alpha, beta, searchConfig, ply + 1);
+            best = Math.min(best, score);
+            beta = Math.min(beta, score);
+          }
+          restoreSnapshot(snapshot, { render: false });
+          if (beta <= alpha) {
+            recordKillerMove(searchConfig, ply, move);
+            updateHistoryHeuristic(searchConfig, move, Math.max(1, searchConfig.historyDepthBase - ply));
+            break;
+          }
+        }
+        if (Number.isFinite(best)) searchConfig.transposition.set(stateKey, best);
+        return best;
+      } finally {
+        searchConfig.pathKeys.delete(stateKey);
+      }
+    }
+
+    function shouldUseExactOracleSearch(openCells, legalMovesCount = 0) {
+      if (!Number.isFinite(openCells)) return false;
+      if (openCells <= 4) return true;
+      if (openCells <= 6 && legalMovesCount <= 10) return true;
+      return false;
+    }
+
+    function chooseOracleMove(player) {
+      player = getLivePlayer(player);
+      if (!player) return null;
+      const previousSearchMode = app.searchMode;
+      app.searchMode = true;
+      try {
+        const legalMoves = collectLegalMoves(player);
+        if (!legalMoves.length) return null;
+        const openCells = estimateRemainingTurnDepth();
+
+        for (const move of legalMoves) {
+          if (moveCausesImmediateWin(player.id, move)) return move;
+        }
+
+        if (!shouldUseExactOracleSearch(openCells, legalMoves.length)) {
+          const mctsConfig = getOracleMctsSearchConfig(openCells, app.config?.oracleStyle || "balanced");
+          const movePool = buildOracleMovePool(player, {
+            pruneLimit: mctsConfig.rootWidth,
+            replySafetyCheck: true,
+            profile: "oracle",
+          });
+          if (!movePool.length) return legalMoves[0];
+          return chooseOracleMoveByMonteCarloTreeSearch(player, movePool);
+        }
+
+        const searchConfig = {
+          transposition: new Map(),
+          historyHeuristic: new Map(),
+          killerMovesByPly: new Map(),
+          pathKeys: new Set(),
+          historyDepthBase: openCells,
+        };
+        const orderedRootMoves = orderMovesForPerfectOracle(player.id, player.id, legalMoves, true, searchConfig, 0);
+        let bestMove = orderedRootMoves[0];
+        let bestScore = -Infinity;
+
+        for (const move of orderedRootMoves) {
+          const snapshot = captureGameSnapshot();
+          const actingPlayer = app.players.find((candidate) => candidate.id === player.id);
+          let score = -Infinity;
+          if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+            score = perfectOracleMinimax(player.id, -Infinity, Infinity, searchConfig, 1);
+          }
+          restoreSnapshot(snapshot, { render: false });
+          if (score > bestScore) {
+            bestScore = score;
+            bestMove = move;
+          }
+        }
+        return bestMove;
+      } finally {
+        app.searchMode = previousSearchMode;
+      }
     }
 
     function doesMoveImmediatelyEliminatePlayer(playerId, move) {
@@ -4190,15 +5203,15 @@
       return eliminated;
     }
 
-    function chooseComputerMove(player, difficulty = app.config?.computerDifficulty || "medium") {
+    function chooseComputerMoveByNamedDifficulty(player, difficulty) {
       player = getLivePlayer(player);
+      if (!player) return null;
       const legalMoves = collectLegalMoves(player);
       if (!legalMoves.length) return null;
+      const nonSuicidalMoves = legalMoves.filter((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
       if (difficulty === "easy") {
-        const saferMoves = legalMoves.filter((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
-        if (!saferMoves.length) return legalMoves[Math.floor(Math.random() * legalMoves.length)];
-        // Keep easy mode imperfect: strongly prefer safer moves, but sometimes still play any random legal move.
-        const movePool = Math.random() < 0.82 ? saferMoves : legalMoves;
+        // Easy can be weak, but should not instantly self-eliminate unless forced.
+        const movePool = nonSuicidalMoves.length ? nonSuicidalMoves : legalMoves;
         return movePool[Math.floor(Math.random() * movePool.length)];
       }
       if (difficulty === "oracle") {
@@ -4216,7 +5229,74 @@
         if (score === bestScore) bestMoves.push(move);
       });
       if (!bestMoves.length) return legalMoves[Math.floor(Math.random() * legalMoves.length)];
-      return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+      const bestNonSuicidalMoves = bestMoves.filter((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
+      const finalPool = bestNonSuicidalMoves.length ? bestNonSuicidalMoves : bestMoves;
+      return finalPool[Math.floor(Math.random() * finalPool.length)];
+    }
+
+    function chooseOracleMoveFromRankedPool(player, weights = [1]) {
+      player = getLivePlayer(player);
+      if (!player) return null;
+      const legalMoves = collectLegalMoves(player);
+      if (!legalMoves.length) return null;
+      for (const move of legalMoves) {
+        if (moveCausesImmediateWin(player.id, move)) return move;
+      }
+      const nonSuicidalMoves = legalMoves.filter((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
+      const survivalPool = nonSuicidalMoves.length ? nonSuicidalMoves : legalMoves;
+      const safeMoves = survivalPool.filter((move) => !moveAllowsOpponentImmediateWin(player.id, move));
+      const movePool = safeMoves.length ? safeMoves : survivalPool;
+      const candidateCount = Math.max(1, Math.min(movePool.length, weights.length || 1));
+      const ranked = rankMovesForLookahead(
+        player.id,
+        player.id,
+        movePool,
+        true,
+        Math.max(candidateCount, 4),
+        "oracle"
+      );
+      if (!ranked.length) return chooseOracleMove(player);
+      const candidates = ranked.slice(0, candidateCount);
+      const effectiveWeights = weights.slice(0, candidates.length);
+      const weightTotal = effectiveWeights.reduce((sum, weight) => sum + Math.max(0, weight), 0);
+      if (weightTotal <= 0) return candidates[0];
+      let roll = Math.random() * weightTotal;
+      for (let i = 0; i < candidates.length; i++) {
+        roll -= Math.max(0, effectiveWeights[i]);
+        if (roll <= 0) return candidates[i];
+      }
+      return candidates[0];
+    }
+
+    function chooseComputerMove(player, difficulty = app.config?.computerEffectiveTier ?? app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty ?? "medium") {
+      player = getLivePlayer(player);
+      if (!player) return null;
+      if (typeof difficulty === "string") {
+        return chooseComputerMoveByNamedDifficulty(player, difficulty);
+      }
+      const tier = normalizeComputerDifficultyTier(difficulty, 3);
+      const adaptiveStrict = !!app.config?.adaptiveDifficultyEnabled;
+      const adaptiveUrgency = Number.isFinite(app.config?.adaptiveUrgency) ? app.config.adaptiveUrgency : 0;
+      if (adaptiveStrict && adaptiveUrgency >= 3) {
+        return chooseComputerMoveByNamedDifficulty(player, "oracle");
+      }
+      if (tier <= 0) return chooseComputerMoveByNamedDifficulty(player, "easy");
+      if (tier === 1) return chooseComputerMoveByNamedDifficulty(player, Math.random() < 0.32 ? "medium" : "easy");
+      if (tier === 2) return chooseComputerMoveByNamedDifficulty(player, Math.random() < 0.62 ? "medium" : "easy");
+      if (tier === 3) return chooseComputerMoveByNamedDifficulty(player, "medium");
+      if (tier === 4) return chooseComputerMoveByNamedDifficulty(player, Math.random() < 0.34 ? "hard" : "medium");
+      if (tier === 5) return chooseComputerMoveByNamedDifficulty(player, Math.random() < 0.66 ? "hard" : "medium");
+      if (tier === 6) return chooseComputerMoveByNamedDifficulty(player, adaptiveStrict ? (Math.random() < 0.62 ? "oracle" : "hard") : "hard");
+      if (tier === 7) {
+        if (adaptiveStrict) return chooseOracleMoveFromRankedPool(player, adaptiveUrgency >= 2 ? [0.95, 0.05] : [0.88, 0.12]);
+        if (Math.random() < 0.52) return chooseComputerMoveByNamedDifficulty(player, "hard");
+        return chooseOracleMoveFromRankedPool(player, [0.62, 0.38]);
+      }
+      if (tier === 8) {
+        if (adaptiveStrict) return chooseOracleMoveFromRankedPool(player, adaptiveUrgency >= 2 ? [0.97, 0.03] : [0.9, 0.08, 0.02]);
+        return chooseOracleMoveFromRankedPool(player, [0.46, 0.39, 0.15]);
+      }
+      return chooseComputerMoveByNamedDifficulty(player, "oracle");
     }
 
     function withPreservedGameState(task) {
@@ -4396,6 +5476,7 @@
       const player = currentPlayer();
       if (!isComputerControlledPlayer(player)) return;
       const playerId = player.id;
+      refreshComputerEffectiveDifficultyForTurn();
       app.aiThinking = true;
       renderAll();
       app.computerTurnTimer = setTimeout(() => {
@@ -4405,7 +5486,7 @@
           renderAll();
           return;
         }
-        const move = chooseComputerMove(playerId);
+        const move = chooseComputerMove(playerId, app.config?.computerEffectiveTier ?? app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
         app.aiThinking = false;
         const activePlayer = getLivePlayer(playerId);
         if (!activePlayer || !move) {
@@ -4854,7 +5935,7 @@
     function eliminatePlayer(player, msg) {
       player.alive = false;
       log(msg);
-      app.eliminationQueue.push(player);
+      if (!app.searchMode) app.eliminationQueue.push(player);
     }
 
     function finalizeRemainingPlayersOutcome() {
@@ -4909,6 +5990,10 @@
     function setWinner(playerId) {
       app.gameOver = true;
       app.winner = playerId;
+      if (app.searchMode) {
+        app.pendingFirstPlacement = null;
+        return;
+      }
       app.winShown = false;
       app.tieShown = false;
       app.pendingFirstPlacement = null;
@@ -4925,6 +6010,10 @@
     function setTie() {
       app.gameOver = true;
       app.winner = null;
+      if (app.searchMode) {
+        app.pendingFirstPlacement = null;
+        return;
+      }
       app.tieShown = false;
       app.pendingFirstPlacement = null;
       el.entrySelectWrap.classList.add("hidden");
@@ -4959,6 +6048,7 @@
 
     function postTurnAdvance(options = {}) {
       const shouldRender = options.render !== false;
+      app.adaptiveTurnCounter++;
       if (!app.gameOver) {
         const skipPlayerTwo = shouldSkipPlayerTwoTutorialTurns();
         let idx = app.currentPlayerIdx;
@@ -5082,6 +6172,8 @@
       renderSelectedTilePreview();
       renderVariant();
       renderComputerPanel();
+      renderGameAnalysisButton();
+      renderAnalysisPanel();
       renderBoard();
       renderStatus();
       renderPlayers();
@@ -5124,6 +6216,9 @@
     }
 
     function renderHeader() {
+      if (app.config?.computerEnabled && app.config?.adaptiveDifficultyEnabled && !app.gameOver) {
+        refreshComputerEffectiveDifficultyForTurn();
+      }
       el.headerChips.innerHTML = "";
       const chips = [
         `Board: ${app.config.size}×${app.config.size}`,
@@ -5131,8 +6226,13 @@
         `Jump: ${app.config.jumpSelection}${app.config.jumpSelection === "both" ? ` (${app.config.poolMode})` : ""}`,
       ];
       if (app.config.variantMode === "overload") chips.push("Variant: overload");
-      if (app.config.computerEnabled) chips.push(`Computer: ${app.config.computerDifficulty}`);
       if (app.config.computerEnabled) {
+        chips.push(`Computer: ${app.config.computerEffectiveDifficultyLabel || app.config.computerEffectiveDifficulty || app.config.computerDifficulty}`);
+      }
+      if (app.config.computerEnabled) {
+        if (app.config.adaptiveDifficultyEnabled) {
+          chips.push(`Adaptive base: ${app.config.computerDifficultyLabel || getDifficultyLabelText(app.config.computerDifficulty)}`);
+        }
         chips.push(`Computer style: ${app.config.oracleStyle || "balanced"}`);
       }
       chips.forEach(t => {
@@ -5157,6 +6257,9 @@
       const enabled = !!app.config?.computerEnabled;
       el.computerPanel.classList.toggle("hidden", !enabled);
       if (!enabled) return;
+      if (app.config?.adaptiveDifficultyEnabled && !app.gameOver) {
+        refreshComputerEffectiveDifficultyForTurn();
+      }
       const player = app.players.find((candidate) => candidate.isComputer);
       const state = app.aiThinking && isComputerControlledPlayer()
         ? "Thinking..."
@@ -5164,7 +6267,94 @@
           ? "Ready to move."
           : "Waiting for your turn.";
       const styleText = `<br>Style: ${app.config.oracleStyle || "balanced"}.`;
-      el.computerText.innerHTML = `${player?.name || "Computer"} is controlling Player 2.<br>Difficulty: ${app.config.computerDifficulty}.${styleText}<br>${state}`;
+      const baseDifficulty = app.config.computerDifficulty;
+      const effectiveDifficulty = app.config.computerEffectiveDifficulty || baseDifficulty;
+      const baseLabel = app.config.computerDifficultyLabel || getDifficultyLabelText(baseDifficulty);
+      const effectiveLabel = app.config.computerEffectiveDifficultyLabel || getDifficultyLabelText(effectiveDifficulty);
+      const adaptiveText = app.config.adaptiveDifficultyEnabled && app.config.computerDifficultyTier < COMPUTER_MAX_DIFFICULTY_TIER
+        ? `<br>Adaptive: on (base ${baseLabel} -> this game ${effectiveLabel}).`
+        : "";
+      el.computerText.innerHTML = `${player?.name || "Computer"} is controlling Player 2.<br>Difficulty: ${effectiveLabel}.${adaptiveText}${styleText}<br>${state}`;
+    }
+
+    function renderGameAnalysisButton() {
+      if (!el.gameAnalysisBtn) return;
+      const canAnalyze = !!app.config
+        && app.config.playerCount === 2
+        && !app.tutorialMode
+        && !!app.gameOver
+        && Array.isArray(app.moveHistory)
+        && app.moveHistory.length > 0;
+      el.gameAnalysisBtn.classList.toggle("hidden", !canAnalyze);
+      el.gameAnalysisBtn.disabled = !canAnalyze || !!app.analysisBusy;
+      if (!canAnalyze) {
+        el.gameAnalysisBtn.textContent = "Game Analysis";
+        return;
+      }
+      if (app.analysisBusy) {
+        el.gameAnalysisBtn.textContent = "Analyzing...";
+        return;
+      }
+      el.gameAnalysisBtn.textContent = app.analysisVisible ? "Hide Analysis" : "Game Analysis";
+    }
+
+    function renderAnalysisPanel() {
+      if (!el.analysisPanel || !el.analysisMoves || !el.analysisEvalSummary || !el.analysisEvalPointer) return;
+      const enabled = !!app.config
+        && app.config.playerCount === 2
+        && !app.tutorialMode
+        && !!app.analysisVisible
+        && (app.analysisBusy || app.analysisReady);
+      el.analysisPanel.classList.toggle("hidden", !enabled);
+      if (!enabled) return;
+
+      const evalPercent = Math.max(0, Math.min(100, Number(app.analysisEvalPercent) || 50));
+      el.analysisEvalPointer.style.left = `${evalPercent}%`;
+      el.analysisEvalSummary.textContent = app.analysisEvalText || "Even position";
+      el.analysisMoves.innerHTML = "";
+      if (app.analysisBusy) {
+        const busy = document.createElement("div");
+        busy.className = "analysis-move-detail";
+        busy.textContent = "Oracle is analyzing the finished game...";
+        el.analysisMoves.appendChild(busy);
+        return;
+      }
+      const entries = app.analysisHistory;
+      if (!entries.length) {
+        const empty = document.createElement("div");
+        empty.className = "analysis-move-detail";
+        empty.textContent = "No analysis data is available for this game.";
+        el.analysisMoves.appendChild(empty);
+        return;
+      }
+      entries.forEach((entry, index) => {
+        const row = document.createElement("div");
+        row.className = `analysis-move-row ${qualityToCssClass(entry.quality)}${index === app.analysisSelectedMoveIdx ? " selected" : ""}`;
+        const title = document.createElement("div");
+        title.className = "analysis-move-title";
+        const left = document.createElement("span");
+        left.textContent = `#${entry.idx} ${entry.playerName}`;
+        const right = document.createElement("span");
+        right.textContent = entry.quality;
+        title.appendChild(left);
+        title.appendChild(right);
+        const detail = document.createElement("div");
+        detail.className = "analysis-move-detail";
+        const lossPart = entry.quality === "Best move"
+          ? "loss 0"
+          : `loss ${Number.isFinite(entry.scoreLoss) ? entry.scoreLoss : 0}`;
+        detail.textContent = `${entry.moveText} | ${lossPart} | best: ${entry.bestMoveText} | eval: ${entry.evalAfterText}`;
+        row.appendChild(title);
+        row.appendChild(detail);
+        row.addEventListener("click", () => {
+          app.analysisSelectedMoveIdx = index;
+          app.analysisEvalScore = entry.evalScore ?? 0;
+          app.analysisEvalPercent = entry.evalPercent ?? 50;
+          app.analysisEvalText = entry.evalAfterText || "Even position";
+          renderAll();
+        });
+        el.analysisMoves.appendChild(row);
+      });
     }
 
     function tileIsEnabledForSelection(type) {
@@ -5488,6 +6678,10 @@
     }
 
     window.runOracleBenchmark = runOracleBenchmark;
+    window.loadOracleWasmModule = loadOracleWasmModule;
+    window.getOracleWasmStatus = getOracleWasmStatus;
+    window.runOracleWasmBenchmark = runOracleWasmBenchmark;
+    window.chooseBestOpeningMoveWithOracleWasm = chooseBestOpeningMoveWithOracleWasm;
     window.saveOracleRegressionSnapshot = saveOracleRegressionSnapshot;
     window.runOracleRegressionSuite = runOracleRegressionSuite;
 
@@ -5500,6 +6694,7 @@
     } catch (err) {
       setMenuCollapsed(false);
     }
+    loadOracleWasmModule();
   </script>
 </body>
 </html>
