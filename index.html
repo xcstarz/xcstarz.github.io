@@ -5131,8 +5131,9 @@
 
     function shouldUseExactOracleSearch(openCells, legalMovesCount = 0) {
       if (!Number.isFinite(openCells)) return false;
-      if (openCells <= 4) return true;
-      if (openCells <= 6 && legalMovesCount <= 10) return true;
+      if (openCells <= 5) return true;
+      if (openCells <= 7 && legalMovesCount <= 12) return true;
+      if (openCells <= 8 && legalMovesCount <= 8) return true;
       return false;
     }
 
@@ -5140,25 +5141,31 @@
       const tuning = getOracleStyleTuning(style);
       if (openCells <= 8) {
         return {
-          maxDepth: Math.min(openCells, Math.max(7, tuning.midDepth - 4)),
-          maxMovesPerNode: Math.min(14, Math.max(8, tuning.midBreadth - 12)),
-          timeBudgetMs: 520,
-          rootWidth: Math.min(14, Math.max(9, tuning.midBreadth - 10)),
+          maxDepth: Math.min(openCells, Math.max(8, tuning.midDepth - 3)),
+          maxMovesPerNode: Math.min(18, Math.max(12, tuning.midBreadth - 8)),
+          timeBudgetMs: 900,
+          prePruneWidth: Math.min(22, Math.max(14, tuning.midBreadth - 4)),
+          rootWidth: Math.min(16, Math.max(10, tuning.midBreadth - 8)),
+          replyCap: 16,
         };
       }
       if (openCells <= 16) {
         return {
-          maxDepth: Math.max(6, tuning.midDepth - 7),
-          maxMovesPerNode: Math.min(10, Math.max(6, tuning.midBreadth - 18)),
-          timeBudgetMs: 320,
-          rootWidth: Math.min(12, Math.max(8, tuning.midBreadth - 14)),
+          maxDepth: Math.max(7, tuning.midDepth - 5),
+          maxMovesPerNode: Math.min(14, Math.max(9, tuning.midBreadth - 12)),
+          timeBudgetMs: 560,
+          prePruneWidth: Math.min(18, Math.max(12, tuning.midBreadth - 8)),
+          rootWidth: Math.min(14, Math.max(9, tuning.midBreadth - 12)),
+          replyCap: 14,
         };
       }
       return {
-        maxDepth: Math.max(5, tuning.earlyDepth - 7),
-        maxMovesPerNode: Math.min(8, Math.max(5, tuning.earlyBreadth - 15)),
-        timeBudgetMs: 220,
-        rootWidth: Math.min(10, Math.max(7, tuning.earlyBreadth - 12)),
+        maxDepth: Math.max(6, tuning.earlyDepth - 5),
+        maxMovesPerNode: Math.min(12, Math.max(7, tuning.earlyBreadth - 12)),
+        timeBudgetMs: 360,
+        prePruneWidth: Math.min(16, Math.max(10, tuning.earlyBreadth - 8)),
+        rootWidth: Math.min(12, Math.max(8, tuning.earlyBreadth - 12)),
+        replyCap: 12,
       };
     }
 
@@ -5178,12 +5185,20 @@
 
         if (!shouldUseExactOracleSearch(openCells, legalMoves.length)) {
           const alphaBetaConfig = getOracleAlphaBetaSearchConfig(openCells, app.config?.oracleStyle || "balanced");
-          const movePool = buildOracleMovePool(player, {
-            pruneLimit: alphaBetaConfig.rootWidth,
+          let movePool = buildOracleMovePool(player, {
+            pruneLimit: alphaBetaConfig.prePruneWidth,
             replySafetyCheck: true,
             profile: "oracle",
           });
           if (!movePool.length) return legalMoves[0];
+          if (movePool.length > alphaBetaConfig.rootWidth) {
+            movePool = pruneOracleMovesByOpponentReply(
+              player,
+              movePool,
+              alphaBetaConfig.rootWidth,
+              alphaBetaConfig.replyCap
+            );
+          }
           return chooseMoveWithDeepLookahead(
             player,
             alphaBetaConfig.maxDepth,
