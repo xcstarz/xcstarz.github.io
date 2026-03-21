@@ -2048,6 +2048,21 @@
             "number",
             ["number", "number", "number", "number", "number", "number"]
           ),
+          countEmptyPlayable: module.cwrap(
+            "oracle_count_empty_playable_cells",
+            "number",
+            ["number", "number", "number", "number"]
+          ),
+          computeStateHash: module.cwrap(
+            "oracle_compute_state_hash",
+            "number",
+            ["number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number"]
+          ),
+          chooseNativeMove: module.cwrap(
+            "oracle_choose_native_move",
+            "number",
+            ["number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number"]
+          ),
         };
         oracleWasm.ready = true;
         oracleWasm.error = null;
@@ -2109,6 +2124,210 @@
       } finally {
         oracleWasm.module._free(rowsPtr);
         oracleWasm.module._free(colsPtr);
+      }
+    }
+
+    const ORACLE_WASM_PLAYER_STATE_STRIDE = 9;
+    const ORACLE_WASM_CELL_FLAG_DEAD = 1;
+    const ORACLE_WASM_CELL_FLAG_START = 2;
+
+    function allocOracleWasmInt32Buffer(values) {
+      if (!oracleWasm.ready || !oracleWasm.module) return { ptr: 0, data: new Int32Array() };
+      const data = values instanceof Int32Array ? values : Int32Array.from(values || []);
+      if (!data.length) return { ptr: 0, data };
+      const ptr = oracleWasm.module._malloc(data.length * 4);
+      oracleWasm.module.HEAP32.set(data, ptr >> 2);
+      return { ptr, data };
+    }
+
+    function buildOracleWasmStatePayload() {
+      const size = Number(app.config?.size) || 7;
+      const cellCount = Math.min(64, Math.max(0, size * size));
+      const playerCount = Math.max(0, Math.min(app.players.length || 0, 4));
+      const playerState = new Int32Array(playerCount * ORACLE_WASM_PLAYER_STATE_STRIDE);
+      const cellTypes = new Int32Array(cellCount);
+      const cellRots = new Int32Array(cellCount);
+      const cellOwners = new Int32Array(cellCount);
+      const cellFlags = new Int32Array(cellCount);
+      cellOwners.fill(-1);
+
+      for (let idx = 0; idx < playerCount; idx++) {
+        const player = app.players[idx];
+        const base = idx * ORACLE_WASM_PLAYER_STATE_STRIDE;
+        playerState[base + 0] = Number.isInteger(player?.id) ? player.id : idx;
+        playerState[base + 1] = player?.alive ? 1 : 0;
+        playerState[base + 2] = player?.hasPlacedFirstTile ? 1 : 0;
+        playerState[base + 3] = Number.isInteger(player?.row) ? player.row : -1;
+        playerState[base + 4] = Number.isInteger(player?.col) ? player.col : -1;
+        playerState[base + 5] = Number.isInteger(player?.entrance) ? player.entrance : -1;
+        playerState[base + 6] = Number(player?.jumpLeft) || 0;
+        playerState[base + 7] = Number(player?.diagonalJumpLeft) || 0;
+        playerState[base + 8] = Number(player?.combinedJumpLeft) || 0;
+      }
+
+      app.board.forEach((row, r) => {
+        row.forEach((cell, c) => {
+          const idx = r * size + c;
+          if (idx < 0 || idx >= cellCount || !cell) return;
+          let flags = 0;
+          if (cell.dead) flags |= ORACLE_WASM_CELL_FLAG_DEAD;
+          if (cell.startOwner != null) flags |= ORACLE_WASM_CELL_FLAG_START;
+          cellFlags[idx] = flags;
+          if (!cell.tile) return;
+          cellTypes[idx] = tileTypeCode(cell.tile.type);
+          cellRots[idx] = (cell.tile.rot || 0) & 3;
+          cellOwners[idx] = Number.isInteger(cell.tile.ownerId) ? cell.tile.ownerId : -1;
+        });
+      });
+
+      return {
+        size,
+        cellCount,
+        playerCount,
+        playerState,
+        cellTypes,
+        cellRots,
+        cellOwners,
+        cellFlags,
+      };
+    }
+
+    function countEmptyPlayableCellsWithOracleWasm() {
+      if (!oracleWasm.ready || !oracleWasm.module || !oracleWasm.wrappers?.countEmptyPlayable) return null;
+      const payload = buildOracleWasmStatePayload();
+      const cellTypes = allocOracleWasmInt32Buffer(payload.cellTypes);
+      const cellFlags = allocOracleWasmInt32Buffer(payload.cellFlags);
+      try {
+        return oracleWasm.wrappers.countEmptyPlayable(
+          payload.size,
+          payload.cellCount,
+          cellTypes.ptr,
+          cellFlags.ptr
+        );
+      } finally {
+        if (cellTypes.ptr) oracleWasm.module._free(cellTypes.ptr);
+        if (cellFlags.ptr) oracleWasm.module._free(cellFlags.ptr);
+      }
+    }
+
+    function computeOracleStateHashWithWasm(playerId, depthRemaining) {
+      if (!oracleWasm.ready || !oracleWasm.module || !oracleWasm.wrappers?.computeStateHash) return null;
+      const payload = buildOracleWasmStatePayload();
+      const actor = currentPlayer();
+      const playerState = allocOracleWasmInt32Buffer(payload.playerState);
+      const cellTypes = allocOracleWasmInt32Buffer(payload.cellTypes);
+      const cellRots = allocOracleWasmInt32Buffer(payload.cellRots);
+      const cellOwners = allocOracleWasmInt32Buffer(payload.cellOwners);
+      const cellFlags = allocOracleWasmInt32Buffer(payload.cellFlags);
+      try {
+        return oracleWasm.wrappers.computeStateHash(
+          payload.size,
+          payload.cellCount,
+          Number(depthRemaining) || 0,
+          Number(app.currentPlayerIdx) || 0,
+          Number(playerId) || 0,
+          Number.isInteger(actor?.id) ? actor.id : -1,
+          app.gameOver ? 1 : 0,
+          Number.isInteger(app.winner) ? app.winner : -1,
+          payload.playerCount,
+          playerState.ptr,
+          cellTypes.ptr,
+          cellRots.ptr,
+          cellOwners.ptr,
+          cellFlags.ptr
+        );
+      } finally {
+        if (playerState.ptr) oracleWasm.module._free(playerState.ptr);
+        if (cellTypes.ptr) oracleWasm.module._free(cellTypes.ptr);
+        if (cellRots.ptr) oracleWasm.module._free(cellRots.ptr);
+        if (cellOwners.ptr) oracleWasm.module._free(cellOwners.ptr);
+        if (cellFlags.ptr) oracleWasm.module._free(cellFlags.ptr);
+      }
+    }
+
+    function oracleStyleToWasmMode(style = app.config?.oracleStyle || "balanced") {
+      const normalized = normalizeOracleStyle(style);
+      if (normalized === "aggressive") return 1;
+      if (normalized === "defensive") return 2;
+      return 0;
+    }
+
+    function oracleJumpSelectionToWasmMode() {
+      const jumpSelection = app.config?.jumpSelection || "none";
+      if (jumpSelection === "cardinal") return 1;
+      if (jumpSelection === "diagonal") return 2;
+      if (jumpSelection === "both") return 3;
+      return 0;
+    }
+
+    function oracleVariantToWasmMode() {
+      return app.config?.variantMode === "overload" ? 1 : 0;
+    }
+
+    function canUseNativeOracleWasm() {
+      if (!oracleWasm.ready || !oracleWasm.module || !oracleWasm.wrappers?.chooseNativeMove) return false;
+      if ((app.config?.size || 7) !== 7) return false;
+      if ((app.config?.playerCount || app.players.length || 0) !== 2) return false;
+      if (oracleVariantToWasmMode() !== 0) return false;
+      let compatible = true;
+      app.board.forEach((row) => {
+        row.forEach((cell) => {
+          if (!compatible || !cell?.tile) return;
+          if ((cell.tile.rot || 0) !== 0) compatible = false;
+        });
+      });
+      return compatible;
+    }
+
+    function decodePackedOracleNativeMove(packedMove) {
+      if (!Number.isInteger(packedMove) || packedMove < 0) return null;
+      const entry = packedMove & 0x0f;
+      const c = (packedMove >> 4) & 0x3f;
+      const r = (packedMove >> 12) & 0x3f;
+      const tileType = tileTypeFromCode((packedMove >> 20) & 0x0f);
+      if (!tileType) return null;
+      return entry === 15 ? { tileType, r, c } : { tileType, r, c, entry };
+    }
+
+    function chooseNativeOracleMoveWithWasm(player, maxDepth, timeBudgetMs) {
+      player = getLivePlayer(player);
+      if (!player || !canUseNativeOracleWasm()) return null;
+      const payload = buildOracleWasmStatePayload();
+      const playerState = allocOracleWasmInt32Buffer(payload.playerState);
+      const cellTypes = allocOracleWasmInt32Buffer(payload.cellTypes);
+      const cellRots = allocOracleWasmInt32Buffer(payload.cellRots);
+      const cellFlags = allocOracleWasmInt32Buffer(payload.cellFlags);
+      try {
+        const packedMove = oracleWasm.wrappers.chooseNativeMove(
+          payload.size,
+          payload.cellCount,
+          Number(app.currentPlayerIdx) || 0,
+          payload.playerCount,
+          oracleJumpSelectionToWasmMode(),
+          app.config?.poolMode === "combined" ? 1 : 0,
+          oracleStyleToWasmMode(app.config?.oracleStyle || "balanced"),
+          oracleVariantToWasmMode(),
+          Math.max(1, Number(maxDepth) || 1),
+          Math.max(1, Number(timeBudgetMs) || 1),
+          playerState.ptr,
+          cellTypes.ptr,
+          cellRots.ptr,
+          cellFlags.ptr
+        );
+        const decodedMove = decodePackedOracleNativeMove(packedMove);
+        if (!decodedMove) return null;
+        const legalMoves = collectLegalMoves(player);
+        return legalMoves.find((candidate) =>
+          candidate.tileType === decodedMove.tileType
+          && candidate.r === decodedMove.r
+          && candidate.c === decodedMove.c
+          && ((candidate.entry ?? null) === (decodedMove.entry ?? null))
+        ) || null;
+      } finally {
+        if (playerState.ptr) oracleWasm.module._free(playerState.ptr);
+        if (cellTypes.ptr) oracleWasm.module._free(cellTypes.ptr);
+        if (cellRots.ptr) oracleWasm.module._free(cellRots.ptr);
+        if (cellFlags.ptr) oracleWasm.module._free(cellFlags.ptr);
       }
     }
 
@@ -3539,7 +3758,7 @@
         }
         if ((app.config.computerEffectiveDifficulty || computerEffectiveDifficulty) === "oracle") {
           log(`Oracle style set to ${oracleStyle}.`);
-          log("Oracle uses alpha-beta pruning, with exact search in small endgames.");
+          log("Oracle uses max-depth alpha-beta pruning with C++ 64-bit bitboard state keys.");
         }
       }
       app.analysisBaseSnapshot = captureGameSnapshot();
@@ -4353,8 +4572,93 @@
       return 0;
     }
 
+    function tileTypeFromCode(typeCode) {
+      if (typeCode === 1) return "straightaway";
+      if (typeCode === 2) return "uturn";
+      if (typeCode === 3) return "centrifugal";
+      if (typeCode === 4) return "diagonal";
+      if (typeCode === 5) return "weave";
+      if (typeCode === 6) return "jump";
+      if (typeCode === 7) return "diagonalJump";
+      return null;
+    }
+
+    function boardCellBitMask(r, c, size = Number(app.config?.size) || 7) {
+      if (!Number.isInteger(r) || !Number.isInteger(c) || !Number.isInteger(size) || size <= 0) return 0n;
+      return BigInt.asUintN(64, 1n << BigInt(r * size + c));
+    }
+
+    function popcount64(mask) {
+      let value = BigInt.asUintN(64, mask);
+      let count = 0;
+      while (value) {
+        value &= value - 1n;
+        count++;
+      }
+      return count;
+    }
+
+    function hashMix64(seed, value, salt = 0) {
+      const normalized = BigInt.asUintN(64, value ^ BigInt(salt >>> 0));
+      const low = Number(normalized & 0xffffffffn) >>> 0;
+      const high = Number((normalized >> 32n) & 0xffffffffn) >>> 0;
+      let h = hashMix32(seed, low);
+      h = hashMix32(h, high ^ ((salt * 33 + 17) >>> 0));
+      return h;
+    }
+
+    function buildOracleBoardBitboards() {
+      const size = Number(app.config?.size) || 7;
+      const typeMasks = Array.from({ length: 8 }, () => 0n);
+      const rotMasks = Array.from({ length: 4 }, () => 0n);
+      const ownerMasks = Array.from({ length: Math.max(2, app.players.length || 0) }, () => 0n);
+      let occupiedMask = 0n;
+      let playableMask = 0n;
+      let deadMask = 0n;
+      let startMask = 0n;
+
+      app.board.forEach((row, r) => {
+        row.forEach((cell, c) => {
+          const bit = boardCellBitMask(r, c, size);
+          if (!cell) return;
+          if (cell.dead) deadMask |= bit;
+          if (cell.startOwner != null) startMask |= bit;
+          if (!cell.dead && cell.startOwner == null) playableMask |= bit;
+          if (!cell.tile) return;
+          occupiedMask |= bit;
+          const typeCode = tileTypeCode(cell.tile.type);
+          if (typeCode) typeMasks[typeCode] |= bit;
+          rotMasks[(cell.tile.rot || 0) & 3] |= bit;
+          const ownerId = Number.isInteger(cell.tile.ownerId) ? cell.tile.ownerId : -1;
+          if (ownerId >= 0) {
+            while (ownerMasks.length <= ownerId) ownerMasks.push(0n);
+            ownerMasks[ownerId] |= bit;
+          }
+        });
+      });
+
+      occupiedMask = BigInt.asUintN(64, occupiedMask);
+      playableMask = BigInt.asUintN(64, playableMask);
+      deadMask = BigInt.asUintN(64, deadMask);
+      startMask = BigInt.asUintN(64, startMask);
+      return {
+        size,
+        occupiedMask,
+        playableMask,
+        emptyPlayableMask: BigInt.asUintN(64, playableMask & ~occupiedMask),
+        deadMask,
+        startMask,
+        typeMasks: typeMasks.map((mask) => BigInt.asUintN(64, mask)),
+        rotMasks: rotMasks.map((mask) => BigInt.asUintN(64, mask)),
+        ownerMasks: ownerMasks.map((mask) => BigInt.asUintN(64, mask)),
+      };
+    }
+
     function buildLookaheadStateKey(playerId, depthRemaining) {
+      const wasmHash = computeOracleStateHashWithWasm(playerId, depthRemaining);
+      if (Number.isFinite(wasmHash)) return `${playerId}|${depthRemaining}|${wasmHash}`;
       const actor = currentPlayer();
+      const bitboards = buildOracleBoardBitboards();
       let h = 2166136261 >>> 0;
       h = hashMix32(h, (playerId + 17) * 97);
       h = hashMix32(h, (depthRemaining + 31) * 131);
@@ -4362,6 +4666,7 @@
       h = hashMix32(h, (app.currentPlayerIdx + 61) * 173);
       h = hashMix32(h, app.gameOver ? 1 : 0);
       h = hashMix32(h, Number.isInteger(app.winner) ? app.winner + 7 : 0);
+      h = hashMix32(h, bitboards.size + 787);
       app.players.forEach((p) => {
         h = hashMix32(h, p.id + 101);
         h = hashMix32(h, p.alive ? 1 : 0);
@@ -4373,15 +4678,18 @@
         h = hashMix32(h, (p.diagonalJumpLeft || 0) + 653);
         h = hashMix32(h, (p.combinedJumpLeft || 0) + 751);
       });
-      app.board.forEach((row, r) => {
-        row.forEach((cell, c) => {
-          if (!cell.tile) return;
-          h = hashMix32(h, r + 811);
-          h = hashMix32(h, c + 887);
-          h = hashMix32(h, tileTypeCode(cell.tile.type) + 953);
-          h = hashMix32(h, (cell.tile.ownerId ?? -1) + 1039);
-          h = hashMix32(h, (cell.tile.rot || 0) + 1129);
-        });
+      h = hashMix64(h, bitboards.occupiedMask, 811);
+      h = hashMix64(h, bitboards.deadMask, 887);
+      h = hashMix64(h, bitboards.startMask, 953);
+      bitboards.typeMasks.forEach((mask, typeCode) => {
+        if (!typeCode) return;
+        h = hashMix64(h, mask, 1009 + typeCode * 61);
+      });
+      bitboards.rotMasks.forEach((mask, rot) => {
+        h = hashMix64(h, mask, 1601 + rot * 73);
+      });
+      bitboards.ownerMasks.forEach((mask, ownerId) => {
+        h = hashMix64(h, mask, 1901 + ownerId * 89);
       });
       return `${playerId}|${depthRemaining}|${h}`;
     }
@@ -4548,14 +4856,20 @@
 
     function estimateRemainingTurnDepth() {
       if (!app.board?.length) return 10;
-      let openCells = 0;
-      app.board.forEach((row) => {
-        row.forEach((cell) => {
-          if (!cell.tile) openCells++;
-        });
-      });
-      // Each non-overload turn places one tile, so open cells are a practical upper bound.
-      return Math.max(1, openCells);
+      const wasmOpenPlayableCells = countEmptyPlayableCellsWithOracleWasm();
+      if (Number.isFinite(wasmOpenPlayableCells)) {
+        const overloadReserve = isOverloadVariantEnabled()
+          ? app.players.reduce((sum, player) => sum + (player?.alive ? Math.max(0, player.combinedJumpLeft || 0) : 0), 0)
+          : 0;
+        return Math.max(1, wasmOpenPlayableCells + overloadReserve);
+      }
+      const bitboards = buildOracleBoardBitboards();
+      const openPlayableCells = popcount64(bitboards.emptyPlayableMask);
+      const overloadReserve = isOverloadVariantEnabled()
+        ? app.players.reduce((sum, player) => sum + (player?.alive ? Math.max(0, player.combinedJumpLeft || 0) : 0), 0)
+        : 0;
+      // Search horizon is the remaining placeable board plus any overload replacements still banked.
+      return Math.max(1, openPlayableCells + overloadReserve);
     }
 
     function moveCausesImmediateWin(playerId, move) {
@@ -4772,7 +5086,7 @@
       app.analysisSelectedMoveIdx = -1;
       app.analysisEvalScore = 0;
       app.analysisEvalPercent = 50;
-      app.analysisEvalText = "Analyzing with Oracle alpha-beta search. Exact in late endgames.";
+      app.analysisEvalText = "Analyzing with Oracle max-depth alpha-beta search and C++ 64-bit bitboards.";
       renderAll();
       setTimeout(() => {
         const report = computeGameAnalysisReport();
@@ -5131,41 +5445,42 @@
 
     function shouldUseExactOracleSearch(openCells, legalMovesCount = 0) {
       if (!Number.isFinite(openCells)) return false;
-      if (openCells <= 5) return true;
-      if (openCells <= 7 && legalMovesCount <= 12) return true;
-      if (openCells <= 8 && legalMovesCount <= 8) return true;
+      if (openCells <= 6) return true;
+      if (openCells <= 8 && legalMovesCount <= 14) return true;
+      if (openCells <= 10 && legalMovesCount <= 10) return true;
       return false;
     }
 
     function getOracleAlphaBetaSearchConfig(openCells, style = app.config?.oracleStyle || "balanced") {
       const tuning = getOracleStyleTuning(style);
+      const maxDepth = Math.max(1, Number(openCells) || 1);
       if (openCells <= 8) {
         return {
-          maxDepth: Math.min(openCells, Math.max(8, tuning.midDepth - 3)),
-          maxMovesPerNode: Math.min(18, Math.max(12, tuning.midBreadth - 8)),
-          timeBudgetMs: 900,
-          prePruneWidth: Math.min(22, Math.max(14, tuning.midBreadth - 4)),
-          rootWidth: Math.min(16, Math.max(10, tuning.midBreadth - 8)),
-          replyCap: 16,
+          maxDepth,
+          maxMovesPerNode: Infinity,
+          timeBudgetMs: Math.max(18000, tuning.endgameTimeMs),
+          prePruneWidth: 64,
+          rootWidth: 64,
+          replyCap: 24,
         };
       }
       if (openCells <= 16) {
         return {
-          maxDepth: Math.max(7, tuning.midDepth - 5),
-          maxMovesPerNode: Math.min(14, Math.max(9, tuning.midBreadth - 12)),
-          timeBudgetMs: 560,
-          prePruneWidth: Math.min(18, Math.max(12, tuning.midBreadth - 8)),
-          rootWidth: Math.min(14, Math.max(9, tuning.midBreadth - 12)),
-          replyCap: 14,
+          maxDepth,
+          maxMovesPerNode: Infinity,
+          timeBudgetMs: Math.max(12000, tuning.midTimeMs),
+          prePruneWidth: 48,
+          rootWidth: 48,
+          replyCap: 20,
         };
       }
       return {
-        maxDepth: Math.max(6, tuning.earlyDepth - 5),
-        maxMovesPerNode: Math.min(12, Math.max(7, tuning.earlyBreadth - 12)),
-        timeBudgetMs: 360,
-        prePruneWidth: Math.min(16, Math.max(10, tuning.earlyBreadth - 8)),
-        rootWidth: Math.min(12, Math.max(8, tuning.earlyBreadth - 12)),
-        replyCap: 12,
+        maxDepth,
+        maxMovesPerNode: Infinity,
+        timeBudgetMs: Math.max(8000, tuning.earlyTimeMs),
+        prePruneWidth: 40,
+        rootWidth: 40,
+        replyCap: 18,
       };
     }
 
@@ -5178,13 +5493,15 @@
         const legalMoves = collectLegalMoves(player);
         if (!legalMoves.length) return null;
         const openCells = estimateRemainingTurnDepth();
+        const alphaBetaConfig = getOracleAlphaBetaSearchConfig(openCells, app.config?.oracleStyle || "balanced");
+        const nativeMove = chooseNativeOracleMoveWithWasm(player, alphaBetaConfig.maxDepth, alphaBetaConfig.timeBudgetMs);
+        if (nativeMove) return nativeMove;
 
         for (const move of legalMoves) {
           if (moveCausesImmediateWin(player.id, move)) return move;
         }
 
         if (!shouldUseExactOracleSearch(openCells, legalMoves.length)) {
-          const alphaBetaConfig = getOracleAlphaBetaSearchConfig(openCells, app.config?.oracleStyle || "balanced");
           let movePool = buildOracleMovePool(player, {
             pruneLimit: alphaBetaConfig.prePruneWidth,
             replySafetyCheck: true,

@@ -14,7 +14,7 @@ em++ native/oracle_engine.cpp \
   -sEXPORT_NAME=createOracleWasmModule \
   -sALLOW_MEMORY_GROWTH=1 \
   -sENVIRONMENT=web,worker \
-  -sEXPORTED_FUNCTIONS='["_oracle_module_version","_oracle_benchmark_nodes","_oracle_choose_best_opening_move","_malloc","_free"]' \
+  -sEXPORTED_FUNCTIONS='["_oracle_module_version","_oracle_benchmark_nodes","_oracle_choose_best_opening_move","_oracle_count_empty_playable_cells","_oracle_compute_state_hash","_oracle_choose_native_move","_malloc","_free"]' \
   -sEXPORTED_RUNTIME_METHODS='["cwrap","ccall","HEAP32"]' \
   -o wasm/oracle_engine.js
 
