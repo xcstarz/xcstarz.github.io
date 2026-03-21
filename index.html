@@ -3539,7 +3539,7 @@
         }
         if ((app.config.computerEffectiveDifficulty || computerEffectiveDifficulty) === "oracle") {
           log(`Oracle style set to ${oracleStyle}.`);
-          log("Oracle uses exact search in small endgames and practical search elsewhere.");
+          log("Oracle uses alpha-beta pruning, with exact search in small endgames.");
         }
       }
       app.analysisBaseSnapshot = captureGameSnapshot();
@@ -4772,7 +4772,7 @@
       app.analysisSelectedMoveIdx = -1;
       app.analysisEvalScore = 0;
       app.analysisEvalPercent = 50;
-      app.analysisEvalText = "Analyzing with Oracle search. Exact in late endgames, practical elsewhere.";
+      app.analysisEvalText = "Analyzing with Oracle alpha-beta search. Exact in late endgames.";
       renderAll();
       setTimeout(() => {
         const report = computeGameAnalysisReport();
@@ -5136,6 +5136,32 @@
       return false;
     }
 
+    function getOracleAlphaBetaSearchConfig(openCells, style = app.config?.oracleStyle || "balanced") {
+      const tuning = getOracleStyleTuning(style);
+      if (openCells <= 8) {
+        return {
+          maxDepth: Math.min(openCells, Math.max(7, tuning.midDepth - 4)),
+          maxMovesPerNode: Math.min(14, Math.max(8, tuning.midBreadth - 12)),
+          timeBudgetMs: 520,
+          rootWidth: Math.min(14, Math.max(9, tuning.midBreadth - 10)),
+        };
+      }
+      if (openCells <= 16) {
+        return {
+          maxDepth: Math.max(6, tuning.midDepth - 7),
+          maxMovesPerNode: Math.min(10, Math.max(6, tuning.midBreadth - 18)),
+          timeBudgetMs: 320,
+          rootWidth: Math.min(12, Math.max(8, tuning.midBreadth - 14)),
+        };
+      }
+      return {
+        maxDepth: Math.max(5, tuning.earlyDepth - 7),
+        maxMovesPerNode: Math.min(8, Math.max(5, tuning.earlyBreadth - 15)),
+        timeBudgetMs: 220,
+        rootWidth: Math.min(10, Math.max(7, tuning.earlyBreadth - 12)),
+      };
+    }
+
     function chooseOracleMove(player) {
       player = getLivePlayer(player);
       if (!player) return null;
@@ -5151,14 +5177,21 @@
         }
 
         if (!shouldUseExactOracleSearch(openCells, legalMoves.length)) {
-          const mctsConfig = getOracleMctsSearchConfig(openCells, app.config?.oracleStyle || "balanced");
+          const alphaBetaConfig = getOracleAlphaBetaSearchConfig(openCells, app.config?.oracleStyle || "balanced");
           const movePool = buildOracleMovePool(player, {
-            pruneLimit: mctsConfig.rootWidth,
+            pruneLimit: alphaBetaConfig.rootWidth,
             replySafetyCheck: true,
             profile: "oracle",
           });
           if (!movePool.length) return legalMoves[0];
-          return chooseOracleMoveByMonteCarloTreeSearch(player, movePool);
+          return chooseMoveWithDeepLookahead(
+            player,
+            alphaBetaConfig.maxDepth,
+            alphaBetaConfig.maxMovesPerNode,
+            alphaBetaConfig.timeBudgetMs,
+            movePool,
+            "oracle"
+          );
         }
 
         const searchConfig = {
