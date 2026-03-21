@@ -1038,6 +1038,40 @@
       color: #acc2ea;
       margin-top: 2px;
     }
+    .analysis-screen {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .analysis-screen-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .analysis-screen-copy h2 {
+      margin: 0 0 6px;
+      font-size: 22px;
+      color: #f4f8ff;
+    }
+    .analysis-screen-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .analysis-screen .analysis-eval-bar {
+      height: 18px;
+      margin: 10px 0 14px;
+    }
+    .analysis-screen .analysis-eval-pointer {
+      top: -3px;
+      height: 24px;
+    }
+    .analysis-screen .analysis-moves {
+      max-height: min(58vh, 620px);
+    }
     .winner {
       font-size: 14px;
       font-weight: 700;
@@ -1669,14 +1703,6 @@
                     <h3>Computer</h3>
                     <div id="computerText" class="status"></div>
                   </div>
-                  <div id="analysisPanel" class="panel hidden">
-                    <h3>Game Analysis</h3>
-                    <div id="analysisEvalSummary" class="status"></div>
-                    <div id="analysisEvalBar" class="analysis-eval-bar">
-                      <div id="analysisEvalPointer" class="analysis-eval-pointer"></div>
-                    </div>
-                    <div id="analysisMoves" class="analysis-moves"></div>
-                  </div>
                   <div class="panel">
                     <h3>Players</h3>
                     <div id="playersText" class="status"></div>
@@ -1686,6 +1712,26 @@
                     <div id="log" class="log"></div>
                   </div>
                 </div>
+              </div>
+            </div>
+            <div id="analysisView" class="analysis-screen card hidden">
+              <div class="analysis-screen-header">
+                <div class="analysis-screen-copy">
+                  <h2>Oracle Game Analysis</h2>
+                  <div class="status">Review the finished game on a dedicated screen with the Oracle evaluation bar and move-by-move grades.</div>
+                </div>
+                <div class="analysis-screen-actions">
+                  <button id="analysisBackBtn" type="button">Back to Game</button>
+                  <button id="analysisNewGameBtn" type="button">New Game</button>
+                </div>
+              </div>
+              <div id="analysisPanel" class="panel hidden">
+                <h3>Game Analysis</h3>
+                <div id="analysisEvalSummary" class="status"></div>
+                <div id="analysisEvalBar" class="analysis-eval-bar">
+                  <div id="analysisEvalPointer" class="analysis-eval-pointer"></div>
+                </div>
+                <div id="analysisMoves" class="analysis-moves"></div>
               </div>
             </div>
           </div>
@@ -1824,6 +1870,7 @@
       suppressOverlays: false,
       benchmarkMode: false,
       searchMode: false,
+      playScreen: "setup",
       adaptiveTurnCounter: 0,
       moveHistory: [],
       analysisHistory: [],
@@ -1833,6 +1880,7 @@
       analysisVisible: false,
       analysisReady: false,
       analysisBusy: false,
+      analysisRunId: 0,
       analysisSelectedMoveIdx: -1,
       analysisBaseSnapshot: null,
     };
@@ -1841,6 +1889,7 @@
       setupView: document.getElementById("setupView"),
       playGameHost: document.getElementById("playGameHost"),
       gameView: document.getElementById("gameView"),
+      analysisView: document.getElementById("analysisView"),
       board: document.getElementById("board"),
       boardStack: document.querySelector(".board-stack"),
       cellHoverMenu: document.getElementById("cellHoverMenu"),
@@ -1901,6 +1950,8 @@
       analysisEvalBar: document.getElementById("analysisEvalBar"),
       analysisEvalPointer: document.getElementById("analysisEvalPointer"),
       analysisMoves: document.getElementById("analysisMoves"),
+      analysisBackBtn: document.getElementById("analysisBackBtn"),
+      analysisNewGameBtn: document.getElementById("analysisNewGameBtn"),
       tutorialBubbleBtn: null,
       tutorialNextBtn: document.getElementById("tutorialNextBtn"),
       tutorialStepText: document.getElementById("tutorialStepText"),
@@ -2011,6 +2062,39 @@
       mountGameView(useTutorialHost ? el.tutorialLessonOneBoards : el.playGameHost);
       el.gameView.classList.toggle("tutorial-live-view", useTutorialHost);
       if (el.tutorialShell) el.tutorialShell.classList.toggle("tutorial-embedded-live", useTutorialHost);
+    }
+
+    function setPlayScreen(screenName) {
+      const nextScreen = screenName === "analysis"
+        ? "analysis"
+        : screenName === "game"
+          ? "game"
+          : "setup";
+      app.playScreen = nextScreen;
+      if (el.setupView) el.setupView.classList.toggle("hidden", nextScreen !== "setup");
+      if (el.gameView) el.gameView.classList.toggle("hidden", nextScreen !== "game");
+      if (el.analysisView) el.analysisView.classList.toggle("hidden", nextScreen !== "analysis");
+      syncGameViewHost();
+    }
+
+    function returnToSetupScreen() {
+      clearComputerTurnTimer();
+      app.aiThinking = false;
+      app.tutorialMode = null;
+      app.undoStack = [];
+      app.analysisVisible = false;
+      app.analysisBusy = false;
+      app.analysisRunId += 1;
+      setTutorialTopNotice("");
+      setPlayScreen("setup");
+      setTab(app.setupMode === "computer" ? "computer" : "play");
+      updateUndoButtons();
+    }
+
+    function closeGameAnalysis() {
+      app.analysisVisible = false;
+      setPlayScreen("game");
+      renderAll();
     }
 
     function clearComputerTurnTimer() {
@@ -2597,18 +2681,13 @@
       if (el.gameAnalysisBtn) {
         el.gameAnalysisBtn.addEventListener("click", toggleGameAnalysis);
       }
-      el.newGameBtn.addEventListener("click", () => {
-        clearComputerTurnTimer();
-        app.aiThinking = false;
-        app.tutorialMode = null;
-        app.undoStack = [];
-        setTutorialTopNotice("");
-        syncGameViewHost();
-        el.gameView.classList.add("hidden");
-        el.setupView.classList.remove("hidden");
-        setTab(app.setupMode === "computer" ? "computer" : "play");
-        updateUndoButtons();
-      });
+      el.newGameBtn.addEventListener("click", returnToSetupScreen);
+      if (el.analysisBackBtn) {
+        el.analysisBackBtn.addEventListener("click", closeGameAnalysis);
+      }
+      if (el.analysisNewGameBtn) {
+        el.analysisNewGameBtn.addEventListener("click", returnToSetupScreen);
+      }
 
       el.elimOkBtn.addEventListener("click", dismissElimination);
       el.winOkBtn.addEventListener("click", dismissWin);
@@ -2709,6 +2788,7 @@
         analysisEvalText: app.analysisEvalText || "Even",
         analysisVisible: !!app.analysisVisible,
         analysisReady: !!app.analysisReady,
+        playScreen: app.playScreen || "setup",
         analysisSelectedMoveIdx: Number.isInteger(app.analysisSelectedMoveIdx) ? app.analysisSelectedMoveIdx : -1,
         tutorialLessonIndex,
       };
@@ -2761,6 +2841,11 @@
       app.analysisEvalText = typeof snapshot.analysisEvalText === "string" ? snapshot.analysisEvalText : "Even";
       app.analysisVisible = !!snapshot.analysisVisible;
       app.analysisReady = !!snapshot.analysisReady;
+      app.playScreen = snapshot.playScreen === "analysis"
+        ? "analysis"
+        : snapshot.playScreen === "game"
+          ? "game"
+          : "setup";
       app.analysisSelectedMoveIdx = Number.isInteger(snapshot.analysisSelectedMoveIdx)
         ? snapshot.analysisSelectedMoveIdx
         : -1;
@@ -2774,6 +2859,7 @@
         : tutorialLessonIndex;
 
       if (!shouldRender) return;
+      setPlayScreen(app.playScreen);
       hideHoverTileMenu(true);
       el.eliminationOverlay.classList.add("hidden");
       el.winOverlay.classList.add("hidden");
@@ -3688,6 +3774,7 @@
       app.analysisVisible = false;
       app.analysisReady = false;
       app.analysisBusy = false;
+      app.analysisRunId += 1;
       app.analysisSelectedMoveIdx = -1;
       app.analysisBaseSnapshot = null;
       app.overlayMode = null;
@@ -3758,12 +3845,11 @@
         }
         if ((app.config.computerEffectiveDifficulty || computerEffectiveDifficulty) === "oracle") {
           log(`Oracle style set to ${oracleStyle}.`);
-          log("Oracle uses max-depth alpha-beta pruning with C++ 64-bit bitboard state keys.");
+          log("Oracle uses full-depth native C++ search with 64-bit bitboards and stronger draw avoidance.");
         }
       }
       app.analysisBaseSnapshot = captureGameSnapshot();
-      el.setupView.classList.add("hidden");
-      el.gameView.classList.remove("hidden");
+      setPlayScreen("game");
       renderAll();
       scheduleComputerTurnIfNeeded();
     }
@@ -4185,7 +4271,7 @@
       if (app.gameOver) {
         if (app.winner === playerId) return 100000;
         // Oracle should prefer pressing for wins over settling for draws.
-        if (app.winner == null) return -350;
+        if (app.winner == null) return -12000;
         return -100000;
       }
       if (!player.alive) return -50000;
@@ -4406,7 +4492,7 @@
       }
       if (app.gameOver) {
         if (app.winner === playerId) return 1.2 + (maxTurns - turns) * 0.01;
-        if (app.winner == null) return 0;
+        if (app.winner == null) return -0.22;
         return -1.2 - (maxTurns - turns) * 0.01;
       }
       return Math.max(-1, Math.min(1, evaluateStateForOracle(playerId) / 12000));
@@ -4697,7 +4783,7 @@
     function terminalScoreForLookahead(playerId, depthRemaining) {
       if (!app.gameOver) return null;
       if (app.winner === playerId) return 1000000 + depthRemaining;
-      if (app.winner == null) return -500;
+      if (app.winner == null) return -25000 - depthRemaining;
       return -1000000 - depthRemaining;
     }
 
@@ -5070,26 +5156,25 @@
 
     function toggleGameAnalysis() {
       if (!app.gameOver || app.tutorialMode || app.config?.playerCount !== 2 || !app.moveHistory.length || app.analysisBusy) return;
-      if (app.analysisVisible && app.analysisReady) {
-        app.analysisVisible = false;
-        renderAll();
-        return;
-      }
       app.analysisVisible = true;
+      setPlayScreen("analysis");
       if (app.analysisReady && app.analysisHistory.length === app.moveHistory.length) {
         renderAll();
         return;
       }
+      const runId = app.analysisRunId + 1;
+      app.analysisRunId = runId;
       app.analysisBusy = true;
       app.analysisReady = false;
       app.analysisHistory = [];
       app.analysisSelectedMoveIdx = -1;
       app.analysisEvalScore = 0;
       app.analysisEvalPercent = 50;
-      app.analysisEvalText = "Analyzing with Oracle max-depth alpha-beta search and C++ 64-bit bitboards.";
+      app.analysisEvalText = "Analyzing with Oracle full-depth native C++ search and stronger draw avoidance.";
       renderAll();
       setTimeout(() => {
         const report = computeGameAnalysisReport();
+        if (app.analysisRunId !== runId) return;
         app.analysisBusy = false;
         app.analysisReady = !!report;
         app.analysisHistory = report?.entries || [];
@@ -5261,7 +5346,7 @@
     function oracleTerminalValue(rootPlayerId, pliesPlayed = 0) {
       if (!app.gameOver) return normalizeOracleValue(evaluateStateForOracle(rootPlayerId));
       if (app.winner === rootPlayerId) return Math.max(0.76, 1 - pliesPlayed * 0.04);
-      if (app.winner == null) return 0;
+      if (app.winner == null) return -0.22;
       return Math.min(-0.76, -1 + pliesPlayed * 0.04);
     }
 
@@ -5362,7 +5447,7 @@
     function terminalScoreForPerfectOracle(playerId, ply = 0) {
       if (!app.gameOver) return null;
       if (app.winner === playerId) return 1000000 - ply;
-      if (app.winner == null) return 0;
+      if (app.winner == null) return -25000 + ply;
       return -1000000 + ply;
     }
 
@@ -5389,7 +5474,7 @@
       if (!actor || !actor.alive) return evaluateStateForOracle(playerId);
 
       const stateKey = buildPerfectOracleStateKey(playerId);
-      if (searchConfig.pathKeys.has(stateKey)) return 0;
+      if (searchConfig.pathKeys.has(stateKey)) return -25000 + ply;
       if (searchConfig.transposition.has(stateKey)) return searchConfig.transposition.get(stateKey);
 
       searchConfig.pathKeys.add(stateKey);
@@ -5679,6 +5764,7 @@
         app.setupMode = priorSetupMode;
         if (snapshot) {
           restoreSnapshot(snapshot, { render: false });
+          setPlayScreen(app.playScreen);
           renderAll();
           scheduleComputerTurnIfNeeded();
         }
@@ -6660,7 +6746,7 @@
         el.gameAnalysisBtn.textContent = "Analyzing...";
         return;
       }
-      el.gameAnalysisBtn.textContent = app.analysisVisible ? "Hide Analysis" : "Game Analysis";
+      el.gameAnalysisBtn.textContent = app.analysisReady ? "View Analysis" : "Game Analysis";
     }
 
     function renderAnalysisPanel() {

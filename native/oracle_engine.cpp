@@ -196,8 +196,6 @@ struct OracleTuning {
 
 struct SearchContext {
   int style = kStyleBalanced;
-  std::chrono::steady_clock::time_point deadline;
-  bool timed_out = false;
   std::unordered_map<std::uint64_t, int> transposition;
 };
 
@@ -722,7 +720,7 @@ int evaluate_state_for_player(const StateNative& state, int root_player_index, i
 
   if (state.game_over) {
     if (state.winner == player.id) return 100000;
-    if (state.winner < 0) return -350;
+    if (state.winner < 0) return -12000;
     return -100000;
   }
   if (!player.alive) return -50000;
@@ -834,7 +832,7 @@ int terminal_score(const StateNative& state, int root_player_id, int depth_remai
   }
   is_terminal = true;
   if (state.winner == root_player_id) return 1000000 + depth_remaining;
-  if (state.winner < 0) return -500;
+  if (state.winner < 0) return -25000 - depth_remaining;
   return -1000000 - depth_remaining;
 }
 
@@ -900,11 +898,6 @@ std::vector<MoveNative> order_moves(const StateNative& state, const std::vector<
 }
 
 int alpha_beta_search(const StateNative& state, int root_player_index, int depth_remaining, int alpha, int beta, SearchContext& ctx) {
-  if (std::chrono::steady_clock::now() >= ctx.deadline) {
-    ctx.timed_out = true;
-    return evaluate_state_for_oracle(state, root_player_index, ctx.style);
-  }
-
   bool is_terminal = false;
   const int terminal = terminal_score(state, state.players[root_player_index].id, depth_remaining, is_terminal);
   if (is_terminal) return terminal;
@@ -928,10 +921,6 @@ int alpha_beta_search(const StateNative& state, int root_player_index, int depth
 
   int best = maximize ? -kSearchInfinity : kSearchInfinity;
   for (const auto& move : legal_moves) {
-    if (std::chrono::steady_clock::now() >= ctx.deadline) {
-      ctx.timed_out = true;
-      break;
-    }
     StateNative child = state;
     if (!execute_move(child, move)) continue;
     const int score = alpha_beta_search(child, root_player_index, depth_remaining - 1, alpha, beta, ctx);
@@ -945,7 +934,7 @@ int alpha_beta_search(const StateNative& state, int root_player_index, int depth
     if (beta <= alpha) break;
   }
 
-  if (!ctx.timed_out) ctx.transposition[tt_key] = best;
+  ctx.transposition[tt_key] = best;
   return best;
 }
 
@@ -1173,6 +1162,7 @@ int oracle_choose_native_move(int board_size,
                               const int* cell_types,
                               const int* cell_rots,
                               const int* cell_flags) {
+  (void)time_budget_ms;
   StateNative state;
   if (!build_native_state(
         state,
@@ -1194,39 +1184,21 @@ int oracle_choose_native_move(int board_size,
   const int root_player_index = state.current_player_idx;
   auto legal_moves = collect_legal_moves(state, root_player_index);
   if (legal_moves.empty()) return -1;
-  MoveNative best_move = legal_moves[0];
+  auto ordered = order_moves(state, legal_moves, root_player_index, true, oracle_style);
+  MoveNative best_move = ordered.empty() ? legal_moves[0] : ordered[0];
 
   SearchContext ctx;
   ctx.style = oracle_style;
-  ctx.deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(std::max(1, time_budget_ms));
-
   const int safe_max_depth = std::max(1, max_depth);
-  for (int depth = 1; depth <= safe_max_depth; ++depth) {
-    if (std::chrono::steady_clock::now() >= ctx.deadline) break;
-    auto ordered = order_moves(state, legal_moves, root_player_index, true, oracle_style);
-    if (const auto it = std::find_if(ordered.begin(), ordered.end(), [&](const MoveNative& move) { return same_move(move, best_move); });
-        it != ordered.end() && it != ordered.begin()) {
-      std::rotate(ordered.begin(), it, it + 1);
+  int best_score = -kSearchInfinity;
+  for (const auto& move : ordered) {
+    StateNative child = state;
+    if (!execute_move(child, move)) continue;
+    const int score = alpha_beta_search(child, root_player_index, safe_max_depth - 1, -kSearchInfinity, kSearchInfinity, ctx);
+    if (score > best_score) {
+      best_score = score;
+      best_move = move;
     }
-
-    int best_score = -kSearchInfinity;
-    MoveNative depth_best = best_move;
-    for (const auto& move : ordered) {
-      if (std::chrono::steady_clock::now() >= ctx.deadline) {
-        ctx.timed_out = true;
-        break;
-      }
-      StateNative child = state;
-      if (!execute_move(child, move)) continue;
-      const int score = alpha_beta_search(child, root_player_index, depth - 1, -kSearchInfinity, kSearchInfinity, ctx);
-      if (score > best_score) {
-        best_score = score;
-        depth_best = move;
-      }
-      if (ctx.timed_out) break;
-    }
-    if (!ctx.timed_out) best_move = depth_best;
-    if (ctx.timed_out) break;
   }
 
   return pack_move(best_move);
