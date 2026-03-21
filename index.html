@@ -1072,6 +1072,37 @@
     .analysis-screen .analysis-moves {
       max-height: min(58vh, 620px);
     }
+    .analysis-loading-panel {
+      min-height: min(52vh, 520px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 12px;
+    }
+    .analysis-loading-panel h3 {
+      margin: 0;
+      font-size: 20px;
+      color: #f4f8ff;
+    }
+    .analysis-loading-panel .status {
+      max-width: 520px;
+    }
+    .analysis-loading-spinner {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      border: 4px solid rgba(220, 232, 255, .14);
+      border-top-color: #7eb4ff;
+      border-right-color: #ff8296;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, .04), 0 14px 30px rgba(0, 0, 0, .26);
+      animation: analysisSpin .9s linear infinite;
+    }
+    @keyframes analysisSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
     .winner {
       font-size: 14px;
       font-weight: 700;
@@ -1725,6 +1756,11 @@
                   <button id="analysisNewGameBtn" type="button">New Game</button>
                 </div>
               </div>
+              <div id="analysisLoadingPanel" class="panel analysis-loading-panel hidden" aria-live="polite">
+                <div class="analysis-loading-spinner" aria-hidden="true"></div>
+                <h3>Oracle is analyzing the game...</h3>
+                <div id="analysisLoadingText" class="status">Reviewing the finished game move by move and building the evaluation bar.</div>
+              </div>
               <div id="analysisPanel" class="panel hidden">
                 <h3>Game Analysis</h3>
                 <div id="analysisEvalSummary" class="status"></div>
@@ -1946,6 +1982,8 @@
       computerPanel: document.getElementById("computerPanel"),
       computerText: document.getElementById("computerText"),
       analysisPanel: document.getElementById("analysisPanel"),
+      analysisLoadingPanel: document.getElementById("analysisLoadingPanel"),
+      analysisLoadingText: document.getElementById("analysisLoadingText"),
       analysisEvalSummary: document.getElementById("analysisEvalSummary"),
       analysisEvalBar: document.getElementById("analysisEvalBar"),
       analysisEvalPointer: document.getElementById("analysisEvalPointer"),
@@ -6756,20 +6794,21 @@
         && !app.tutorialMode
         && !!app.analysisVisible
         && (app.analysisBusy || app.analysisReady);
-      el.analysisPanel.classList.toggle("hidden", !enabled);
+      const showLoading = enabled && !!app.analysisBusy;
+      if (el.analysisLoadingPanel) el.analysisLoadingPanel.classList.toggle("hidden", !showLoading);
+      if (el.analysisLoadingText) {
+        el.analysisLoadingText.textContent = showLoading
+          ? (app.analysisEvalText || "Reviewing the finished game move by move and building the evaluation bar.")
+          : "Reviewing the finished game move by move and building the evaluation bar.";
+      }
+      el.analysisPanel.classList.toggle("hidden", !enabled || showLoading);
       if (!enabled) return;
+      if (showLoading) return;
 
       const evalPercent = Math.max(0, Math.min(100, Number(app.analysisEvalPercent) || 50));
       el.analysisEvalPointer.style.left = `${evalPercent}%`;
       el.analysisEvalSummary.textContent = app.analysisEvalText || "Even position";
       el.analysisMoves.innerHTML = "";
-      if (app.analysisBusy) {
-        const busy = document.createElement("div");
-        busy.className = "analysis-move-detail";
-        busy.textContent = "Oracle is analyzing the finished game...";
-        el.analysisMoves.appendChild(busy);
-        return;
-      }
       const entries = app.analysisHistory;
       if (!entries.length) {
         const empty = document.createElement("div");

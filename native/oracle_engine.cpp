@@ -45,6 +45,13 @@ constexpr int kVariantOverload = 1;
 constexpr int kNoEntry = -1;
 constexpr int kPackedNoEntry = 15;
 constexpr int kSearchInfinity = 2'000'000'000;
+constexpr int kMaxSearchPly = 64;
+
+enum TranspositionBound {
+  kBoundExact = 0,
+  kBoundLower = 1,
+  kBoundUpper = 2,
+};
 
 inline int manhattan_distance(int a_row, int a_col, int b_row, int b_col) {
   return std::abs(a_row - b_row) + std::abs(a_col - b_col);
@@ -186,6 +193,7 @@ struct StateNative {
   std::array<PlayerNative, kNativePlayers> players{};
   std::array<int, kSupportedBoardCells> cell_types{};
   std::array<int, kSupportedBoardCells> cell_flags{};
+  std::uint64_t zobrist_hash = 0;
 };
 
 struct OracleTuning {
@@ -194,10 +202,47 @@ struct OracleTuning {
   double tactical_scale = 1.0;
 };
 
+struct TranspositionEntry {
+  int depth = 0;
+  int score = 0;
+  int bound = kBoundExact;
+  int best_move = 0;
+};
+
 struct SearchContext {
   int style = kStyleBalanced;
-  std::unordered_map<std::uint64_t, int> transposition;
+  std::unordered_map<std::uint64_t, TranspositionEntry> transposition;
+  std::array<std::array<int, 2>, kMaxSearchPly> killer_moves{};
+  std::unordered_map<int, int> history_heuristic;
 };
+
+std::unordered_map<std::uint64_t, int> g_oracle_root_move_cache;
+
+struct UndoNative {
+  std::array<PlayerNative, kNativePlayers> players{};
+  int current_player_idx = 0;
+  bool game_over = false;
+  int winner = -1;
+  int changed_cell_index = -1;
+  int previous_cell_type = kTileNone;
+  std::uint64_t zobrist_hash = 0;
+};
+
+int pack_move(const MoveNative& move);
+void record_killer_move(SearchContext& ctx, int ply, int packed_move);
+void update_history_heuristic(SearchContext& ctx, int packed_move, int depth_remaining);
+int ordering_bonus(const SearchContext& ctx, int packed_move, int ply, int tt_move);
+
+inline std::uint64_t splitmix64(std::uint64_t x) {
+  x += 0x9e3779b97f4a7c15ull;
+  x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
+  x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;
+  return x ^ (x >> 31);
+}
+
+inline std::uint64_t zobrist_key(std::uint64_t tag, std::uint64_t value) {
+  return splitmix64(tag ^ (value + 0x9e3779b97f4a7c15ull));
+}
 
 inline int board_index(int row, int col, int board_size = kBoardSize7) {
   return row * board_size + col;
@@ -782,47 +827,87 @@ int evaluate_state_for_oracle(const StateNative& state, int root_player_index, i
   return base_score + pressure;
 }
 
-std::uint32_t compute_native_state_hash(const StateNative& state, int player_id, int depth_remaining) {
-  std::array<int, kSupportedBoardCells> owners{};
-  owners.fill(-1);
-  std::array<int, kSupportedBoardCells> rots{};
-  const BoardBitboards bitboards = build_board_bitboards(
-    state.board_size,
-    state.board_size * state.board_size,
-    state.cell_types.data(),
-    rots.data(),
-    owners.data(),
-    state.cell_flags.data(),
-    0
-  );
+std::uint64_t cell_type_zobrist(int cell_index, int tile_type) {
+  if (cell_index < 0 || cell_index >= kSupportedBoardCells || tile_type <= 0) return 0;
+  return zobrist_key(0x43454c4c54595045ull, (static_cast<std::uint64_t>(cell_index) << 8) | static_cast<std::uint64_t>(tile_type & 0xff));
+}
 
-  std::uint32_t h = 2166136261u;
-  h = hash_mix32(h, static_cast<std::uint32_t>((player_id + 17) * 97));
-  h = hash_mix32(h, static_cast<std::uint32_t>((depth_remaining + 31) * 131));
-  h = hash_mix32(h, static_cast<std::uint32_t>((state.players[state.current_player_idx].id + 53) * 151));
-  h = hash_mix32(h, static_cast<std::uint32_t>((state.current_player_idx + 61) * 173));
-  h = hash_mix32(h, static_cast<std::uint32_t>(state.game_over ? 1 : 0));
-  h = hash_mix32(h, state.winner >= 0 ? static_cast<std::uint32_t>(state.winner + 7) : 0u);
-  h = hash_mix32(h, static_cast<std::uint32_t>(bitboards.size + 787));
+std::uint64_t player_state_zobrist(const PlayerNative& player, int slot) {
+  std::uint64_t key = 0;
+  key ^= zobrist_key(0x5049440000000000ull, (static_cast<std::uint64_t>(slot & 0xff) << 8) | static_cast<std::uint64_t>(player.id & 0xff));
+  key ^= zobrist_key(0x50414c4956450000ull, (static_cast<std::uint64_t>(slot & 0xff) << 8) | static_cast<std::uint64_t>(player.alive ? 1 : 0));
+  key ^= zobrist_key(0x5046495253540000ull, (static_cast<std::uint64_t>(slot & 0xff) << 8) | static_cast<std::uint64_t>(player.has_placed_first_tile ? 1 : 0));
+  key ^= zobrist_key(0x50524f5700000000ull, (static_cast<std::uint64_t>(slot & 0xff) << 16) | static_cast<std::uint64_t>((player.row + 1) & 0xff));
+  key ^= zobrist_key(0x50434f4c00000000ull, (static_cast<std::uint64_t>(slot & 0xff) << 16) | static_cast<std::uint64_t>((player.col + 1) & 0xff));
+  key ^= zobrist_key(0x50454e5400000000ull, (static_cast<std::uint64_t>(slot & 0xff) << 16) | static_cast<std::uint64_t>((player.entrance + 1) & 0xff));
+  key ^= zobrist_key(0x504a554d50000000ull, (static_cast<std::uint64_t>(slot & 0xff) << 16) | static_cast<std::uint64_t>(player.jump_left & 0xff));
+  key ^= zobrist_key(0x50444a554d500000ull, (static_cast<std::uint64_t>(slot & 0xff) << 16) | static_cast<std::uint64_t>(player.diagonal_jump_left & 0xff));
+  key ^= zobrist_key(0x50434a554d500000ull, (static_cast<std::uint64_t>(slot & 0xff) << 16) | static_cast<std::uint64_t>(player.combined_jump_left & 0xff));
+  return key;
+}
+
+std::uint64_t current_player_zobrist(int current_player_idx) {
+  return zobrist_key(0x43555252454e5400ull, static_cast<std::uint64_t>(current_player_idx & 0xff));
+}
+
+std::uint64_t game_state_zobrist(bool game_over, int winner) {
+  return zobrist_key(0x47414d4553544154ull, (static_cast<std::uint64_t>(game_over ? 1 : 0) << 16) | static_cast<std::uint64_t>((winner + 2) & 0xff));
+}
+
+std::uint64_t config_zobrist(const ConfigNative& config) {
+  std::uint64_t key = 0;
+  key ^= zobrist_key(0x434f4e4649474a53ull, static_cast<std::uint64_t>(config.jump_selection & 0xff));
+  key ^= zobrist_key(0x434f4e464947504full, static_cast<std::uint64_t>(config.combined_pool ? 1 : 0));
+  key ^= zobrist_key(0x434f4e4649475354ull, static_cast<std::uint64_t>(config.oracle_style & 0xff));
+  return key;
+}
+
+std::uint64_t compute_native_zobrist_hash(const StateNative& state) {
+  std::uint64_t hash = config_zobrist(state.config);
+  hash ^= current_player_zobrist(state.current_player_idx);
+  hash ^= game_state_zobrist(state.game_over, state.winner);
   for (int idx = 0; idx < state.player_count; ++idx) {
-    const auto& player = state.players[idx];
-    h = hash_mix32(h, static_cast<std::uint32_t>(player.id + 101));
-    h = hash_mix32(h, static_cast<std::uint32_t>(player.alive ? 1 : 0));
-    h = hash_mix32(h, static_cast<std::uint32_t>(player.has_placed_first_tile ? 1 : 0));
-    h = hash_mix32(h, player.row >= 0 ? static_cast<std::uint32_t>(player.row + 257) : 0u);
-    h = hash_mix32(h, player.col >= 0 ? static_cast<std::uint32_t>(player.col + 353) : 0u);
-    h = hash_mix32(h, player.entrance >= 0 ? static_cast<std::uint32_t>(player.entrance + 449) : 0u);
-    h = hash_mix32(h, static_cast<std::uint32_t>(player.jump_left + 557));
-    h = hash_mix32(h, static_cast<std::uint32_t>(player.diagonal_jump_left + 653));
-    h = hash_mix32(h, static_cast<std::uint32_t>(player.combined_jump_left + 751));
+    hash ^= player_state_zobrist(state.players[idx], idx);
   }
-  h = hash_mix64(h, bitboards.occupied_mask, 811);
-  h = hash_mix64(h, bitboards.dead_mask, 887);
-  h = hash_mix64(h, bitboards.start_mask, 953);
-  for (int type_code = 1; type_code < static_cast<int>(bitboards.type_masks.size()); ++type_code) {
-    h = hash_mix64(h, bitboards.type_masks[type_code], static_cast<std::uint32_t>(1009 + type_code * 61));
+  for (int idx = 0; idx < state.board_size * state.board_size; ++idx) {
+    hash ^= cell_type_zobrist(idx, state.cell_types[idx]);
   }
-  return h;
+  return hash;
+}
+
+void refresh_zobrist_hash_after_move(StateNative& state, const UndoNative& undo) {
+  std::uint64_t hash = undo.zobrist_hash;
+  hash ^= current_player_zobrist(undo.current_player_idx);
+  hash ^= current_player_zobrist(state.current_player_idx);
+  hash ^= game_state_zobrist(undo.game_over, undo.winner);
+  hash ^= game_state_zobrist(state.game_over, state.winner);
+  for (int idx = 0; idx < state.player_count; ++idx) {
+    hash ^= player_state_zobrist(undo.players[idx], idx);
+    hash ^= player_state_zobrist(state.players[idx], idx);
+  }
+  if (undo.changed_cell_index >= 0) {
+    hash ^= cell_type_zobrist(undo.changed_cell_index, undo.previous_cell_type);
+    hash ^= cell_type_zobrist(undo.changed_cell_index, state.cell_types[undo.changed_cell_index]);
+  }
+  state.zobrist_hash = hash;
+}
+
+void undo_move(StateNative& state, const UndoNative& undo) {
+  state.players = undo.players;
+  state.current_player_idx = undo.current_player_idx;
+  state.game_over = undo.game_over;
+  state.winner = undo.winner;
+  if (undo.changed_cell_index >= 0) {
+    state.cell_types[undo.changed_cell_index] = undo.previous_cell_type;
+  }
+  state.zobrist_hash = undo.zobrist_hash;
+}
+
+std::uint32_t compute_native_state_hash(const StateNative& state, int player_id, int depth_remaining) {
+  std::uint64_t hash = state.zobrist_hash;
+  hash ^= zobrist_key(0x4450544800000000ull, static_cast<std::uint64_t>(depth_remaining & 0xff));
+  hash ^= zobrist_key(0x52504c4159455200ull, static_cast<std::uint64_t>(player_id & 0xff));
+  return static_cast<std::uint32_t>((hash ^ (hash >> 32)) & 0xffffffffu);
 }
 
 int terminal_score(const StateNative& state, int root_player_id, int depth_remaining, bool& is_terminal) {
@@ -836,13 +921,22 @@ int terminal_score(const StateNative& state, int root_player_id, int depth_remai
   return -1000000 - depth_remaining;
 }
 
-bool execute_move(StateNative& state, const MoveNative& move) {
+bool execute_move(StateNative& state, const MoveNative& move, UndoNative* undo = nullptr) {
   if (state.game_over) return false;
   const int player_index = state.current_player_idx;
   if (player_index < 0 || player_index >= state.player_count) return false;
   auto& player = state.players[player_index];
   if (!player.alive || !can_use_tile(player, move.tile_type, state.config)) return false;
   if (!cell_is_open_for_placement(state, move.row, move.col)) return false;
+  if (undo) {
+    undo->players = state.players;
+    undo->current_player_idx = state.current_player_idx;
+    undo->game_over = state.game_over;
+    undo->winner = state.winner;
+    undo->changed_cell_index = board_index(move.row, move.col, state.board_size);
+    undo->previous_cell_type = state.cell_types[undo->changed_cell_index];
+    undo->zobrist_hash = state.zobrist_hash;
+  }
 
   if (!player.has_placed_first_tile) {
     bool valid_first_cell = false;
@@ -861,6 +955,8 @@ bool execute_move(StateNative& state, const MoveNative& move) {
     player.has_placed_first_tile = true;
     finalize_remaining_players_outcome(state);
     if (!state.game_over) advance_to_next_alive(state);
+    if (undo) refresh_zobrist_hash_after_move(state, *undo);
+    else state.zobrist_hash = compute_native_zobrist_hash(state);
     return true;
   }
 
@@ -870,10 +966,19 @@ bool execute_move(StateNative& state, const MoveNative& move) {
   consume_tile(player, move.tile_type, state.config);
   resolve_after_placement(state, move.row, move.col);
   if (!state.game_over) advance_to_next_alive(state);
+  if (undo) refresh_zobrist_hash_after_move(state, *undo);
+  else state.zobrist_hash = compute_native_zobrist_hash(state);
   return true;
 }
 
-std::vector<MoveNative> order_moves(const StateNative& state, const std::vector<MoveNative>& moves, int root_player_index, bool maximize, int style) {
+std::vector<MoveNative> order_moves(StateNative& state,
+                                    const std::vector<MoveNative>& moves,
+                                    int root_player_index,
+                                    bool maximize,
+                                    int style,
+                                    const SearchContext* ctx = nullptr,
+                                    int ply = 0,
+                                    int tt_move = 0) {
   struct RankedMove {
     MoveNative move;
     int score;
@@ -881,11 +986,14 @@ std::vector<MoveNative> order_moves(const StateNative& state, const std::vector<
   std::vector<RankedMove> ranked;
   ranked.reserve(moves.size());
   for (const auto& move : moves) {
-    StateNative child = state;
     int score = -kSearchInfinity;
-    if (execute_move(child, move)) {
-      score = evaluate_state_for_oracle(child, root_player_index, style);
+    UndoNative undo;
+    if (execute_move(state, move, &undo)) {
+      score = evaluate_state_for_oracle(state, root_player_index, style);
+      undo_move(state, undo);
     }
+    const int packed_move = pack_move(move);
+    if (ctx) score += ordering_bonus(*ctx, packed_move, ply, tt_move);
     ranked.push_back({move, score});
   }
   std::sort(ranked.begin(), ranked.end(), [maximize](const RankedMove& a, const RankedMove& b) {
@@ -897,7 +1005,7 @@ std::vector<MoveNative> order_moves(const StateNative& state, const std::vector<
   return ordered;
 }
 
-int alpha_beta_search(const StateNative& state, int root_player_index, int depth_remaining, int alpha, int beta, SearchContext& ctx) {
+int alpha_beta_search(StateNative& state, int root_player_index, int depth_remaining, int alpha, int beta, SearchContext& ctx, int ply = 0) {
   bool is_terminal = false;
   const int terminal = terminal_score(state, state.players[root_player_index].id, depth_remaining, is_terminal);
   if (is_terminal) return terminal;
@@ -908,39 +1016,111 @@ int alpha_beta_search(const StateNative& state, int root_player_index, int depth
     return evaluate_state_for_oracle(state, root_player_index, ctx.style);
   }
 
-  const std::uint64_t tt_key = (static_cast<std::uint64_t>(depth_remaining) << 32) |
-    compute_native_state_hash(state, state.players[root_player_index].id, depth_remaining);
+  const std::uint64_t tt_key = state.zobrist_hash;
+  const int alpha_orig = alpha;
+  const int beta_orig = beta;
+  int tt_move = 0;
   if (const auto it = ctx.transposition.find(tt_key); it != ctx.transposition.end()) {
-    return it->second;
+    const auto& entry = it->second;
+    tt_move = entry.best_move;
+    if (entry.depth >= depth_remaining) {
+      if (entry.bound == kBoundExact) return entry.score;
+      if (entry.bound == kBoundLower) alpha = std::max(alpha, entry.score);
+      else if (entry.bound == kBoundUpper) beta = std::min(beta, entry.score);
+      if (alpha >= beta) return entry.score;
+    }
   }
 
   auto legal_moves = collect_legal_moves(state, actor_index);
   if (legal_moves.empty()) return evaluate_state_for_oracle(state, root_player_index, ctx.style);
   const bool maximize = actor_index == root_player_index;
-  legal_moves = order_moves(state, legal_moves, root_player_index, maximize, ctx.style);
+  legal_moves = order_moves(state, legal_moves, root_player_index, maximize, ctx.style, &ctx, ply, tt_move);
 
   int best = maximize ? -kSearchInfinity : kSearchInfinity;
+  int best_move = 0;
+  bool first_move = true;
   for (const auto& move : legal_moves) {
-    StateNative child = state;
-    if (!execute_move(child, move)) continue;
-    const int score = alpha_beta_search(child, root_player_index, depth_remaining - 1, alpha, beta, ctx);
-    if (maximize) {
-      best = std::max(best, score);
-      alpha = std::max(alpha, score);
+    UndoNative undo;
+    if (!execute_move(state, move, &undo)) continue;
+    const int packed_move = pack_move(move);
+    int score = 0;
+    if (first_move) {
+      score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, beta, ctx, ply + 1);
+      first_move = false;
+    } else if (maximize) {
+      const int scout_beta = alpha >= kSearchInfinity - 1 ? kSearchInfinity : alpha + 1;
+      score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, scout_beta, ctx, ply + 1);
+      if (score > alpha && score < beta) {
+        score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, beta, ctx, ply + 1);
+      }
     } else {
-      best = std::min(best, score);
-      beta = std::min(beta, score);
+      const int scout_alpha = beta <= -kSearchInfinity + 1 ? -kSearchInfinity : beta - 1;
+      score = alpha_beta_search(state, root_player_index, depth_remaining - 1, scout_alpha, beta, ctx, ply + 1);
+      if (score < beta && score > alpha) {
+        score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, beta, ctx, ply + 1);
+      }
     }
-    if (beta <= alpha) break;
+    undo_move(state, undo);
+    if (maximize) {
+      if (score > best) {
+        best = score;
+        best_move = packed_move;
+      }
+      alpha = std::max(alpha, best);
+    } else {
+      if (score < best) {
+        best = score;
+        best_move = packed_move;
+      }
+      beta = std::min(beta, best);
+    }
+    if (beta <= alpha) {
+      record_killer_move(ctx, ply, packed_move);
+      update_history_heuristic(ctx, packed_move, depth_remaining);
+      break;
+    }
   }
 
-  ctx.transposition[tt_key] = best;
+  int bound = kBoundExact;
+  if (best <= alpha_orig) bound = kBoundUpper;
+  else if (best >= beta_orig) bound = kBoundLower;
+  const auto existing = ctx.transposition.find(tt_key);
+  if (existing == ctx.transposition.end() || depth_remaining >= existing->second.depth || bound == kBoundExact) {
+    ctx.transposition[tt_key] = { depth_remaining, best, bound, best_move };
+  }
   return best;
 }
 
 int pack_move(const MoveNative& move) {
   const int entry = move.entry < 0 ? kPackedNoEntry : move.entry;
   return ((move.tile_type & 0x0f) << 20) | ((move.row & 0x3f) << 12) | ((move.col & 0x3f) << 4) | (entry & 0x0f);
+}
+
+void record_killer_move(SearchContext& ctx, int ply, int packed_move) {
+  if (ply < 0 || ply >= kMaxSearchPly || packed_move <= 0) return;
+  auto& killers = ctx.killer_moves[ply];
+  if (killers[0] == packed_move) return;
+  killers[1] = killers[0];
+  killers[0] = packed_move;
+}
+
+void update_history_heuristic(SearchContext& ctx, int packed_move, int depth_remaining) {
+  if (packed_move <= 0) return;
+  ctx.history_heuristic[packed_move] += std::max(1, depth_remaining * depth_remaining);
+}
+
+int ordering_bonus(const SearchContext& ctx, int packed_move, int ply, int tt_move) {
+  if (packed_move <= 0) return 0;
+  int bonus = 0;
+  if (tt_move > 0 && packed_move == tt_move) bonus += 1'000'000;
+  if (ply >= 0 && ply < kMaxSearchPly) {
+    if (ctx.killer_moves[ply][0] == packed_move) bonus += 250'000;
+    else if (ctx.killer_moves[ply][1] == packed_move) bonus += 125'000;
+  }
+  if (const auto it = ctx.history_heuristic.find(packed_move); it != ctx.history_heuristic.end()) {
+    bonus += std::min(100'000, it->second * 24);
+  }
+  return bonus;
 }
 
 bool rots_are_supported(int board_size, int cell_count, const int* cell_rots) {
@@ -1000,6 +1180,7 @@ bool build_native_state(StateNative& state,
 
   finalize_remaining_players_outcome(state);
   check_position_draw(state);
+  state.zobrist_hash = compute_native_zobrist_hash(state);
   return true;
 }
 
@@ -1184,24 +1365,46 @@ int oracle_choose_native_move(int board_size,
   const int root_player_index = state.current_player_idx;
   auto legal_moves = collect_legal_moves(state, root_player_index);
   if (legal_moves.empty()) return -1;
-  auto ordered = order_moves(state, legal_moves, root_player_index, true, oracle_style);
-  MoveNative best_move = ordered.empty() ? legal_moves[0] : ordered[0];
-
+  const std::uint64_t root_cache_key = state.zobrist_hash
+    ^ zobrist_key(0x524f4f5443414348ull, static_cast<std::uint64_t>((oracle_style & 0xff) << 8 | (max_depth & 0xff)));
+  if (const auto it = g_oracle_root_move_cache.find(root_cache_key); it != g_oracle_root_move_cache.end()) {
+    return it->second;
+  }
   SearchContext ctx;
   ctx.style = oracle_style;
+  auto ordered = order_moves(state, legal_moves, root_player_index, true, oracle_style, &ctx, 0, 0);
+  MoveNative best_move = ordered.empty() ? legal_moves[0] : ordered[0];
   const int safe_max_depth = std::max(1, max_depth);
   int best_score = -kSearchInfinity;
+  int alpha = -kSearchInfinity;
+  bool first_move = true;
   for (const auto& move : ordered) {
-    StateNative child = state;
-    if (!execute_move(child, move)) continue;
-    const int score = alpha_beta_search(child, root_player_index, safe_max_depth - 1, -kSearchInfinity, kSearchInfinity, ctx);
+    UndoNative undo;
+    if (!execute_move(state, move, &undo)) continue;
+    int score = 0;
+    if (first_move) {
+      score = alpha_beta_search(state, root_player_index, safe_max_depth - 1, alpha, kSearchInfinity, ctx, 1);
+      first_move = false;
+    } else {
+      const int scout_beta = alpha >= kSearchInfinity - 1 ? kSearchInfinity : alpha + 1;
+      score = alpha_beta_search(state, root_player_index, safe_max_depth - 1, alpha, scout_beta, ctx, 1);
+      if (score > alpha && score < kSearchInfinity) {
+        score = alpha_beta_search(state, root_player_index, safe_max_depth - 1, alpha, kSearchInfinity, ctx, 1);
+      }
+    }
+    undo_move(state, undo);
     if (score > best_score) {
       best_score = score;
       best_move = move;
+      alpha = std::max(alpha, best_score);
     }
+    if (best_score >= 900000) break;
   }
 
-  return pack_move(best_move);
+  const int packed_best_move = pack_move(best_move);
+  if (g_oracle_root_move_cache.size() > 200000) g_oracle_root_move_cache.clear();
+  g_oracle_root_move_cache[root_cache_key] = packed_best_move;
+  return packed_best_move;
 }
 
 }  // extern "C"
