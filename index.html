@@ -4611,61 +4611,6 @@
       return bonus;
     }
 
-    function scoreOracleMoveByOpponentBestReply(playerId, move, replyCap = 12) {
-      const snapshot = captureGameSnapshot();
-      let score = -Infinity;
-      const actingPlayer = app.players.find((candidate) => candidate.id === playerId);
-      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
-        if (app.gameOver && app.winner === playerId) {
-          score = 2000000;
-        } else {
-          const responder = currentPlayer();
-          if (!responder || responder.id === playerId || !responder.alive) {
-            score = evaluateStateForOracle(playerId);
-          } else {
-            let replies = collectLegalMoves(responder);
-            if (replies.length > replyCap) {
-              replies = rankMovesForLookahead(
-                responder.id,
-                responder.id,
-                replies,
-                true,
-                replyCap,
-                "oracle"
-              );
-            }
-            if (!replies.length) {
-              score = evaluateStateForOracle(playerId);
-            } else {
-              let worstForOracle = Infinity;
-              for (const reply of replies) {
-                const replySnapshot = captureGameSnapshot();
-                const replyPlayer = currentPlayer();
-                if (replyPlayer && executePlannedMove(replyPlayer, reply, { recordUndo: false, render: false, recordTutorial: false })) {
-                  worstForOracle = Math.min(worstForOracle, evaluateStateForOracle(playerId));
-                }
-                restoreSnapshot(replySnapshot, { render: false });
-              }
-              score = Number.isFinite(worstForOracle) ? worstForOracle : evaluateStateForOracle(playerId);
-            }
-          }
-        }
-      }
-      restoreSnapshot(snapshot, { render: false });
-      return score;
-    }
-
-    function pruneOracleMovesByOpponentReply(player, moves, keepCount = 16, replyCap = 12) {
-      if (!Array.isArray(moves) || !moves.length) return [];
-      if (moves.length <= keepCount) return [...moves];
-      const scored = moves.map((move) => ({
-        move,
-        score: scoreOracleMoveByOpponentBestReply(player.id, move, replyCap),
-      }));
-      scored.sort((a, b) => b.score - a.score);
-      return scored.slice(0, keepCount).map((entry) => entry.move);
-    }
-
     function chooseOracleMoveForSimulation(player) {
       const legalMoves = collectLegalMoves(player);
       if (!legalMoves.length) return null;
@@ -5199,23 +5144,6 @@
       return blunder;
     }
 
-    function moveAllowsOpponentForcedWinWithinTwoTurns(playerId, move, maxOpenCells = 26) {
-      const snapshot = captureGameSnapshot();
-      let forcedLoss = false;
-      const actingPlayer = app.players.find((candidate) => candidate.id === playerId);
-      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
-        const responder = currentPlayer();
-        if (responder && responder.id !== playerId && responder.alive) {
-          const openCells = estimateRemainingTurnDepth();
-          if (openCells <= Math.max(1, Number(maxOpenCells) || 1)) {
-            forcedLoss = playerCanForceWinWithinTwoTurns(responder.id, playerId);
-          }
-        }
-      }
-      restoreSnapshot(snapshot, { render: false });
-      return forcedLoss;
-    }
-
     function playerCanForceWinWithinTwoTurns(playerId, opponentId) {
       const player = getLivePlayer(playerId);
       const opponent = getLivePlayer(opponentId);
@@ -5475,158 +5403,6 @@
       }, 30);
     }
 
-    function buildOracleMovePool(player, options = {}) {
-      player = getLivePlayer(player);
-      if (!player) return [];
-      const legalMoves = Array.isArray(options.moves) && options.moves.length
-        ? options.moves
-        : collectLegalMoves(player);
-      if (!legalMoves.length) return [];
-      if (options.checkImmediateWins !== false) {
-        for (const move of legalMoves) {
-          if (moveCausesImmediateWin(player.id, move)) return [move];
-        }
-      }
-      const nonSuicidalMoves = legalMoves.filter((move) => !doesMoveImmediatelyEliminatePlayer(player.id, move));
-      const survivalPool = nonSuicidalMoves.length ? nonSuicidalMoves : legalMoves;
-      const pruneLimit = Math.max(1, Math.min(
-        survivalPool.length,
-        Number.isInteger(options.pruneLimit) ? options.pruneLimit : survivalPool.length
-      ));
-      const rankedPool = survivalPool.length > pruneLimit
-        ? rankMovesForLookahead(player.id, player.id, survivalPool, true, pruneLimit, options.profile || "oracle")
-        : [...survivalPool];
-      if (!options.replySafetyCheck) return rankedPool;
-      const safeMoves = rankedPool.filter((move) => !moveAllowsOpponentImmediateWin(player.id, move));
-      return safeMoves.length ? safeMoves : rankedPool;
-    }
-
-    function buildPerfectOracleStateKey(playerId) {
-      return buildLookaheadStateKey(playerId, -1);
-    }
-
-    function terminalScoreForPerfectOracle(playerId, ply = 0) {
-      if (!app.gameOver) return null;
-      if (app.winner === playerId) return 1000000 - ply;
-      if (app.winner == null) return -25000 + ply;
-      return -1000000 + ply;
-    }
-
-    function orderMovesForPerfectOracle(playerId, actorId, legalMoves, maximize, searchConfig, ply = 0) {
-      if (!Array.isArray(legalMoves) || !legalMoves.length) return [];
-      const ordered = rankMovesForLookahead(
-        playerId,
-        actorId,
-        legalMoves,
-        maximize,
-        legalMoves.length,
-        "oracle",
-        searchConfig,
-        ply
-      );
-      if (!ordered.length) return [...legalMoves];
-      return ordered;
-    }
-
-    function perfectOracleMinimax(playerId, alpha, beta, searchConfig, ply = 0) {
-      const terminalScore = terminalScoreForPerfectOracle(playerId, ply);
-      if (terminalScore != null) return terminalScore;
-      const actor = currentPlayer();
-      if (!actor || !actor.alive) return evaluateStateForOracle(playerId);
-
-      const stateKey = buildPerfectOracleStateKey(playerId);
-      if (searchConfig.pathKeys.has(stateKey)) return -25000 + ply;
-      if (searchConfig.transposition.has(stateKey)) return searchConfig.transposition.get(stateKey);
-
-      searchConfig.pathKeys.add(stateKey);
-      try {
-        let legalMoves = collectLegalMoves(actor);
-        if (!legalMoves.length) return evaluateStateForOracle(playerId);
-        const maximize = actor.id === playerId;
-        legalMoves = orderMovesForPerfectOracle(playerId, actor.id, legalMoves, maximize, searchConfig, ply);
-
-        if (maximize) {
-          let best = -Infinity;
-          for (const move of legalMoves) {
-            const snapshot = captureGameSnapshot();
-            const actingPlayer = app.players.find((candidate) => candidate.id === actor.id);
-            if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
-              const score = perfectOracleMinimax(playerId, alpha, beta, searchConfig, ply + 1);
-              best = Math.max(best, score);
-              alpha = Math.max(alpha, score);
-            }
-            restoreSnapshot(snapshot, { render: false });
-            if (beta <= alpha) {
-              recordKillerMove(searchConfig, ply, move);
-              updateHistoryHeuristic(searchConfig, move, Math.max(1, searchConfig.historyDepthBase - ply));
-              break;
-            }
-          }
-          if (Number.isFinite(best)) searchConfig.transposition.set(stateKey, best);
-          return best;
-        }
-
-        let best = Infinity;
-        for (const move of legalMoves) {
-          const snapshot = captureGameSnapshot();
-          const actingPlayer = app.players.find((candidate) => candidate.id === actor.id);
-          if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
-            const score = perfectOracleMinimax(playerId, alpha, beta, searchConfig, ply + 1);
-            best = Math.min(best, score);
-            beta = Math.min(beta, score);
-          }
-          restoreSnapshot(snapshot, { render: false });
-          if (beta <= alpha) {
-            recordKillerMove(searchConfig, ply, move);
-            updateHistoryHeuristic(searchConfig, move, Math.max(1, searchConfig.historyDepthBase - ply));
-            break;
-          }
-        }
-        if (Number.isFinite(best)) searchConfig.transposition.set(stateKey, best);
-        return best;
-      } finally {
-        searchConfig.pathKeys.delete(stateKey);
-      }
-    }
-
-    function chooseExactOracleMoveFromLegalMoves(player, legalMoves, openCells = estimateRemainingTurnDepth()) {
-      player = getLivePlayer(player);
-      if (!player || !Array.isArray(legalMoves) || !legalMoves.length) return null;
-      const searchConfig = {
-        transposition: new Map(),
-        historyHeuristic: new Map(),
-        killerMovesByPly: new Map(),
-        pathKeys: new Set(),
-        historyDepthBase: Number.isFinite(openCells) ? openCells : legalMoves.length,
-      };
-      const orderedRootMoves = orderMovesForPerfectOracle(player.id, player.id, legalMoves, true, searchConfig, 0);
-      const candidateMoves = orderedRootMoves.length ? orderedRootMoves : legalMoves;
-      let bestMove = candidateMoves[0];
-      let bestScore = -Infinity;
-      for (const move of candidateMoves) {
-        const snapshot = captureGameSnapshot();
-        const actingPlayer = app.players.find((candidate) => candidate.id === player.id);
-        let score = -Infinity;
-        if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
-          score = perfectOracleMinimax(player.id, -Infinity, Infinity, searchConfig, 1);
-        }
-        restoreSnapshot(snapshot, { render: false });
-        if (score > bestScore) {
-          bestScore = score;
-          bestMove = move;
-        }
-      }
-      return bestMove;
-    }
-
-    function shouldUseExactOracleSearch(openCells, legalMovesCount = 0) {
-      if (!Number.isFinite(openCells)) return false;
-      if (openCells <= 8) return true;
-      if (openCells <= 10 && legalMovesCount <= 16) return true;
-      if (openCells <= 12 && legalMovesCount <= 12) return true;
-      return false;
-    }
-
     function getOracleAlphaBetaSearchConfig(openCells, style = app.config?.oracleStyle || "balanced") {
       const tuning = getOracleStyleTuning(style);
       const maxDepth = Math.max(1, Number(openCells) || 1);
@@ -5635,9 +5411,6 @@
           maxDepth,
           maxMovesPerNode: Infinity,
           timeBudgetMs: Math.max(36000, tuning.endgameTimeMs),
-          prePruneWidth: 64,
-          rootWidth: 64,
-          replyCap: 24,
         };
       }
       if (openCells <= 16) {
@@ -5645,18 +5418,12 @@
           maxDepth,
           maxMovesPerNode: Infinity,
           timeBudgetMs: Math.max(24000, tuning.midTimeMs),
-          prePruneWidth: 48,
-          rootWidth: 48,
-          replyCap: 20,
         };
       }
       return {
         maxDepth,
         maxMovesPerNode: Infinity,
         timeBudgetMs: Math.max(14000, tuning.earlyTimeMs),
-        prePruneWidth: 40,
-        rootWidth: 40,
-        replyCap: 18,
       };
     }
 
