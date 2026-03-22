@@ -1997,11 +1997,14 @@
       analysisRunId: 0,
       analysisSelectedMoveIdx: -1,
       analysisBaseSnapshot: null,
+      computerSearchRunId: 0,
       oraclePerf: {
         thinking: false,
         nodes: 0,
         elapsedMs: 0,
         nodesPerSecond: 0,
+        currentDepth: 0,
+        targetDepth: 40,
       },
     };
 
@@ -2229,6 +2232,7 @@
       if (!app.computerTurnTimer) return;
       clearTimeout(app.computerTurnTimer);
       app.computerTurnTimer = null;
+      app.computerSearchRunId++;
     }
 
     const oracleWasm = {
@@ -2535,7 +2539,6 @@
         app.oraclePerf.nodesPerSecond = measuredElapsedMs > 0
           ? Math.round((measuredNodes * 1000) / measuredElapsedMs)
           : 0;
-        app.oraclePerf.thinking = false;
         const decodedMove = decodePackedOracleNativeMove(packedMove);
         if (!decodedMove) return null;
         const legalMoves = collectLegalMoves(player);
@@ -5456,6 +5459,69 @@
       }
     }
 
+    function runProgressiveOracleTurn(playerId, targetDepth = 40) {
+      const runId = ++app.computerSearchRunId;
+      let bestMove = null;
+      let depth = 1;
+      const finalDepth = Math.max(1, Number(targetDepth) || 1);
+      app.oraclePerf.currentDepth = 0;
+      app.oraclePerf.targetDepth = finalDepth;
+      app.oraclePerf.thinking = true;
+      renderAll();
+
+      const finish = () => {
+        if (runId !== app.computerSearchRunId) return;
+        app.aiThinking = false;
+        app.oraclePerf.thinking = false;
+        const activePlayer = getLivePlayer(playerId);
+        if (!activePlayer || !bestMove) {
+          const effectiveDifficulty = normalizeComputerDifficulty(app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
+          const shouldRetryNativeOracle = !!activePlayer
+            && effectiveDifficulty === "oracle"
+            && !app.gameOver
+            && !oracleWasm.error
+            && (oracleWasm.loading || !oracleWasm.ready);
+          if (shouldRetryNativeOracle) {
+            loadOracleWasmModule();
+            scheduleComputerTurnIfNeeded();
+          }
+          renderAll();
+          return;
+        }
+        executePlannedMove(activePlayer, bestMove);
+      };
+
+      const step = () => {
+        if (runId !== app.computerSearchRunId) return;
+        if (app.gameOver || !app.aiThinking) {
+          app.aiThinking = false;
+          app.oraclePerf.thinking = false;
+          renderAll();
+          return;
+        }
+        const activePlayer = getLivePlayer(playerId);
+        const turnOwner = currentPlayer();
+        if (!activePlayer || !turnOwner || turnOwner.id !== playerId) {
+          app.aiThinking = false;
+          app.oraclePerf.thinking = false;
+          renderAll();
+          return;
+        }
+        const moveAtDepth = chooseNativeOracleMoveWithWasm(activePlayer, depth, 0);
+        if (moveAtDepth) bestMove = moveAtDepth;
+        app.oraclePerf.currentDepth = depth;
+        renderAll();
+        if (depth >= finalDepth) {
+          finish();
+          return;
+        }
+        depth++;
+        app.computerTurnTimer = setTimeout(step, 6);
+      };
+
+      app.computerTurnTimer = setTimeout(step, 0);
+    }
+
     function doesMoveImmediatelyEliminatePlayer(playerId, move) {
       const snapshot = captureGameSnapshot();
       let eliminated = true;
@@ -5746,6 +5812,8 @@
       const effectiveDifficulty = normalizeComputerDifficulty(app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
       app.aiThinking = true;
       app.oraclePerf.thinking = effectiveDifficulty === "oracle";
+      app.oraclePerf.currentDepth = 0;
+      app.oraclePerf.targetDepth = 40;
       renderAll();
       app.computerTurnTimer = setTimeout(() => {
         app.computerTurnTimer = null;
@@ -5753,6 +5821,10 @@
           app.aiThinking = false;
           app.oraclePerf.thinking = false;
           renderAll();
+          return;
+        }
+        if (effectiveDifficulty === "oracle") {
+          runProgressiveOracleTurn(playerId, 40);
           return;
         }
         const move = chooseComputerMove(playerId, app.config?.computerEffectiveTier ?? app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
@@ -6564,7 +6636,9 @@
         el.oracleNpsCounter.classList.toggle("hidden", !isOracle);
         if (isOracle) {
           if (app.oraclePerf.thinking) {
-            el.oracleNpsCounter.textContent = "Oracle N/s: thinking...";
+            const depthLabel = Math.max(0, Number(app.oraclePerf.currentDepth) || 0);
+            const targetLabel = Math.max(1, Number(app.oraclePerf.targetDepth) || 40);
+            el.oracleNpsCounter.textContent = `Oracle N/s: thinking d${depthLabel}/${targetLabel}`;
             el.oracleNpsCounter.title = "Oracle is searching...";
           } else if (app.oraclePerf.elapsedMs > 0 && app.oraclePerf.nodes > 0) {
             el.oracleNpsCounter.textContent = `Oracle N/s: ${Math.max(0, app.oraclePerf.nodesPerSecond).toLocaleString()}`;
