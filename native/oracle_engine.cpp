@@ -46,6 +46,7 @@ constexpr int kNoEntry = -1;
 constexpr int kPackedNoEntry = 15;
 constexpr int kSearchInfinity = 2'000'000'000;
 constexpr int kMaxSearchPly = 64;
+constexpr int kOracleTargetDepth = 40;
 
 enum TranspositionBound {
   kBoundExact = 0,
@@ -284,9 +285,12 @@ struct SearchContext {
   bool use_deadline = false;
   bool timed_out = false;
   int root_best_move = 0;
+  std::uint64_t visited_nodes = 0;
 };
 
 std::unordered_map<std::uint64_t, int> g_oracle_root_move_cache;
+std::uint64_t g_oracle_last_search_nodes = 0;
+int g_oracle_last_search_elapsed_ms = 0;
 
 struct UndoNative {
   std::array<PlayerNative, kNativePlayers> players{};
@@ -1173,6 +1177,7 @@ std::vector<MoveNative> order_moves(StateNative& state,
 }
 
 int alpha_beta_search(StateNative& state, int root_player_index, int depth_remaining, int alpha, int beta, SearchContext& ctx, int ply = 0) {
+  ctx.visited_nodes++;
   bool is_terminal = false;
   const int terminal = terminal_score(state, state.players[root_player_index].id, depth_remaining, is_terminal);
   if (is_terminal) return terminal;
@@ -1316,6 +1321,7 @@ bool search_root_depth(StateNative& state,
     if (search_should_stop(ctx)) break;
     UndoNative undo;
     if (!execute_move(state, move, &undo)) continue;
+    ctx.visited_nodes++;
     searched_any = true;
     int score = 0;
     if (first_move) {
@@ -1443,7 +1449,7 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 int oracle_module_version() {
-  return 5;
+  return 6;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -1596,6 +1602,10 @@ int oracle_choose_native_move(int board_size,
                               const int* cell_types,
                               const int* cell_rots,
                               const int* cell_flags) {
+  const auto search_start = std::chrono::steady_clock::now();
+  g_oracle_last_search_nodes = 0;
+  g_oracle_last_search_elapsed_ms = 0;
+
   StateNative state;
   if (!build_native_state(
         state,
@@ -1611,14 +1621,20 @@ int oracle_choose_native_move(int board_size,
         cell_types,
         cell_rots,
         cell_flags)) {
+    g_oracle_last_search_elapsed_ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - search_start).count());
     return -1;
   }
 
   const int root_player_index = state.current_player_idx;
-  const int safe_max_depth = std::max(1, max_depth);
-  const int safe_time_budget_ms = std::max(1, time_budget_ms);
+  const int safe_max_depth = std::max(1, std::min(max_depth, kOracleTargetDepth));
+  const int safe_time_budget_ms = std::max(0, time_budget_ms);
   auto legal_moves = collect_legal_moves(state, root_player_index);
-  if (legal_moves.empty()) return -1;
+  if (legal_moves.empty()) {
+    g_oracle_last_search_elapsed_ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - search_start).count());
+    return -1;
+  }
   const std::uint64_t root_cache_key = state.zobrist_hash
     ^ zobrist_key(
       0x524f4f5443414348ull,
@@ -1627,6 +1643,8 @@ int oracle_choose_native_move(int board_size,
       | static_cast<std::uint64_t>(safe_time_budget_ms & 0xffff)
     );
   if (const auto it = g_oracle_root_move_cache.find(root_cache_key); it != g_oracle_root_move_cache.end()) {
+    g_oracle_last_search_elapsed_ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - search_start).count());
     return it->second;
   }
   SearchContext ctx;
@@ -1710,9 +1728,22 @@ int oracle_choose_native_move(int board_size,
   }
 
   const int packed_best_move = pack_move(best_move);
+  g_oracle_last_search_nodes = ctx.visited_nodes;
+  g_oracle_last_search_elapsed_ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+    std::chrono::steady_clock::now() - search_start).count());
   if (g_oracle_root_move_cache.size() > 200000) g_oracle_root_move_cache.clear();
   g_oracle_root_move_cache[root_cache_key] = packed_best_move;
   return packed_best_move;
+}
+
+EMSCRIPTEN_KEEPALIVE
+double oracle_last_search_nodes() {
+  return static_cast<double>(g_oracle_last_search_nodes);
+}
+
+EMSCRIPTEN_KEEPALIVE
+int oracle_last_search_elapsed_ms() {
+  return g_oracle_last_search_elapsed_ms;
 }
 
 }  // extern "C"

@@ -910,6 +910,17 @@
     }
     .status { font-size: 13px; color: #d1e0ff; line-height: 1.4; }
     .status strong { color: #fff; }
+    .oracle-nps-counter {
+      margin-left: auto;
+      align-self: center;
+      font-size: 12px;
+      color: #9ec6ff;
+      border: 1px solid #365184;
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #0b152d;
+      white-space: nowrap;
+    }
     .tile-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1767,10 +1778,11 @@
                   </div>
                 </div>
                 <div class="game-sidebar card">
-                  <div style="display:flex; gap:8px; margin-bottom: 10px;">
+                  <div style="display:flex; gap:8px; margin-bottom: 10px; align-items:center;">
                     <button id="undoBtn" type="button" disabled>Undo</button>
                     <button id="gameAnalysisBtn" type="button" class="hidden">Game Analysis</button>
                     <button id="newGameBtn">New Game</button>
+                    <div id="oracleNpsCounter" class="oracle-nps-counter hidden">Oracle N/s: --</div>
                   </div>
                   <div id="statusText" class="status hidden"></div>
                   <div id="winnerText" class="winner hidden"></div>
@@ -1985,6 +1997,12 @@
       analysisRunId: 0,
       analysisSelectedMoveIdx: -1,
       analysisBaseSnapshot: null,
+      oraclePerf: {
+        thinking: false,
+        nodes: 0,
+        elapsedMs: 0,
+        nodesPerSecond: 0,
+      },
     };
 
     const el = {
@@ -2045,6 +2063,7 @@
       computerDifficultyLabel: document.getElementById("computerDifficultyLabel"),
       adaptiveDifficulty: document.getElementById("adaptiveDifficulty"),
       oracleStyle: document.getElementById("oracleStyle"),
+      oracleNpsCounter: document.getElementById("oracleNpsCounter"),
       computerSide: document.getElementById("computerSide"),
       computerPanel: document.getElementById("computerPanel"),
       computerText: document.getElementById("computerText"),
@@ -2256,6 +2275,8 @@
             "number",
             ["number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number"]
           ),
+          lastSearchNodes: module.cwrap("oracle_last_search_nodes", "number", []),
+          lastSearchElapsedMs: module.cwrap("oracle_last_search_elapsed_ms", "number", []),
         };
         oracleWasm.ready = true;
         oracleWasm.error = null;
@@ -2507,6 +2528,14 @@
           cellRots.ptr,
           cellFlags.ptr
         );
+        const measuredNodes = Math.max(0, Number(oracleWasm.wrappers?.lastSearchNodes?.()) || 0);
+        const measuredElapsedMs = Math.max(0, Number(oracleWasm.wrappers?.lastSearchElapsedMs?.()) || 0);
+        app.oraclePerf.nodes = measuredNodes;
+        app.oraclePerf.elapsedMs = measuredElapsedMs;
+        app.oraclePerf.nodesPerSecond = measuredElapsedMs > 0
+          ? Math.round((measuredNodes * 1000) / measuredElapsedMs)
+          : 0;
+        app.oraclePerf.thinking = false;
         const decodedMove = decodePackedOracleNativeMove(packedMove);
         if (!decodedMove) return null;
         const legalMoves = collectLegalMoves(player);
@@ -5404,24 +5433,8 @@
     }
 
     function getOracleAlphaBetaSearchConfig(openCells, style = app.config?.oracleStyle || "balanced") {
-      const tuning = getOracleStyleTuning(style);
-      const maxDepth = Math.max(1, Number(openCells) || 1);
-      if (openCells <= 8) {
-        return {
-          maxDepth,
-          maxMovesPerNode: Infinity,
-          timeBudgetMs: 0,
-        };
-      }
-      if (openCells <= 16) {
-        return {
-          maxDepth,
-          maxMovesPerNode: Infinity,
-          timeBudgetMs: 0,
-        };
-      }
       return {
-        maxDepth,
+        maxDepth: 40,
         maxMovesPerNode: Infinity,
         timeBudgetMs: 0,
       };
@@ -5730,20 +5743,23 @@
       if (!isComputerControlledPlayer(player)) return;
       const playerId = player.id;
       refreshComputerEffectiveDifficultyForTurn();
+      const effectiveDifficulty = normalizeComputerDifficulty(app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
       app.aiThinking = true;
+      app.oraclePerf.thinking = effectiveDifficulty === "oracle";
       renderAll();
       app.computerTurnTimer = setTimeout(() => {
         app.computerTurnTimer = null;
         if (app.gameOver) {
           app.aiThinking = false;
+          app.oraclePerf.thinking = false;
           renderAll();
           return;
         }
         const move = chooseComputerMove(playerId, app.config?.computerEffectiveTier ?? app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
         app.aiThinking = false;
+        app.oraclePerf.thinking = false;
         const activePlayer = getLivePlayer(playerId);
         if (!activePlayer || !move) {
-          const effectiveDifficulty = normalizeComputerDifficulty(app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
           const shouldRetryNativeOracle = !!activePlayer
             && effectiveDifficulty === "oracle"
             && !app.gameOver
@@ -6519,7 +6535,10 @@
       if (!el.computerPanel || !el.computerText) return;
       const enabled = !!app.config?.computerEnabled;
       el.computerPanel.classList.toggle("hidden", !enabled);
-      if (!enabled) return;
+      if (!enabled) {
+        if (el.oracleNpsCounter) el.oracleNpsCounter.classList.add("hidden");
+        return;
+      }
       if (app.config?.adaptiveDifficultyEnabled && !app.gameOver) {
         refreshComputerEffectiveDifficultyForTurn();
       }
@@ -6540,6 +6559,22 @@
       const computerSlotText = app.config?.computerPlayerSlot === "p1" ? "Player 1" : "Player 2";
       const humanSlotText = app.config?.humanPlayerSlot === "p2" ? "Player 2" : "Player 1";
       el.computerText.innerHTML = `${player?.name || "Computer"} is controlling ${computerSlotText}.<br>You are ${humanSlotText}.<br>Difficulty: ${effectiveLabel}.${adaptiveText}${styleText}<br>${state}`;
+      if (el.oracleNpsCounter) {
+        const isOracle = normalizeComputerDifficulty(effectiveDifficulty) === "oracle";
+        el.oracleNpsCounter.classList.toggle("hidden", !isOracle);
+        if (isOracle) {
+          if (app.oraclePerf.thinking) {
+            el.oracleNpsCounter.textContent = "Oracle N/s: thinking...";
+            el.oracleNpsCounter.title = "Oracle is searching...";
+          } else if (app.oraclePerf.elapsedMs > 0 && app.oraclePerf.nodes > 0) {
+            el.oracleNpsCounter.textContent = `Oracle N/s: ${Math.max(0, app.oraclePerf.nodesPerSecond).toLocaleString()}`;
+            el.oracleNpsCounter.title = `Nodes: ${Math.round(app.oraclePerf.nodes).toLocaleString()} | Time: ${Math.round(app.oraclePerf.elapsedMs).toLocaleString()} ms`;
+          } else {
+            el.oracleNpsCounter.textContent = "Oracle N/s: --";
+            el.oracleNpsCounter.title = "No completed native search yet.";
+          }
+        }
+      }
     }
 
     function renderGameAnalysisButton() {
