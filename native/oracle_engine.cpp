@@ -202,6 +202,39 @@ struct OracleTuning {
   double tactical_scale = 1.0;
 };
 
+struct OracleSignals {
+  int own_jump_pool = 0;
+  int opp_jump_pool = 0;
+  int own_distance = 0;
+  int opp_distance = 0;
+  int own_projection_status = 0;
+  int opp_projection_status = 0;
+  int own_projection_steps = 0;
+  int opp_projection_steps = 0;
+  int own_projection_gain = 0;
+  int opp_projection_gain = 0;
+  bool own_alive = false;
+  bool opp_alive = false;
+  bool own_has_first_tile = false;
+  bool opp_has_first_tile = false;
+};
+
+constexpr int kOracleNnueInputs = 16;
+constexpr int kOracleNnueHidden = 8;
+constexpr std::array<std::array<int8_t, kOracleNnueInputs>, kOracleNnueHidden> kOracleNnueW1{{
+  {{  2,  3, -1,  4,  1,  2, -2,  3, -2,  6, -6,  5, -6,  2, -2,  1 }},
+  {{  1, -2,  3, -3, -1,  5,  2, -6,  7, -5,  6, -4,  6, -2,  3, -2 }},
+  {{  2,  4, -3,  5,  1,  6, -4,  2, -2,  5, -6,  2, -3,  4, -2,  0 }},
+  {{  1, -3,  4, -4,  0, -4,  6, -4,  6, -2,  4, -5,  7, -1,  4, -3 }},
+  {{  0,  2, -2,  1,  3,  2, -1,  5, -4,  3, -5,  7, -7,  6, -5,  3 }},
+  {{  0, -2,  2, -1,  3, -2,  3, -4,  5, -6,  6, -5,  7, -5,  6, -3 }},
+  {{  1,  3, -1,  2,  4,  4, -3,  3, -3,  4, -4,  3, -4,  5, -4,  2 }},
+  {{  1, -2,  2, -2,  4, -3,  4, -3,  4, -4,  5, -4,  5, -4,  5, -4 }},
+}};
+constexpr std::array<int16_t, kOracleNnueHidden> kOracleNnueB1{{ 24, 22, 18, 16, 10, 8, 14, 6 }};
+constexpr std::array<int8_t, kOracleNnueHidden> kOracleNnueW2{{ 7, 7, 6, 6, 5, 5, 4, 4 }};
+constexpr int kOracleNnueOutBias = -128;
+
 struct TranspositionEntry {
   int depth = 0;
   int score = 0;
@@ -214,6 +247,10 @@ struct SearchContext {
   std::unordered_map<std::uint64_t, TranspositionEntry> transposition;
   std::array<std::array<int, 2>, kMaxSearchPly> killer_moves{};
   std::unordered_map<int, int> history_heuristic;
+  std::chrono::steady_clock::time_point deadline{};
+  bool use_deadline = false;
+  bool timed_out = false;
+  int root_best_move = 0;
 };
 
 std::unordered_map<std::uint64_t, int> g_oracle_root_move_cache;
@@ -229,6 +266,19 @@ struct UndoNative {
 };
 
 int pack_move(const MoveNative& move);
+bool packed_move_equals(const MoveNative& move, int packed_move);
+void promote_packed_move_to_front(std::vector<MoveNative>& moves, int packed_move);
+bool search_should_stop(SearchContext& ctx);
+int score_position_for_search(const StateNative& state, int root_player_index, int style, int depth_remaining);
+bool search_root_depth(StateNative& state,
+                       const std::vector<MoveNative>& root_moves,
+                       int root_player_index,
+                       int depth,
+                       int alpha,
+                       int beta,
+                       SearchContext& ctx,
+                       MoveNative& best_move,
+                       int& best_score);
 void record_killer_move(SearchContext& ctx, int ply, int packed_move);
 void update_history_heuristic(SearchContext& ctx, int packed_move, int depth_remaining);
 int ordering_bonus(const SearchContext& ctx, int packed_move, int ply, int tt_move);
@@ -756,6 +806,37 @@ OracleTuning get_oracle_tuning(int style) {
   return {38, 28, 1.0};
 }
 
+int evaluate_oracle_nnue(const OracleSignals& signals, int style) {
+  std::array<int, kOracleNnueInputs> input{};
+  input[0] = 64;  // bias
+  input[1] = style == kStyleAggressive ? 64 : 0;
+  input[2] = style == kStyleDefensive ? 64 : 0;
+  input[3] = signals.own_alive ? 64 : -64;
+  input[4] = signals.opp_alive ? 64 : -64;
+  input[5] = signals.own_has_first_tile ? 48 : -48;
+  input[6] = signals.opp_has_first_tile ? 48 : -48;
+  input[7] = std::clamp(signals.own_jump_pool * 10, 0, 96);
+  input[8] = std::clamp(signals.opp_jump_pool * 10, 0, 96);
+  input[9] = std::clamp((14 - signals.own_distance) * 8, -96, 96);
+  input[10] = std::clamp((signals.opp_distance - 4) * 8, -96, 96);
+  input[11] = std::clamp(signals.own_projection_gain * 22, -110, 110);
+  input[12] = std::clamp(signals.opp_projection_gain * 22, -110, 110);
+  input[13] = std::clamp((signals.own_projection_status == 1 ? 96 : 0) - (signals.own_projection_status == 2 ? 96 : 0), -96, 96);
+  input[14] = std::clamp((signals.opp_projection_status == 2 ? 96 : 0) - (signals.opp_projection_status == 1 ? 96 : 0), -96, 96);
+  input[15] = std::clamp((signals.own_projection_steps - signals.opp_projection_steps) * 10, -100, 100);
+
+  int output = kOracleNnueOutBias;
+  for (int h = 0; h < kOracleNnueHidden; ++h) {
+    int acc = kOracleNnueB1[h];
+    for (int i = 0; i < kOracleNnueInputs; ++i) {
+      acc += static_cast<int>(kOracleNnueW1[h][i]) * input[i];
+    }
+    const int activated = std::clamp(acc, 0, 255);
+    output += activated * static_cast<int>(kOracleNnueW2[h]);
+  }
+  return std::clamp(output / 48, -420, 420);
+}
+
 int evaluate_state_for_player(const StateNative& state, int root_player_index, int style) {
   const auto& player = state.players[root_player_index];
   const int opponent_index = 1 - root_player_index;
@@ -795,8 +876,17 @@ int evaluate_state_for_oracle(const StateNative& state, int root_player_index, i
 
   const OracleTuning tuning = get_oracle_tuning(style);
   const int opponent_index = 1 - root_player_index;
+  const auto& opponent = state.players[opponent_index];
+  const int own_jump_pool = player.jump_left + player.diagonal_jump_left + player.combined_jump_left;
+  const int opp_jump_pool = opponent.jump_left + opponent.diagonal_jump_left + opponent.combined_jump_left;
+  const int own_distance = distance_to_nearest_opponent_base(state, root_player_index);
+  int opp_distance = opponent.alive
+    ? distance_to_player_base(state, opponent_index, root_player_index)
+    : state.board_size * 2;
+  int own_projection_gain = 0;
+  int opp_projection_gain = 0;
   int pressure = 0;
-  pressure -= distance_to_nearest_opponent_base(state, root_player_index) * tuning.attack_weight;
+  pressure -= own_distance * tuning.attack_weight;
 
   const ProjectionResult own_projection = project_player_along_existing_tiles(state, root_player_index);
   if (own_projection.status == 1) {
@@ -805,26 +895,59 @@ int evaluate_state_for_oracle(const StateNative& state, int root_player_index, i
     pressure -= 900;
   } else if (own_projection.row >= 0 && own_projection.col >= 0) {
     const int projected_distance = distance_to_base(state.board_size, own_projection.row, own_projection.col, state.players[opponent_index].id);
-    pressure += (distance_to_nearest_opponent_base(state, root_player_index) - projected_distance) * 70;
+    own_projection_gain = own_distance - projected_distance;
+    pressure += own_projection_gain * 70;
     pressure += own_projection.steps * 10;
   }
 
-  const auto& opponent = state.players[opponent_index];
   if (opponent.alive) {
-    pressure += distance_to_player_base(state, opponent_index, root_player_index) * tuning.defense_weight;
+    pressure += opp_distance * tuning.defense_weight;
     const ProjectionResult opp_projection = project_player_along_existing_tiles(state, opponent_index);
     if (opp_projection.status == 1) {
       pressure -= 1200;
     } else if (opp_projection.status == 2) {
       pressure += 700;
     } else if (opp_projection.row >= 0 && opp_projection.col >= 0) {
-      const int before = distance_to_player_base(state, opponent_index, root_player_index);
       const int after = distance_to_base(state.board_size, opp_projection.row, opp_projection.col, player.id);
-      pressure += (after - before) * 54;
+      opp_projection_gain = opp_distance - after;
+      pressure += (after - opp_distance) * 54;
     }
+    const OracleSignals signals{
+      own_jump_pool,
+      opp_jump_pool,
+      own_distance,
+      opp_distance,
+      own_projection.status,
+      opp_projection.status,
+      own_projection.steps,
+      opp_projection.steps,
+      own_projection_gain,
+      opp_projection_gain,
+      player.alive,
+      opponent.alive,
+      player.has_placed_first_tile,
+      opponent.has_placed_first_tile,
+    };
+    return base_score + pressure + evaluate_oracle_nnue(signals, style);
   }
 
-  return base_score + pressure;
+  const OracleSignals signals{
+    own_jump_pool,
+    opp_jump_pool,
+    own_distance,
+    opp_distance,
+    own_projection.status,
+    0,
+    own_projection.steps,
+    0,
+    own_projection_gain,
+    0,
+    player.alive,
+    opponent.alive,
+    player.has_placed_first_tile,
+    opponent.has_placed_first_tile,
+  };
+  return base_score + pressure + evaluate_oracle_nnue(signals, style);
 }
 
 std::uint64_t cell_type_zobrist(int cell_index, int tile_type) {
@@ -976,7 +1099,7 @@ std::vector<MoveNative> order_moves(StateNative& state,
                                     int root_player_index,
                                     bool maximize,
                                     int style,
-                                    const SearchContext* ctx = nullptr,
+                                    SearchContext* ctx = nullptr,
                                     int ply = 0,
                                     int tt_move = 0) {
   struct RankedMove {
@@ -986,10 +1109,11 @@ std::vector<MoveNative> order_moves(StateNative& state,
   std::vector<RankedMove> ranked;
   ranked.reserve(moves.size());
   for (const auto& move : moves) {
+    if (ctx && search_should_stop(*ctx)) break;
     int score = -kSearchInfinity;
     UndoNative undo;
     if (execute_move(state, move, &undo)) {
-      score = evaluate_state_for_oracle(state, root_player_index, style);
+      score = score_position_for_search(state, root_player_index, style, 0);
       undo_move(state, undo);
     }
     const int packed_move = pack_move(move);
@@ -1009,6 +1133,7 @@ int alpha_beta_search(StateNative& state, int root_player_index, int depth_remai
   bool is_terminal = false;
   const int terminal = terminal_score(state, state.players[root_player_index].id, depth_remaining, is_terminal);
   if (is_terminal) return terminal;
+  if (search_should_stop(ctx)) return evaluate_state_for_oracle(state, root_player_index, ctx.style);
   if (depth_remaining <= 0) return evaluate_state_for_oracle(state, root_player_index, ctx.style);
 
   const int actor_index = state.current_player_idx;
@@ -1035,11 +1160,13 @@ int alpha_beta_search(StateNative& state, int root_player_index, int depth_remai
   if (legal_moves.empty()) return evaluate_state_for_oracle(state, root_player_index, ctx.style);
   const bool maximize = actor_index == root_player_index;
   legal_moves = order_moves(state, legal_moves, root_player_index, maximize, ctx.style, &ctx, ply, tt_move);
+  if (ctx.timed_out) return evaluate_state_for_oracle(state, root_player_index, ctx.style);
 
   int best = maximize ? -kSearchInfinity : kSearchInfinity;
   int best_move = 0;
   bool first_move = true;
   for (const auto& move : legal_moves) {
+    if (search_should_stop(ctx)) break;
     UndoNative undo;
     if (!execute_move(state, move, &undo)) continue;
     const int packed_move = pack_move(move);
@@ -1074,6 +1201,7 @@ int alpha_beta_search(StateNative& state, int root_player_index, int depth_remai
       }
       beta = std::min(beta, best);
     }
+    if (ctx.timed_out) return best;
     if (beta <= alpha) {
       record_killer_move(ctx, ply, packed_move);
       update_history_heuristic(ctx, packed_move, depth_remaining);
@@ -1094,6 +1222,89 @@ int alpha_beta_search(StateNative& state, int root_player_index, int depth_remai
 int pack_move(const MoveNative& move) {
   const int entry = move.entry < 0 ? kPackedNoEntry : move.entry;
   return ((move.tile_type & 0x0f) << 20) | ((move.row & 0x3f) << 12) | ((move.col & 0x3f) << 4) | (entry & 0x0f);
+}
+
+bool packed_move_equals(const MoveNative& move, int packed_move) {
+  return packed_move > 0 && pack_move(move) == packed_move;
+}
+
+void promote_packed_move_to_front(std::vector<MoveNative>& moves, int packed_move) {
+  if (packed_move <= 0 || moves.empty()) return;
+  const auto it = std::find_if(moves.begin(), moves.end(), [packed_move](const MoveNative& move) {
+    return packed_move_equals(move, packed_move);
+  });
+  if (it == moves.end() || it == moves.begin()) return;
+  const MoveNative prioritized = *it;
+  moves.erase(it);
+  moves.insert(moves.begin(), prioritized);
+}
+
+bool search_should_stop(SearchContext& ctx) {
+  if (ctx.timed_out) return true;
+  if (!ctx.use_deadline) return false;
+  if (std::chrono::steady_clock::now() < ctx.deadline) return false;
+  ctx.timed_out = true;
+  return true;
+}
+
+int score_position_for_search(const StateNative& state, int root_player_index, int style, int depth_remaining) {
+  bool is_terminal = false;
+  const int terminal = terminal_score(state, state.players[root_player_index].id, depth_remaining, is_terminal);
+  if (is_terminal) return terminal;
+  return evaluate_state_for_oracle(state, root_player_index, style);
+}
+
+bool search_root_depth(StateNative& state,
+                       const std::vector<MoveNative>& root_moves,
+                       int root_player_index,
+                       int depth,
+                       int alpha,
+                       int beta,
+                       SearchContext& ctx,
+                       MoveNative& best_move,
+                       int& best_score) {
+  if (root_moves.empty()) return false;
+  int local_alpha = alpha;
+  bool searched_any = false;
+  bool first_move = true;
+  int local_best_score = -kSearchInfinity;
+  MoveNative local_best_move = root_moves.front();
+  for (const auto& move : root_moves) {
+    if (search_should_stop(ctx)) break;
+    UndoNative undo;
+    if (!execute_move(state, move, &undo)) continue;
+    searched_any = true;
+    int score = 0;
+    if (first_move) {
+      score = alpha_beta_search(state, root_player_index, depth - 1, local_alpha, beta, ctx, 1);
+      first_move = false;
+    } else {
+      const int scout_beta = local_alpha >= kSearchInfinity - 1 ? kSearchInfinity : local_alpha + 1;
+      score = alpha_beta_search(state, root_player_index, depth - 1, local_alpha, scout_beta, ctx, 1);
+      if (!ctx.timed_out && score > local_alpha && score < beta) {
+        score = alpha_beta_search(state, root_player_index, depth - 1, local_alpha, beta, ctx, 1);
+      }
+    }
+    undo_move(state, undo);
+    if (score > local_best_score) {
+      local_best_score = score;
+      local_best_move = move;
+    }
+    local_alpha = std::max(local_alpha, local_best_score);
+    if (ctx.timed_out) break;
+    if (local_best_score >= 900000) break;
+    if (local_alpha >= beta) {
+      const int packed_move = pack_move(move);
+      record_killer_move(ctx, 0, packed_move);
+      update_history_heuristic(ctx, packed_move, depth);
+      break;
+    }
+  }
+  if (!searched_any) return false;
+  best_move = local_best_move;
+  best_score = local_best_score;
+  ctx.root_best_move = pack_move(local_best_move);
+  return !ctx.timed_out;
 }
 
 void record_killer_move(SearchContext& ctx, int ply, int packed_move) {
@@ -1190,7 +1401,7 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 int oracle_module_version() {
-  return 3;
+  return 5;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -1343,7 +1554,6 @@ int oracle_choose_native_move(int board_size,
                               const int* cell_types,
                               const int* cell_rots,
                               const int* cell_flags) {
-  (void)time_budget_ms;
   StateNative state;
   if (!build_native_state(
         state,
@@ -1363,42 +1573,98 @@ int oracle_choose_native_move(int board_size,
   }
 
   const int root_player_index = state.current_player_idx;
+  const int safe_max_depth = std::max(1, max_depth);
+  const int safe_time_budget_ms = std::max(1, time_budget_ms);
   auto legal_moves = collect_legal_moves(state, root_player_index);
   if (legal_moves.empty()) return -1;
   const std::uint64_t root_cache_key = state.zobrist_hash
-    ^ zobrist_key(0x524f4f5443414348ull, static_cast<std::uint64_t>((oracle_style & 0xff) << 8 | (max_depth & 0xff)));
+    ^ zobrist_key(
+      0x524f4f5443414348ull,
+      (static_cast<std::uint64_t>(oracle_style & 0xff) << 24)
+      | (static_cast<std::uint64_t>(safe_max_depth & 0xff) << 16)
+      | static_cast<std::uint64_t>(safe_time_budget_ms & 0xffff)
+    );
   if (const auto it = g_oracle_root_move_cache.find(root_cache_key); it != g_oracle_root_move_cache.end()) {
     return it->second;
   }
   SearchContext ctx;
   ctx.style = oracle_style;
+  const bool force_exact_endgame = safe_max_depth <= 12
+    || (safe_max_depth <= 14 && legal_moves.size() <= 12);
+  if (time_budget_ms > 0 && !force_exact_endgame) {
+    ctx.use_deadline = true;
+    ctx.deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(safe_time_budget_ms);
+  }
   auto ordered = order_moves(state, legal_moves, root_player_index, true, oracle_style, &ctx, 0, 0);
-  MoveNative best_move = ordered.empty() ? legal_moves[0] : ordered[0];
-  const int safe_max_depth = std::max(1, max_depth);
+  if (ordered.empty()) ordered = legal_moves;
+  MoveNative best_move = ordered[0];
   int best_score = -kSearchInfinity;
-  int alpha = -kSearchInfinity;
-  bool first_move = true;
-  for (const auto& move : ordered) {
-    UndoNative undo;
-    if (!execute_move(state, move, &undo)) continue;
-    int score = 0;
-    if (first_move) {
-      score = alpha_beta_search(state, root_player_index, safe_max_depth - 1, alpha, kSearchInfinity, ctx, 1);
-      first_move = false;
-    } else {
-      const int scout_beta = alpha >= kSearchInfinity - 1 ? kSearchInfinity : alpha + 1;
-      score = alpha_beta_search(state, root_player_index, safe_max_depth - 1, alpha, scout_beta, ctx, 1);
-      if (score > alpha && score < kSearchInfinity) {
-        score = alpha_beta_search(state, root_player_index, safe_max_depth - 1, alpha, kSearchInfinity, ctx, 1);
+  bool completed_depth = false;
+  bool stop_search = false;
+  for (int depth = 1; depth <= safe_max_depth; ++depth) {
+    if (search_should_stop(ctx)) break;
+    ordered = order_moves(state, legal_moves, root_player_index, true, oracle_style, &ctx, 0, ctx.root_best_move);
+    if (ordered.empty()) ordered = legal_moves;
+    promote_packed_move_to_front(ordered, ctx.root_best_move);
+    if (ctx.timed_out) break;
+
+    MoveNative depth_best_move = best_move;
+    int depth_best_score = best_score;
+    int aspiration = 220 + depth * 90;
+    int alpha = -kSearchInfinity;
+    int beta = kSearchInfinity;
+    if (completed_depth && std::abs(best_score) < 900000) {
+      alpha = std::max(-kSearchInfinity, best_score - aspiration);
+      beta = std::min(kSearchInfinity, best_score + aspiration);
+    }
+
+    while (true) {
+      const int window_alpha = alpha;
+      const int window_beta = beta;
+      const bool completed = search_root_depth(
+        state,
+        ordered,
+        root_player_index,
+        depth,
+        window_alpha,
+        window_beta,
+        ctx,
+        depth_best_move,
+        depth_best_score
+      );
+      if (ctx.timed_out) {
+        if (!completed_depth && depth_best_score > -kSearchInfinity) {
+          best_move = depth_best_move;
+          best_score = depth_best_score;
+        }
+        stop_search = true;
+        break;
       }
+      if (!completed) {
+        stop_search = true;
+        break;
+      }
+      if (completed_depth && std::abs(best_score) < 900000) {
+        if (depth_best_score <= window_alpha) {
+          aspiration = std::min(kSearchInfinity / 8, aspiration * 2);
+          alpha = std::max(-kSearchInfinity, best_score - aspiration);
+          beta = window_beta;
+          continue;
+        }
+        if (depth_best_score >= window_beta) {
+          aspiration = std::min(kSearchInfinity / 8, aspiration * 2);
+          alpha = window_alpha;
+          beta = std::min(kSearchInfinity, best_score + aspiration);
+          continue;
+        }
+      }
+      best_move = depth_best_move;
+      best_score = depth_best_score;
+      completed_depth = true;
+      ctx.root_best_move = pack_move(best_move);
+      break;
     }
-    undo_move(state, undo);
-    if (score > best_score) {
-      best_score = score;
-      best_move = move;
-      alpha = std::max(alpha, best_score);
-    }
-    if (best_score >= 900000) break;
+    if (stop_search || best_score >= 900000) break;
   }
 
   const int packed_best_move = pack_move(best_move);

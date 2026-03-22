@@ -1037,6 +1037,59 @@
     .analysis-move-detail {
       color: #acc2ea;
       margin-top: 2px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .analysis-move-meta {
+      color: #86a2d7;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .analysis-move-line strong {
+      color: #ecf3ff;
+    }
+    .analysis-board-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .analysis-board-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .analysis-board-counter {
+      color: #c7d9fb;
+      font-size: 13px;
+      min-width: 140px;
+      text-align: center;
+    }
+    .analysis-board-host {
+      display: flex;
+      justify-content: center;
+      overflow: auto;
+      padding: 2px 0 4px;
+      min-height: 220px;
+    }
+    .analysis-board-host .board-stack {
+      margin: 0 auto;
+    }
+    .board.board--analysis {
+      --cell-size: 40px;
+    }
+    .board.board--analysis .cell {
+      cursor: default;
+    }
+    .analysis-board-empty {
+      margin: auto;
+      color: #acc2ea;
+      font-size: 13px;
+      text-align: center;
     }
     .analysis-screen {
       padding: 18px;
@@ -1668,8 +1721,13 @@
                 <option value="aggressive">Aggressive</option>
                 <option value="defensive">Defensive</option>
               </select>
+              <label for="computerSide" style="margin-top:8px;">You Play As</label>
+              <select id="computerSide">
+                <option value="p1" selected>Player 1</option>
+                <option value="p2">Player 2</option>
+              </select>
               <div style="font-size:12px;color:#9eb8e6;margin-top:6px;">
-                Computer mode is always a 2-player match, and the computer controls Player 2.
+                Computer mode is always a 2-player match. Choose whether you move first as Player 1 or second as Player 2.
               </div>
             </div>
             <div class="grid-2" style="margin-top: 12px;">
@@ -1766,6 +1824,14 @@
                 <div id="analysisEvalSummary" class="status"></div>
                 <div id="analysisEvalBar" class="analysis-eval-bar">
                   <div id="analysisEvalPointer" class="analysis-eval-pointer"></div>
+                </div>
+                <div class="analysis-board-panel">
+                  <div class="analysis-board-toolbar">
+                    <button id="analysisPrevMoveBtn" type="button">Previous Move</button>
+                    <div id="analysisMoveCounter" class="analysis-board-counter">Move 0 of 0</div>
+                    <button id="analysisNextMoveBtn" type="button">Next Move</button>
+                  </div>
+                  <div id="analysisBoardHost" class="analysis-board-host"></div>
                 </div>
                 <div id="analysisMoves" class="analysis-moves"></div>
               </div>
@@ -1979,6 +2045,7 @@
       computerDifficultyLabel: document.getElementById("computerDifficultyLabel"),
       adaptiveDifficulty: document.getElementById("adaptiveDifficulty"),
       oracleStyle: document.getElementById("oracleStyle"),
+      computerSide: document.getElementById("computerSide"),
       computerPanel: document.getElementById("computerPanel"),
       computerText: document.getElementById("computerText"),
       analysisPanel: document.getElementById("analysisPanel"),
@@ -1987,6 +2054,10 @@
       analysisEvalSummary: document.getElementById("analysisEvalSummary"),
       analysisEvalBar: document.getElementById("analysisEvalBar"),
       analysisEvalPointer: document.getElementById("analysisEvalPointer"),
+      analysisBoardHost: document.getElementById("analysisBoardHost"),
+      analysisPrevMoveBtn: document.getElementById("analysisPrevMoveBtn"),
+      analysisNextMoveBtn: document.getElementById("analysisNextMoveBtn"),
+      analysisMoveCounter: document.getElementById("analysisMoveCounter"),
       analysisMoves: document.getElementById("analysisMoves"),
       analysisBackBtn: document.getElementById("analysisBackBtn"),
       analysisNewGameBtn: document.getElementById("analysisNewGameBtn"),
@@ -2522,6 +2593,33 @@
       return normalizeComputerDifficultyTier(baseTier, baseTier);
     }
 
+    function normalizeHumanPlayerSlot(slot) {
+      return slot === "p2" ? "p2" : "p1";
+    }
+
+    function getComputerPlayerSlotFromHumanSlot(humanPlayerSlot = app.config?.humanPlayerSlot || "p1") {
+      return normalizeHumanPlayerSlot(humanPlayerSlot) === "p2" ? "p1" : "p2";
+    }
+
+    function syncComputerPlayerNameDefaults() {
+      if (app.setupMode !== "computer") return;
+      const humanPlayerSlot = normalizeHumanPlayerSlot(el.computerSide?.value || "p1");
+      const computerPlayerSlot = getComputerPlayerSlotFromHumanSlot(humanPlayerSlot);
+      const slotToIndex = (slot) => slot === "p2" ? 1 : 0;
+      const defaultNames = ["Player 1", "Player 2"];
+      const nameInputs = [el.p1Name, el.p2Name];
+      const computerIndex = slotToIndex(computerPlayerSlot);
+      const humanIndex = slotToIndex(humanPlayerSlot);
+      const computerInput = nameInputs[computerIndex];
+      const humanInput = nameInputs[humanIndex];
+      if (computerInput && (!computerInput.value || computerInput.value === defaultNames[computerIndex] || computerInput.value === "Computer")) {
+        computerInput.value = "Computer";
+      }
+      if (humanInput && (!humanInput.value || humanInput.value === "Computer")) {
+        humanInput.value = defaultNames[humanIndex];
+      }
+    }
+
     function refreshComputerEffectiveDifficultyForTurn() {
       if (!app.config?.computerEnabled) return;
       const baseTier = normalizeComputerDifficultyTier(app.config.computerDifficultyTier ?? 3, 3);
@@ -2610,9 +2708,7 @@
       if (el.threePlayerCornerField) {
         el.threePlayerCornerField.classList.toggle("hidden", isComputerMode || el.playerCount.value !== "3");
       }
-      if (isComputerMode && el.p2Name && (!el.p2Name.value || el.p2Name.value === "Player 2")) {
-        el.p2Name.value = "Computer";
-      }
+      syncComputerPlayerNameDefaults();
       syncComputerSetupControls();
     }
 
@@ -2712,6 +2808,9 @@
         el.computerDifficulty.addEventListener("input", syncComputerSetupControls);
         el.computerDifficulty.addEventListener("change", syncComputerSetupControls);
       }
+      if (el.computerSide) {
+        el.computerSide.addEventListener("change", syncComputerPlayerNameDefaults);
+      }
       el.startBtn.addEventListener("click", () => startGame());
       if (el.undoBtn) {
         el.undoBtn.addEventListener("click", undoLastMove);
@@ -2725,6 +2824,12 @@
       }
       if (el.analysisNewGameBtn) {
         el.analysisNewGameBtn.addEventListener("click", returnToSetupScreen);
+      }
+      if (el.analysisPrevMoveBtn) {
+        el.analysisPrevMoveBtn.addEventListener("click", () => stepSelectedAnalysisMove(-1));
+      }
+      if (el.analysisNextMoveBtn) {
+        el.analysisNextMoveBtn.addEventListener("click", () => stepSelectedAnalysisMove(1));
       }
 
       el.elimOkBtn.addEventListener("click", dismissElimination);
@@ -3222,6 +3327,7 @@
         names: [el.p1Name.value, el.p2Name.value, el.p3Name.value, el.p4Name.value],
         deadCorner: Number(el.deadCornerSelect.value),
         computerEnabled,
+        humanPlayerSlot: normalizeHumanPlayerSlot(el.computerSide?.value || "p1"),
         computerDifficultyTier: sliderValueToDifficultyTier(el.computerDifficulty?.value || "3"),
         computerDifficulty: sliderValueToDifficulty(el.computerDifficulty?.value || "3"),
         adaptiveDifficultyEnabled: el.adaptiveDifficulty?.value === "on",
@@ -3258,6 +3364,9 @@
       }
       if (el.oracleStyle && options.oracleStyle) {
         el.oracleStyle.value = normalizeOracleStyle(options.oracleStyle);
+      }
+      if (el.computerSide) {
+        el.computerSide.value = normalizeHumanPlayerSlot(options.humanPlayerSlot || "p1");
       }
       if (el.hoverTilePickerEnabled) {
         el.hoverTilePickerEnabled.value = options.hoverTilePickerEnabled ? "on" : "off";
@@ -3652,6 +3761,59 @@
       `;
     }
 
+    function captureAnalysisBoardSnapshot() {
+      return {
+        config: cloneStateValue(app.config),
+        board: cloneStateValue(app.board),
+        players: cloneStateValue(app.players),
+        currentPlayerIdx: app.currentPlayerIdx,
+        gameOver: !!app.gameOver,
+        winner: Number.isInteger(app.winner) ? app.winner : null,
+      };
+    }
+
+    function getAnalysisBoardCellSize(snapshot) {
+      const size = Number(snapshot?.config?.size) || 7;
+      if (size >= 13) return 28;
+      if (size >= 9) return 34;
+      return 40;
+    }
+
+    function renderAnalysisBoardSnapshot(snapshot) {
+      const size = Number(snapshot?.config?.size) || 0;
+      const board = Array.isArray(snapshot?.board) ? snapshot.board : [];
+      const players = Array.isArray(snapshot?.players) ? snapshot.players : [];
+      if (!size || !board.length) {
+        return `<div class="analysis-board-empty">No board position is available for this move.</div>`;
+      }
+      const cellSize = getAnalysisBoardCellSize(snapshot);
+      const trails = players
+        .filter((player) => Array.isArray(player?.trail) && player.trail.length > 1)
+        .map((player) => ({ color: player.color, points: player.trail }));
+      const cells = [];
+      for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+          const cell = board[r]?.[c];
+          const classes = ["cell"];
+          if (cell?.dead) classes.push("dead");
+          if (cell?.startOwner != null) classes.push("start", `start-p${cell.startOwner + 1}`);
+          let inner = "";
+          if (cell?.tile) inner += `<div class="tile-layer">${tileSvg(cell.tile, cellSize)}</div>`;
+          const tokens = players
+            .filter((player) => player?.alive && player.hasPlacedFirstTile && player.row === r && player.col === c)
+            .map((player) => ({ color: player.color }));
+          inner += renderTokenStack(tokens, cellSize);
+          cells.push(`<div class="${classes.join(" ")}">${inner}</div>`);
+        }
+      }
+      return `
+        <div class="board-stack">
+          ${renderStaticTrails(trails, size, cellSize)}
+          <div class="board board--analysis" style="--cell-size:${cellSize}px;grid-template-columns: repeat(${size}, ${cellSize}px)">${cells.join("")}</div>
+        </div>
+      `;
+    }
+
     function onDragStart(tileType, ev) {
       if (app.gameOver) return;
       ev.preventDefault();
@@ -3755,7 +3917,15 @@
       const computerDifficultyLabel = getDifficultyLabelText(computerDifficultyTier);
       const computerEffectiveDifficultyLabel = getDifficultyLabelText(computerEffectiveTier);
       const oracleStyle = normalizeOracleStyle(options.oracleStyle);
-      if (computerEnabled && (!names[1] || names[1] === "Player 2")) names[1] = "Computer";
+      const humanPlayerSlot = normalizeHumanPlayerSlot(options.humanPlayerSlot);
+      const computerPlayerSlot = computerEnabled ? getComputerPlayerSlotFromHumanSlot(humanPlayerSlot) : null;
+      const computerPlayerIndex = computerEnabled ? (computerPlayerSlot === "p2" ? 1 : 0) : -1;
+      if (computerEnabled && computerPlayerIndex >= 0) {
+        const defaultComputerName = `Player ${computerPlayerIndex + 1}`;
+        if (!names[computerPlayerIndex] || names[computerPlayerIndex] === defaultComputerName) {
+          names[computerPlayerIndex] = "Computer";
+        }
+      }
 
       const activeCorners = [];
       let deadCorner = null;
@@ -3778,6 +3948,8 @@
         variantMode,
         activeCorners,
         computerEnabled,
+        humanPlayerSlot,
+        computerPlayerSlot,
         computerDifficultyTier,
         computerDifficulty,
         computerDifficultyLabel,
@@ -3849,7 +4021,7 @@
           id: i,
           name: names[i] || `Player ${i + 1}`,
           color: COLORS[i],
-          isComputer: computerEnabled && i === 1,
+          isComputer: computerEnabled && i === computerPlayerIndex,
           corner,
           baseCells: getBaseCells(size, corner),
           adjacentFirst: getAdjacentToBase(size, corner),
@@ -5085,6 +5257,27 @@
       return `${tileName} @ (${move.r},${move.c}${entryText})`;
     }
 
+    function getAnalysisActorLabels(actor) {
+      if (!actor) return { label: "Unknown player", subtitle: "" };
+      if (app.config?.computerEnabled) {
+        const humanPlayer = app.players.find((candidate) => candidate && !candidate.isComputer) || null;
+        if (humanPlayer && actor.id === humanPlayer.id) {
+          return {
+            label: "You",
+            subtitle: actor.name && actor.name !== "You" ? actor.name : "",
+          };
+        }
+        return {
+          label: "Opponent",
+          subtitle: actor.name && actor.name !== "Opponent" ? actor.name : "Computer",
+        };
+      }
+      return {
+        label: actor.name || `Player ${actor.id + 1}`,
+        subtitle: "",
+      };
+    }
+
     function getTwoPlayerOracleEvaluation() {
       if (!app.config || app.config.playerCount !== 2 || app.players.length < 2) return null;
       const p1 = app.players[0];
@@ -5146,6 +5339,38 @@
       });
     }
 
+    function setSelectedAnalysisMove(index, options = {}) {
+      const entries = Array.isArray(app.analysisHistory) ? app.analysisHistory : [];
+      const shouldRender = options.render !== false;
+      if (!entries.length) {
+        app.analysisSelectedMoveIdx = -1;
+        app.analysisEvalScore = 0;
+        app.analysisEvalPercent = 50;
+        app.analysisEvalText = "No analysis data is available for this game.";
+        if (shouldRender) renderAll();
+        return null;
+      }
+      const fallbackIndex = entries.length - 1;
+      const normalizedIndex = Number.isInteger(index)
+        ? Math.max(0, Math.min(entries.length - 1, index))
+        : fallbackIndex;
+      const selected = entries[normalizedIndex] || entries[fallbackIndex] || null;
+      app.analysisSelectedMoveIdx = normalizedIndex;
+      app.analysisEvalScore = selected?.evalScore ?? 0;
+      app.analysisEvalPercent = selected?.evalPercent ?? 50;
+      app.analysisEvalText = selected?.evalAfterText || "Even position";
+      if (shouldRender) renderAll();
+      return selected;
+    }
+
+    function stepSelectedAnalysisMove(delta) {
+      if (!Array.isArray(app.analysisHistory) || !app.analysisHistory.length) return;
+      const currentIndex = Number.isInteger(app.analysisSelectedMoveIdx)
+        ? app.analysisSelectedMoveIdx
+        : app.analysisHistory.length - 1;
+      setSelectedAnalysisMove(currentIndex + delta);
+    }
+
     function computeGameAnalysisReport() {
       if (!app.analysisBaseSnapshot || !Array.isArray(app.moveHistory) || !app.moveHistory.length) return null;
       return withPreservedGameState(() => {
@@ -5155,6 +5380,7 @@
           const record = app.moveHistory[i];
           const actor = getLivePlayer(record.playerId) || currentPlayer();
           if (!actor || !record?.move) break;
+          const actorLabels = getAnalysisActorLabels(actor);
           const playedMove = cloneStateValue(record.move);
           const bestMove = chooseOracleMove(actor);
           const bestScore = bestMove
@@ -5175,14 +5401,18 @@
           const evalState = getTwoPlayerOracleEvaluation() || { score: 0, percent: 50, text: "Even position" };
           entries.push({
             idx: i + 1,
+            round: Math.floor(i / 2) + 1,
             playerName: actor.name,
+            playerLabel: actorLabels.label,
+            playerSubtitle: actorLabels.subtitle,
             moveText: describeMoveForAnalysis(playedMove),
-            bestMoveText: describeMoveForAnalysis(bestMove),
+            bestMoveText: bestMove ? describeMoveForAnalysis(bestMove) : "No legal move found",
             quality,
             scoreLoss,
             evalAfterText: evalState.text,
             evalPercent: evalState.percent,
             evalScore: evalState.score,
+            boardSnapshot: captureAnalysisBoardSnapshot(),
           });
         }
         return {
@@ -5216,71 +5446,16 @@
         app.analysisBusy = false;
         app.analysisReady = !!report;
         app.analysisHistory = report?.entries || [];
-        app.analysisSelectedMoveIdx = Number.isInteger(report?.selectedMoveIdx) ? report.selectedMoveIdx : -1;
-        const selected = app.analysisHistory[app.analysisSelectedMoveIdx] || null;
-        app.analysisEvalScore = selected?.evalScore ?? 0;
-        app.analysisEvalPercent = selected?.evalPercent ?? 50;
-        app.analysisEvalText = selected?.evalAfterText || (report ? "Even position" : "Analysis unavailable.");
+        if (report) {
+          setSelectedAnalysisMove(Number.isInteger(report?.selectedMoveIdx) ? report.selectedMoveIdx : -1, { render: false });
+        } else {
+          app.analysisSelectedMoveIdx = -1;
+          app.analysisEvalScore = 0;
+          app.analysisEvalPercent = 50;
+          app.analysisEvalText = "Analysis unavailable.";
+        }
         renderAll();
       }, 30);
-    }
-
-    function normalizeOracleValue(score, scale = 9000) {
-      const numeric = Number.isFinite(score) ? score : 0;
-      return Math.max(-1, Math.min(1, Math.tanh(numeric / scale)));
-    }
-
-    function pickWeightedMoveFromCandidates(moves, weights = [0.58, 0.24, 0.12, 0.06]) {
-      if (!Array.isArray(moves) || !moves.length) return null;
-      const effectiveWeights = moves.map((_, idx) => Math.max(0, Number(weights[idx]) || 0));
-      const totalWeight = effectiveWeights.reduce((sum, weight) => sum + weight, 0);
-      if (totalWeight <= 0) return moves[0];
-      let roll = Math.random() * totalWeight;
-      for (let i = 0; i < moves.length; i++) {
-        roll -= effectiveWeights[i];
-        if (roll <= 0) return moves[i];
-      }
-      return moves[0];
-    }
-
-    function getOracleMctsSearchConfig(openCells, style = app.config?.oracleStyle || "balanced") {
-      const normalized = normalizeOracleStyle(style);
-      const aggressive = normalized === "aggressive";
-      const defensive = normalized === "defensive";
-      if (openCells <= 8) {
-        return {
-          timeBudgetMs: aggressive ? 140 : defensive ? 110 : 125,
-          maxIterations: aggressive ? 96 : defensive ? 72 : 84,
-          rolloutDepth: aggressive ? 10 : defensive ? 8 : 9,
-          rootWidth: defensive ? 8 : 10,
-          childWidth: aggressive ? 6 : 5,
-          exploration: aggressive ? 1.26 : defensive ? 1.08 : 1.16,
-          priorWeight: aggressive ? 0.3 : defensive ? 0.2 : 0.25,
-          replySafetyDepth: 1,
-        };
-      }
-      if (openCells <= 16) {
-        return {
-          timeBudgetMs: aggressive ? 105 : defensive ? 80 : 92,
-          maxIterations: aggressive ? 76 : defensive ? 52 : 64,
-          rolloutDepth: aggressive ? 8 : defensive ? 6 : 7,
-          rootWidth: aggressive ? 12 : 10,
-          childWidth: aggressive ? 6 : 5,
-          exploration: aggressive ? 1.22 : defensive ? 1.05 : 1.13,
-          priorWeight: aggressive ? 0.28 : defensive ? 0.18 : 0.22,
-          replySafetyDepth: 1,
-        };
-      }
-      return {
-        timeBudgetMs: aggressive ? 82 : defensive ? 62 : 72,
-        maxIterations: aggressive ? 58 : defensive ? 38 : 48,
-        rolloutDepth: aggressive ? 6 : defensive ? 5 : 6,
-        rootWidth: aggressive ? 12 : 10,
-        childWidth: aggressive ? 5 : 4,
-        exploration: aggressive ? 1.18 : defensive ? 1.02 : 1.1,
-        priorWeight: aggressive ? 0.25 : defensive ? 0.16 : 0.2,
-        replySafetyDepth: 0,
-      };
     }
 
     function buildOracleMovePool(player, options = {}) {
@@ -5307,175 +5482,6 @@
       if (!options.replySafetyCheck) return rankedPool;
       const safeMoves = rankedPool.filter((move) => !moveAllowsOpponentImmediateWin(player.id, move));
       return safeMoves.length ? safeMoves : rankedPool;
-    }
-
-    function chooseOracleRolloutMove(player, rootPlayerId, config) {
-      player = getLivePlayer(player);
-      if (!player) return null;
-      const movePool = buildOracleMovePool(player, {
-        pruneLimit: Math.max(3, player.id === rootPlayerId ? config.childWidth + 1 : config.childWidth),
-        replySafetyCheck: false,
-        profile: "oracle",
-      });
-      if (!movePool.length) return null;
-      if (movePool.length === 1) return movePool[0];
-      const ranked = rankMovesForLookahead(
-        player.id,
-        player.id,
-        movePool,
-        true,
-        Math.min(movePool.length, 4),
-        "oracle"
-      );
-      return pickWeightedMoveFromCandidates(
-        ranked.length ? ranked : movePool,
-        player.id === rootPlayerId ? [0.58, 0.24, 0.12, 0.06] : [0.5, 0.26, 0.16, 0.08]
-      );
-    }
-
-    function createOracleMctsNode(parent = null, move = null, depth = 0) {
-      return {
-        parent,
-        move,
-        depth,
-        actorId: null,
-        children: [],
-        unexpandedMoves: null,
-        visits: 0,
-        totalValue: 0,
-        priorValue: 0,
-      };
-    }
-
-    function populateOracleMctsNode(node, rootPlayerId, config) {
-      if (!node || node.unexpandedMoves !== null) return;
-      const actor = currentPlayer();
-      node.actorId = actor?.id ?? null;
-      if (!actor || !actor.alive || app.gameOver) {
-        node.unexpandedMoves = [];
-        return;
-      }
-      node.unexpandedMoves = buildOracleMovePool(actor, {
-        pruneLimit: node.depth <= 0 ? config.rootWidth : config.childWidth,
-        replySafetyCheck: node.depth <= config.replySafetyDepth,
-        profile: "oracle",
-      });
-    }
-
-    function selectOracleMctsChild(node, rootPlayerId, config) {
-      if (!node?.children?.length) return null;
-      const actorSign = node.actorId === rootPlayerId ? 1 : -1;
-      const explorationBase = Math.log(Math.max(2, node.visits));
-      let bestChild = null;
-      let bestScore = -Infinity;
-      node.children.forEach((child) => {
-        const meanValue = child.visits ? child.totalValue / child.visits : child.priorValue;
-        const bias = actorSign * child.priorValue * config.priorWeight / (child.visits + 1);
-        const exploration = config.exploration * Math.sqrt(explorationBase / Math.max(1, child.visits));
-        const score = actorSign * meanValue + bias + exploration;
-        if (score > bestScore) {
-          bestScore = score;
-          bestChild = child;
-        }
-      });
-      return bestChild;
-    }
-
-    function oracleTerminalValue(rootPlayerId, pliesPlayed = 0) {
-      if (!app.gameOver) return normalizeOracleValue(evaluateStateForOracle(rootPlayerId));
-      if (app.winner === rootPlayerId) return Math.max(0.76, 1 - pliesPlayed * 0.04);
-      if (app.winner == null) return -0.22;
-      return Math.min(-0.76, -1 + pliesPlayed * 0.04);
-    }
-
-    function simulateOracleMctsRollout(rootPlayerId, config) {
-      const maxPlies = Math.max(4, config.rolloutDepth);
-      let pliesPlayed = 0;
-      while (!app.gameOver && pliesPlayed < maxPlies) {
-        const actor = currentPlayer();
-        if (!actor || !actor.alive) break;
-        const move = chooseOracleRolloutMove(actor, rootPlayerId, config);
-        if (!move) break;
-        if (!executePlannedMove(actor, move, { recordUndo: false, render: false, recordTutorial: false })) break;
-        pliesPlayed++;
-      }
-      return oracleTerminalValue(rootPlayerId, pliesPlayed);
-    }
-
-    function chooseOracleMoveByMonteCarloTreeSearch(player, rootMoves = null) {
-      player = getLivePlayer(player);
-      if (!player) return null;
-      const openCells = estimateRemainingTurnDepth();
-      const config = getOracleMctsSearchConfig(openCells, app.config?.oracleStyle || "balanced");
-      const candidateMoves = Array.isArray(rootMoves) && rootMoves.length
-        ? [...rootMoves]
-        : buildOracleMovePool(player, {
-          pruneLimit: config.rootWidth,
-          replySafetyCheck: true,
-          profile: "oracle",
-        });
-      if (!candidateMoves.length) return null;
-      if (candidateMoves.length === 1) return candidateMoves[0];
-      if (openCells <= 4 && candidateMoves.length <= 6) {
-        return chooseMoveWithDeepLookahead(
-          player,
-          openCells,
-          Infinity,
-          Math.max(60, config.timeBudgetMs),
-          candidateMoves,
-          "oracle"
-        );
-      }
-
-      const rootSnapshot = captureGameSnapshot();
-      const rootNode = createOracleMctsNode(null, null, 0);
-      rootNode.actorId = player.id;
-      rootNode.unexpandedMoves = [...candidateMoves];
-      const deadlineMs = Date.now() + config.timeBudgetMs;
-      let iterations = 0;
-
-      while (iterations < config.maxIterations && Date.now() < deadlineMs) {
-        restoreSnapshot(rootSnapshot, { render: false });
-        let node = rootNode;
-
-        while (!app.gameOver) {
-          populateOracleMctsNode(node, player.id, config);
-          if (node.unexpandedMoves.length) {
-            const nextMove = node.unexpandedMoves.shift();
-            const actor = currentPlayer();
-            if (!actor || !executePlannedMove(actor, nextMove, { recordUndo: false, render: false, recordTutorial: false })) {
-              break;
-            }
-            const child = createOracleMctsNode(node, cloneStateValue(nextMove), node.depth + 1);
-            child.actorId = currentPlayer()?.id ?? null;
-            child.priorValue = normalizeOracleValue(evaluateStateForOracle(player.id));
-            node.children.push(child);
-            node = child;
-            break;
-          }
-
-          const selectedChild = selectOracleMctsChild(node, player.id, config);
-          const actor = currentPlayer();
-          if (!selectedChild || !actor || !executePlannedMove(actor, selectedChild.move, { recordUndo: false, render: false, recordTutorial: false })) {
-            break;
-          }
-          node = selectedChild;
-        }
-
-        const rolloutValue = simulateOracleMctsRollout(player.id, config);
-        for (let cursor = node; cursor; cursor = cursor.parent) {
-          cursor.visits += 1;
-          cursor.totalValue += rolloutValue;
-        }
-        iterations++;
-      }
-
-      restoreSnapshot(rootSnapshot, { render: false });
-      const rankedChildren = [...rootNode.children].sort((a, b) => {
-        if (b.visits !== a.visits) return b.visits - a.visits;
-        return (b.totalValue / Math.max(1, b.visits)) - (a.totalValue / Math.max(1, a.visits));
-      });
-      return rankedChildren[0]?.move || candidateMoves[0];
     }
 
     function buildPerfectOracleStateKey(playerId) {
@@ -5566,11 +5572,41 @@
       }
     }
 
+    function chooseExactOracleMoveFromLegalMoves(player, legalMoves, openCells = estimateRemainingTurnDepth()) {
+      player = getLivePlayer(player);
+      if (!player || !Array.isArray(legalMoves) || !legalMoves.length) return null;
+      const searchConfig = {
+        transposition: new Map(),
+        historyHeuristic: new Map(),
+        killerMovesByPly: new Map(),
+        pathKeys: new Set(),
+        historyDepthBase: Number.isFinite(openCells) ? openCells : legalMoves.length,
+      };
+      const orderedRootMoves = orderMovesForPerfectOracle(player.id, player.id, legalMoves, true, searchConfig, 0);
+      const candidateMoves = orderedRootMoves.length ? orderedRootMoves : legalMoves;
+      let bestMove = candidateMoves[0];
+      let bestScore = -Infinity;
+      for (const move of candidateMoves) {
+        const snapshot = captureGameSnapshot();
+        const actingPlayer = app.players.find((candidate) => candidate.id === player.id);
+        let score = -Infinity;
+        if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+          score = perfectOracleMinimax(player.id, -Infinity, Infinity, searchConfig, 1);
+        }
+        restoreSnapshot(snapshot, { render: false });
+        if (score > bestScore) {
+          bestScore = score;
+          bestMove = move;
+        }
+      }
+      return bestMove;
+    }
+
     function shouldUseExactOracleSearch(openCells, legalMovesCount = 0) {
       if (!Number.isFinite(openCells)) return false;
-      if (openCells <= 6) return true;
-      if (openCells <= 8 && legalMovesCount <= 14) return true;
-      if (openCells <= 10 && legalMovesCount <= 10) return true;
+      if (openCells <= 8) return true;
+      if (openCells <= 10 && legalMovesCount <= 16) return true;
+      if (openCells <= 12 && legalMovesCount <= 12) return true;
       return false;
     }
 
@@ -5581,7 +5617,7 @@
         return {
           maxDepth,
           maxMovesPerNode: Infinity,
-          timeBudgetMs: Math.max(18000, tuning.endgameTimeMs),
+          timeBudgetMs: Math.max(30000, tuning.endgameTimeMs),
           prePruneWidth: 64,
           rootWidth: 64,
           replyCap: 24,
@@ -5591,7 +5627,7 @@
         return {
           maxDepth,
           maxMovesPerNode: Infinity,
-          timeBudgetMs: Math.max(12000, tuning.midTimeMs),
+          timeBudgetMs: Math.max(18000, tuning.midTimeMs),
           prePruneWidth: 48,
           rootWidth: 48,
           replyCap: 20,
@@ -5600,7 +5636,7 @@
       return {
         maxDepth,
         maxMovesPerNode: Infinity,
-        timeBudgetMs: Math.max(8000, tuning.earlyTimeMs),
+        timeBudgetMs: Math.max(10000, tuning.earlyTimeMs),
         prePruneWidth: 40,
         rootWidth: 40,
         replyCap: 18,
@@ -5615,65 +5651,44 @@
       try {
         const legalMoves = collectLegalMoves(player);
         if (!legalMoves.length) return null;
-        const openCells = estimateRemainingTurnDepth();
-        const alphaBetaConfig = getOracleAlphaBetaSearchConfig(openCells, app.config?.oracleStyle || "balanced");
-        const nativeMove = chooseNativeOracleMoveWithWasm(player, alphaBetaConfig.maxDepth, alphaBetaConfig.timeBudgetMs);
-        if (nativeMove) return nativeMove;
-
         for (const move of legalMoves) {
           if (moveCausesImmediateWin(player.id, move)) return move;
         }
+        const openCells = estimateRemainingTurnDepth();
+        if (shouldUseExactOracleSearch(openCells, legalMoves.length)) {
+          return chooseExactOracleMoveFromLegalMoves(player, legalMoves, openCells);
+        }
+        const alphaBetaConfig = getOracleAlphaBetaSearchConfig(openCells, app.config?.oracleStyle || "balanced");
+        const nativeMove = chooseNativeOracleMoveWithWasm(player, alphaBetaConfig.maxDepth, alphaBetaConfig.timeBudgetMs);
+        if (nativeMove) {
+          // Never trust a move that gives the opponent a one-ply forced win.
+          if (!moveAllowsOpponentImmediateWin(player.id, nativeMove)) return nativeMove;
+          const rescueMove = chooseExactOracleMoveFromLegalMoves(player, legalMoves, openCells);
+          if (rescueMove) return rescueMove;
+        }
 
-        if (!shouldUseExactOracleSearch(openCells, legalMoves.length)) {
-          let movePool = buildOracleMovePool(player, {
-            pruneLimit: alphaBetaConfig.prePruneWidth,
-            replySafetyCheck: true,
-            profile: "oracle",
-          });
-          if (!movePool.length) return legalMoves[0];
-          if (movePool.length > alphaBetaConfig.rootWidth) {
-            movePool = pruneOracleMovesByOpponentReply(
-              player,
-              movePool,
-              alphaBetaConfig.rootWidth,
-              alphaBetaConfig.replyCap
-            );
-          }
-          return chooseMoveWithDeepLookahead(
+        let movePool = buildOracleMovePool(player, {
+          pruneLimit: alphaBetaConfig.prePruneWidth,
+          replySafetyCheck: true,
+          profile: "oracle",
+        });
+        if (!movePool.length) return legalMoves[0];
+        if (movePool.length > alphaBetaConfig.rootWidth) {
+          movePool = pruneOracleMovesByOpponentReply(
             player,
-            alphaBetaConfig.maxDepth,
-            alphaBetaConfig.maxMovesPerNode,
-            alphaBetaConfig.timeBudgetMs,
             movePool,
-            "oracle"
+            alphaBetaConfig.rootWidth,
+            alphaBetaConfig.replyCap
           );
         }
-
-        const searchConfig = {
-          transposition: new Map(),
-          historyHeuristic: new Map(),
-          killerMovesByPly: new Map(),
-          pathKeys: new Set(),
-          historyDepthBase: openCells,
-        };
-        const orderedRootMoves = orderMovesForPerfectOracle(player.id, player.id, legalMoves, true, searchConfig, 0);
-        let bestMove = orderedRootMoves[0];
-        let bestScore = -Infinity;
-
-        for (const move of orderedRootMoves) {
-          const snapshot = captureGameSnapshot();
-          const actingPlayer = app.players.find((candidate) => candidate.id === player.id);
-          let score = -Infinity;
-          if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
-            score = perfectOracleMinimax(player.id, -Infinity, Infinity, searchConfig, 1);
-          }
-          restoreSnapshot(snapshot, { render: false });
-          if (score > bestScore) {
-            bestScore = score;
-            bestMove = move;
-          }
-        }
-        return bestMove;
+        return chooseMoveWithDeepLookahead(
+          player,
+          alphaBetaConfig.maxDepth,
+          alphaBetaConfig.maxMovesPerNode,
+          alphaBetaConfig.timeBudgetMs,
+          movePool,
+          "oracle"
+        );
       } finally {
         app.searchMode = previousSearchMode;
       }
@@ -6763,7 +6778,9 @@
       const adaptiveText = app.config.adaptiveDifficultyEnabled && app.config.computerDifficultyTier < COMPUTER_MAX_DIFFICULTY_TIER
         ? `<br>Adaptive: on (base ${baseLabel} -> this game ${effectiveLabel}).`
         : "";
-      el.computerText.innerHTML = `${player?.name || "Computer"} is controlling Player 2.<br>Difficulty: ${effectiveLabel}.${adaptiveText}${styleText}<br>${state}`;
+      const computerSlotText = app.config?.computerPlayerSlot === "p1" ? "Player 1" : "Player 2";
+      const humanSlotText = app.config?.humanPlayerSlot === "p2" ? "Player 2" : "Player 1";
+      el.computerText.innerHTML = `${player?.name || "Computer"} is controlling ${computerSlotText}.<br>You are ${humanSlotText}.<br>Difficulty: ${effectiveLabel}.${adaptiveText}${styleText}<br>${state}`;
     }
 
     function renderGameAnalysisButton() {
@@ -6810,6 +6827,22 @@
       el.analysisEvalSummary.textContent = app.analysisEvalText || "Even position";
       el.analysisMoves.innerHTML = "";
       const entries = app.analysisHistory;
+      const selectedIndex = entries.length
+        ? Math.max(0, Math.min(entries.length - 1, Number.isInteger(app.analysisSelectedMoveIdx) ? app.analysisSelectedMoveIdx : entries.length - 1))
+        : -1;
+      const selectedEntry = selectedIndex >= 0 ? entries[selectedIndex] : null;
+      if (el.analysisMoveCounter) {
+        el.analysisMoveCounter.textContent = entries.length
+          ? `Move ${selectedIndex + 1} of ${entries.length}`
+          : "Move 0 of 0";
+      }
+      if (el.analysisPrevMoveBtn) el.analysisPrevMoveBtn.disabled = selectedIndex <= 0;
+      if (el.analysisNextMoveBtn) el.analysisNextMoveBtn.disabled = !entries.length || selectedIndex >= entries.length - 1;
+      if (el.analysisBoardHost) {
+        el.analysisBoardHost.innerHTML = selectedEntry?.boardSnapshot
+          ? renderAnalysisBoardSnapshot(selectedEntry.boardSnapshot)
+          : `<div class="analysis-board-empty">No board position is available for this move.</div>`;
+      }
       if (!entries.length) {
         const empty = document.createElement("div");
         empty.className = "analysis-move-detail";
@@ -6819,29 +6852,47 @@
       }
       entries.forEach((entry, index) => {
         const row = document.createElement("div");
-        row.className = `analysis-move-row ${qualityToCssClass(entry.quality)}${index === app.analysisSelectedMoveIdx ? " selected" : ""}`;
+        row.className = `analysis-move-row ${qualityToCssClass(entry.quality)}${index === selectedIndex ? " selected" : ""}`;
         const title = document.createElement("div");
         title.className = "analysis-move-title";
         const left = document.createElement("span");
-        left.textContent = `#${entry.idx} ${entry.playerName}`;
+        left.textContent = `Move ${entry.idx} ${entry.playerLabel || entry.playerName || "Player"}`;
         const right = document.createElement("span");
         right.textContent = entry.quality;
         title.appendChild(left);
         title.appendChild(right);
         const detail = document.createElement("div");
         detail.className = "analysis-move-detail";
-        const lossPart = entry.quality === "Best move"
-          ? "loss 0"
-          : `loss ${Number.isFinite(entry.scoreLoss) ? entry.scoreLoss : 0}`;
-        detail.textContent = `${entry.moveText} | ${lossPart} | best: ${entry.bestMoveText} | eval: ${entry.evalAfterText}`;
+        const meta = document.createElement("div");
+        meta.className = "analysis-move-meta";
+        meta.textContent = entry.playerSubtitle
+          ? `Round ${entry.round} • ${entry.playerSubtitle}`
+          : `Round ${entry.round}`;
+        const makeAnalysisLine = (labelText, valueText) => {
+          const line = document.createElement("div");
+          line.className = "analysis-move-line";
+          const label = document.createElement("strong");
+          label.textContent = `${labelText}:`;
+          line.appendChild(label);
+          line.appendChild(document.createTextNode(` ${valueText}`));
+          return line;
+        };
+        const played = makeAnalysisLine("Played", entry.moveText);
+        const best = makeAnalysisLine("Oracle best", entry.bestMoveText);
+        const loss = makeAnalysisLine(
+          "Loss",
+          String(entry.quality === "Best move" ? 0 : (Number.isFinite(entry.scoreLoss) ? entry.scoreLoss : 0))
+        );
+        const evalLine = makeAnalysisLine("Eval after", entry.evalAfterText);
+        detail.appendChild(meta);
+        detail.appendChild(played);
+        detail.appendChild(best);
+        detail.appendChild(loss);
+        detail.appendChild(evalLine);
         row.appendChild(title);
         row.appendChild(detail);
         row.addEventListener("click", () => {
-          app.analysisSelectedMoveIdx = index;
-          app.analysisEvalScore = entry.evalScore ?? 0;
-          app.analysisEvalPercent = entry.evalPercent ?? 50;
-          app.analysisEvalText = entry.evalAfterText || "Even position";
-          renderAll();
+          setSelectedAnalysisMove(index);
         });
         el.analysisMoves.appendChild(row);
       });
