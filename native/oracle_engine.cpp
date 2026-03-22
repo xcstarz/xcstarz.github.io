@@ -101,6 +101,12 @@ struct BoardBitboards {
   }
 };
 
+struct CompactBoardWords {
+  std::uint64_t occupied = 0;
+  std::uint64_t blocked = 0;
+  std::uint64_t tactical = 0;
+};
+
 BoardBitboards build_board_bitboards(int board_size,
                                      int cell_count,
                                      const int* cell_types,
@@ -195,6 +201,33 @@ struct StateNative {
   std::array<int, kSupportedBoardCells> cell_flags{};
   std::uint64_t zobrist_hash = 0;
 };
+
+inline std::uint64_t board_extent_mask(int board_size) {
+  if (board_size <= 0) return 0;
+  const int cells = board_size * board_size;
+  if (cells <= 0) return 0;
+  if (cells >= 64) return std::numeric_limits<std::uint64_t>::max();
+  return (std::uint64_t{1} << cells) - 1;
+}
+
+CompactBoardWords build_compact_board_words(const StateNative& state) {
+  CompactBoardWords words;
+  const int safe_cells = std::max(0, std::min(state.board_size * state.board_size, kMaxBoardCells));
+  for (int idx = 0; idx < safe_cells; ++idx) {
+    const std::uint64_t bit = std::uint64_t{1} << idx;
+    const int flags = state.cell_flags[idx];
+    if (flags & (kCellFlagDead | kCellFlagStart)) words.blocked |= bit;
+    const int tile_type = state.cell_types[idx];
+    if (tile_type != kTileNone) {
+      words.occupied |= bit;
+      if (tile_type == kTileDiagonal || tile_type == kTileWeave
+          || tile_type == kTileJump || tile_type == kTileDiagonalJump) {
+        words.tactical |= bit;
+      }
+    }
+  }
+  return words;
+}
 
 struct OracleTuning {
   int attack_weight = 38;
@@ -873,6 +906,13 @@ int evaluate_state_for_oracle(const StateNative& state, int root_player_index, i
   const int base_score = evaluate_state_for_player(state, root_player_index, style);
   const auto& player = state.players[root_player_index];
   if (!player.alive || state.game_over) return base_score;
+  const CompactBoardWords board_words = build_compact_board_words(state);
+  const std::uint64_t board_extent = board_extent_mask(state.board_size);
+  const std::uint64_t open_playable =
+    board_extent & ~board_words.occupied & ~board_words.blocked;
+  const int tactical_tiles = std::popcount(board_words.tactical);
+  const int occupied_tiles = std::popcount(board_words.occupied);
+  const int open_playable_cells = std::popcount(open_playable);
 
   const OracleTuning tuning = get_oracle_tuning(style);
   const int opponent_index = 1 - root_player_index;
@@ -887,6 +927,9 @@ int evaluate_state_for_oracle(const StateNative& state, int root_player_index, i
   int opp_projection_gain = 0;
   int pressure = 0;
   pressure -= own_distance * tuning.attack_weight;
+  pressure += tactical_tiles * (style == kStyleDefensive ? 6 : 8);
+  pressure += open_playable_cells * (style == kStyleAggressive ? 3 : 2);
+  pressure -= occupied_tiles;
 
   const ProjectionResult own_projection = project_player_along_existing_tiles(state, root_player_index);
   if (own_projection.status == 1) {

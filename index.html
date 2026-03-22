@@ -5199,6 +5199,23 @@
       return blunder;
     }
 
+    function moveAllowsOpponentForcedWinWithinTwoTurns(playerId, move, maxOpenCells = 26) {
+      const snapshot = captureGameSnapshot();
+      let forcedLoss = false;
+      const actingPlayer = app.players.find((candidate) => candidate.id === playerId);
+      if (actingPlayer && executePlannedMove(actingPlayer, move, { recordUndo: false, render: false, recordTutorial: false })) {
+        const responder = currentPlayer();
+        if (responder && responder.id !== playerId && responder.alive) {
+          const openCells = estimateRemainingTurnDepth();
+          if (openCells <= Math.max(1, Number(maxOpenCells) || 1)) {
+            forcedLoss = playerCanForceWinWithinTwoTurns(responder.id, playerId);
+          }
+        }
+      }
+      restoreSnapshot(snapshot, { render: false });
+      return forcedLoss;
+    }
+
     function playerCanForceWinWithinTwoTurns(playerId, opponentId) {
       const player = getLivePlayer(playerId);
       const opponent = getLivePlayer(opponentId);
@@ -5617,7 +5634,7 @@
         return {
           maxDepth,
           maxMovesPerNode: Infinity,
-          timeBudgetMs: Math.max(30000, tuning.endgameTimeMs),
+          timeBudgetMs: Math.max(36000, tuning.endgameTimeMs),
           prePruneWidth: 64,
           rootWidth: 64,
           replyCap: 24,
@@ -5627,7 +5644,7 @@
         return {
           maxDepth,
           maxMovesPerNode: Infinity,
-          timeBudgetMs: Math.max(18000, tuning.midTimeMs),
+          timeBudgetMs: Math.max(24000, tuning.midTimeMs),
           prePruneWidth: 48,
           rootWidth: 48,
           replyCap: 20,
@@ -5636,7 +5653,7 @@
       return {
         maxDepth,
         maxMovesPerNode: Infinity,
-        timeBudgetMs: Math.max(10000, tuning.earlyTimeMs),
+        timeBudgetMs: Math.max(14000, tuning.earlyTimeMs),
         prePruneWidth: 40,
         rootWidth: 40,
         replyCap: 18,
@@ -5649,46 +5666,11 @@
       const previousSearchMode = app.searchMode;
       app.searchMode = true;
       try {
-        const legalMoves = collectLegalMoves(player);
-        if (!legalMoves.length) return null;
-        for (const move of legalMoves) {
-          if (moveCausesImmediateWin(player.id, move)) return move;
-        }
+        if (!canUseNativeOracleWasm()) return null;
         const openCells = estimateRemainingTurnDepth();
-        if (shouldUseExactOracleSearch(openCells, legalMoves.length)) {
-          return chooseExactOracleMoveFromLegalMoves(player, legalMoves, openCells);
-        }
         const alphaBetaConfig = getOracleAlphaBetaSearchConfig(openCells, app.config?.oracleStyle || "balanced");
         const nativeMove = chooseNativeOracleMoveWithWasm(player, alphaBetaConfig.maxDepth, alphaBetaConfig.timeBudgetMs);
-        if (nativeMove) {
-          // Never trust a move that gives the opponent a one-ply forced win.
-          if (!moveAllowsOpponentImmediateWin(player.id, nativeMove)) return nativeMove;
-          const rescueMove = chooseExactOracleMoveFromLegalMoves(player, legalMoves, openCells);
-          if (rescueMove) return rescueMove;
-        }
-
-        let movePool = buildOracleMovePool(player, {
-          pruneLimit: alphaBetaConfig.prePruneWidth,
-          replySafetyCheck: true,
-          profile: "oracle",
-        });
-        if (!movePool.length) return legalMoves[0];
-        if (movePool.length > alphaBetaConfig.rootWidth) {
-          movePool = pruneOracleMovesByOpponentReply(
-            player,
-            movePool,
-            alphaBetaConfig.rootWidth,
-            alphaBetaConfig.replyCap
-          );
-        }
-        return chooseMoveWithDeepLookahead(
-          player,
-          alphaBetaConfig.maxDepth,
-          alphaBetaConfig.maxMovesPerNode,
-          alphaBetaConfig.timeBudgetMs,
-          movePool,
-          "oracle"
-        );
+        return nativeMove || null;
       } finally {
         app.searchMode = previousSearchMode;
       }
@@ -5994,6 +5976,16 @@
         app.aiThinking = false;
         const activePlayer = getLivePlayer(playerId);
         if (!activePlayer || !move) {
+          const effectiveDifficulty = normalizeComputerDifficulty(app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
+          const shouldRetryNativeOracle = !!activePlayer
+            && effectiveDifficulty === "oracle"
+            && !app.gameOver
+            && !oracleWasm.error
+            && (oracleWasm.loading || !oracleWasm.ready);
+          if (shouldRetryNativeOracle) {
+            loadOracleWasmModule();
+            scheduleComputerTurnIfNeeded();
+          }
           renderAll();
           return;
         }
