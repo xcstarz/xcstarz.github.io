@@ -2501,7 +2501,7 @@
           oracleStyleToWasmMode(app.config?.oracleStyle || "balanced"),
           oracleVariantToWasmMode(),
           Math.max(1, Number(maxDepth) || 1),
-          Math.max(1, Number(timeBudgetMs) || 1),
+          Math.max(0, Number(timeBudgetMs) || 0),
           playerState.ptr,
           cellTypes.ptr,
           cellRots.ptr,
@@ -5410,20 +5410,20 @@
         return {
           maxDepth,
           maxMovesPerNode: Infinity,
-          timeBudgetMs: Math.max(36000, tuning.endgameTimeMs),
+          timeBudgetMs: 0,
         };
       }
       if (openCells <= 16) {
         return {
           maxDepth,
           maxMovesPerNode: Infinity,
-          timeBudgetMs: Math.max(24000, tuning.midTimeMs),
+          timeBudgetMs: 0,
         };
       }
       return {
         maxDepth,
         maxMovesPerNode: Infinity,
-        timeBudgetMs: Math.max(14000, tuning.earlyTimeMs),
+        timeBudgetMs: 0,
       };
     }
 

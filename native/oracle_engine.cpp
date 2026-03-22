@@ -1335,7 +1335,6 @@ bool search_root_depth(StateNative& state,
     }
     local_alpha = std::max(local_alpha, local_best_score);
     if (ctx.timed_out) break;
-    if (local_best_score >= 900000) break;
     if (local_alpha >= beta) {
       const int packed_move = pack_move(move);
       record_killer_move(ctx, 0, packed_move);
@@ -1707,7 +1706,7 @@ int oracle_choose_native_move(int board_size,
       ctx.root_best_move = pack_move(best_move);
       break;
     }
-    if (stop_search || best_score >= 900000) break;
+    if (stop_search) break;
   }
 
   const int packed_best_move = pack_move(best_move);
