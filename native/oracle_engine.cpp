@@ -46,7 +46,7 @@ constexpr int kNoEntry = -1;
 constexpr int kPackedNoEntry = 15;
 constexpr int kSearchInfinity = 2'000'000'000;
 constexpr int kMaxSearchPly = 64;
-constexpr int kOracleTargetDepth = 40;
+constexpr int kOracleTargetDepth = 20;
 
 enum TranspositionBound {
   kBoundExact = 0,
@@ -1449,7 +1449,7 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 int oracle_module_version() {
-  return 7;
+  return 8;
 }
 
 EMSCRIPTEN_KEEPALIVE
