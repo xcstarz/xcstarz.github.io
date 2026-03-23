@@ -319,6 +319,9 @@ bool search_root_depth(StateNative& state,
 void record_killer_move(SearchContext& ctx, int ply, int packed_move);
 void update_history_heuristic(SearchContext& ctx, int packed_move, int depth_remaining);
 int ordering_bonus(const SearchContext& ctx, int packed_move, int ply, int tt_move);
+bool is_killer_move(const SearchContext& ctx, int ply, int packed_move);
+bool should_prune_late_move(const SearchContext& ctx, int ply, int depth_remaining, int move_index, int packed_move, int tt_move);
+int late_move_reduction(const SearchContext& ctx, int ply, int depth_remaining, int move_index, int packed_move, int tt_move);
 
 inline std::uint64_t splitmix64(std::uint64_t x) {
   x += 0x9e3779b97f4a7c15ull;
@@ -1213,24 +1216,42 @@ int alpha_beta_search(StateNative& state, int root_player_index, int depth_remai
   int best = maximize ? -kSearchInfinity : kSearchInfinity;
   int best_move = 0;
   bool first_move = true;
+  int move_index = 0;
   for (const auto& move : legal_moves) {
     if (search_should_stop(ctx)) break;
+    const int packed_move = pack_move(move);
+    ++move_index;
+    if (should_prune_late_move(ctx, ply, depth_remaining, move_index, packed_move, tt_move)) continue;
     UndoNative undo;
     if (!execute_move(state, move, &undo)) continue;
-    const int packed_move = pack_move(move);
     int score = 0;
+    const int reduction = late_move_reduction(ctx, ply, depth_remaining, move_index, packed_move, tt_move);
     if (first_move) {
       score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, beta, ctx, ply + 1);
       first_move = false;
     } else if (maximize) {
       const int scout_beta = alpha >= kSearchInfinity - 1 ? kSearchInfinity : alpha + 1;
-      score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, scout_beta, ctx, ply + 1);
+      if (reduction > 0) {
+        score = alpha_beta_search(state, root_player_index, depth_remaining - 1 - reduction, alpha, scout_beta, ctx, ply + 1);
+        if (score > alpha) {
+          score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, scout_beta, ctx, ply + 1);
+        }
+      } else {
+        score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, scout_beta, ctx, ply + 1);
+      }
       if (score > alpha && score < beta) {
         score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, beta, ctx, ply + 1);
       }
     } else {
       const int scout_alpha = beta <= -kSearchInfinity + 1 ? -kSearchInfinity : beta - 1;
-      score = alpha_beta_search(state, root_player_index, depth_remaining - 1, scout_alpha, beta, ctx, ply + 1);
+      if (reduction > 0) {
+        score = alpha_beta_search(state, root_player_index, depth_remaining - 1 - reduction, scout_alpha, beta, ctx, ply + 1);
+        if (score < beta) {
+          score = alpha_beta_search(state, root_player_index, depth_remaining - 1, scout_alpha, beta, ctx, ply + 1);
+        }
+      } else {
+        score = alpha_beta_search(state, root_player_index, depth_remaining - 1, scout_alpha, beta, ctx, ply + 1);
+      }
       if (score < beta && score > alpha) {
         score = alpha_beta_search(state, root_player_index, depth_remaining - 1, alpha, beta, ctx, ply + 1);
       }
@@ -1382,6 +1403,33 @@ int ordering_bonus(const SearchContext& ctx, int packed_move, int ply, int tt_mo
   return bonus;
 }
 
+bool is_killer_move(const SearchContext& ctx, int ply, int packed_move) {
+  if (packed_move <= 0 || ply < 0 || ply >= kMaxSearchPly) return false;
+  return ctx.killer_moves[ply][0] == packed_move || ctx.killer_moves[ply][1] == packed_move;
+}
+
+bool should_prune_late_move(const SearchContext& ctx, int ply, int depth_remaining, int move_index, int packed_move, int tt_move) {
+  if (ply <= 0 || depth_remaining > 2 || move_index <= 10 || packed_move <= 0) return false;
+  if (tt_move > 0 && packed_move == tt_move) return false;
+  if (is_killer_move(ctx, ply, packed_move)) return false;
+  if (const auto it = ctx.history_heuristic.find(packed_move); it != ctx.history_heuristic.end()) {
+    if (it->second >= depth_remaining * depth_remaining * 8) return false;
+  }
+  return true;
+}
+
+int late_move_reduction(const SearchContext& ctx, int ply, int depth_remaining, int move_index, int packed_move, int tt_move) {
+  if (ply <= 0 || depth_remaining < 3 || move_index <= 3 || packed_move <= 0) return 0;
+  if (tt_move > 0 && packed_move == tt_move) return 0;
+  if (is_killer_move(ctx, ply, packed_move)) return 0;
+  if (const auto it = ctx.history_heuristic.find(packed_move); it != ctx.history_heuristic.end()) {
+    if (it->second >= depth_remaining * depth_remaining * 12) return 0;
+  }
+  int reduction = 1;
+  if (depth_remaining >= 7 && move_index >= 10) reduction = 2;
+  return std::min(reduction, depth_remaining - 2);
+}
+
 bool rots_are_supported(int board_size, int cell_count, const int* cell_rots) {
   if (!cell_rots) return true;
   const int safe_cell_count = std::min(cell_count, board_size * board_size);
@@ -1449,7 +1497,7 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 int oracle_module_version() {
-  return 8;
+  return 9;
 }
 
 EMSCRIPTEN_KEEPALIVE
