@@ -4087,7 +4087,7 @@
         }
         if ((app.config.computerEffectiveDifficulty || computerEffectiveDifficulty) === "oracle") {
           log(`Oracle style set to ${oracleStyle}.`);
-          log("Oracle uses full-depth native C++ search with 64-bit bitboards and stronger draw avoidance.");
+          log("Oracle uses timed native C++ iterative-deepening search with 64-bit bitboards and stronger draw avoidance.");
         }
       }
       app.analysisBaseSnapshot = captureGameSnapshot();
@@ -5415,7 +5415,7 @@
       app.analysisSelectedMoveIdx = -1;
       app.analysisEvalScore = 0;
       app.analysisEvalPercent = 50;
-      app.analysisEvalText = "Analyzing with Oracle full-depth native C++ search and stronger draw avoidance.";
+      app.analysisEvalText = "Analyzing with Oracle native C++ iterative-deepening search and stronger draw avoidance.";
       renderAll();
       setTimeout(() => {
         const report = computeGameAnalysisReport();
@@ -5436,10 +5436,24 @@
     }
 
     function getOracleAlphaBetaSearchConfig(openCells, style = app.config?.oracleStyle || "balanced") {
+      const normalized = normalizeOracleStyle(style);
+      const styleTimeAdjustMs = normalized === "aggressive" ? 200 : normalized === "defensive" ? -100 : 0;
+      let maxDepth = 40;
+      let timeBudgetMs = 2200;
+      if (openCells > 24) {
+        maxDepth = 18;
+        timeBudgetMs = 750;
+      } else if (openCells > 16) {
+        maxDepth = 22;
+        timeBudgetMs = 1050;
+      } else if (openCells > 8) {
+        maxDepth = 28;
+        timeBudgetMs = 1500;
+      }
       return {
-        maxDepth: 40,
+        maxDepth,
         maxMovesPerNode: Infinity,
-        timeBudgetMs: 0,
+        timeBudgetMs: Math.max(350, timeBudgetMs + styleTimeAdjustMs),
       };
     }
 
@@ -5459,11 +5473,10 @@
       }
     }
 
-    function runProgressiveOracleTurn(playerId, targetDepth = 40) {
+    function runProgressiveOracleTurn(playerId, targetDepth = 40, timeBudgetMs = 1500) {
       const runId = ++app.computerSearchRunId;
-      let bestMove = null;
-      let depth = 1;
       const finalDepth = Math.max(1, Number(targetDepth) || 1);
+      const safeTimeBudgetMs = Math.max(1, Number(timeBudgetMs) || 1);
       app.oraclePerf.currentDepth = 0;
       app.oraclePerf.targetDepth = finalDepth;
       app.oraclePerf.thinking = true;
@@ -5474,7 +5487,7 @@
         app.aiThinking = false;
         app.oraclePerf.thinking = false;
         const activePlayer = getLivePlayer(playerId);
-        if (!activePlayer || !bestMove) {
+        if (!activePlayer) {
           const effectiveDifficulty = normalizeComputerDifficulty(app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
           const shouldRetryNativeOracle = !!activePlayer
             && effectiveDifficulty === "oracle"
@@ -5488,38 +5501,18 @@
           renderAll();
           return;
         }
+        const bestMove = chooseNativeOracleMoveWithWasm(activePlayer, finalDepth, safeTimeBudgetMs);
+        app.oraclePerf.currentDepth = finalDepth;
+        app.aiThinking = false;
+        app.oraclePerf.thinking = false;
+        if (!bestMove) {
+          renderAll();
+          return;
+        }
         executePlannedMove(activePlayer, bestMove);
       };
 
-      const step = () => {
-        if (runId !== app.computerSearchRunId) return;
-        if (app.gameOver || !app.aiThinking) {
-          app.aiThinking = false;
-          app.oraclePerf.thinking = false;
-          renderAll();
-          return;
-        }
-        const activePlayer = getLivePlayer(playerId);
-        const turnOwner = currentPlayer();
-        if (!activePlayer || !turnOwner || turnOwner.id !== playerId) {
-          app.aiThinking = false;
-          app.oraclePerf.thinking = false;
-          renderAll();
-          return;
-        }
-        const moveAtDepth = chooseNativeOracleMoveWithWasm(activePlayer, depth, 0);
-        if (moveAtDepth) bestMove = moveAtDepth;
-        app.oraclePerf.currentDepth = depth;
-        renderAll();
-        if (depth >= finalDepth) {
-          finish();
-          return;
-        }
-        depth++;
-        app.computerTurnTimer = setTimeout(step, 6);
-      };
-
-      app.computerTurnTimer = setTimeout(step, 0);
+      app.computerTurnTimer = setTimeout(finish, 0);
     }
 
     function doesMoveImmediatelyEliminatePlayer(playerId, move) {
@@ -5824,7 +5817,12 @@
           return;
         }
         if (effectiveDifficulty === "oracle") {
-          runProgressiveOracleTurn(playerId, 40);
+          const oracleConfig = getOracleAlphaBetaSearchConfig(
+            estimateRemainingTurnDepth(),
+            app.config?.oracleStyle || "balanced"
+          );
+          app.oraclePerf.targetDepth = oracleConfig.maxDepth;
+          runProgressiveOracleTurn(playerId, oracleConfig.maxDepth, oracleConfig.timeBudgetMs);
           return;
         }
         const move = chooseComputerMove(playerId, app.config?.computerEffectiveTier ?? app.config?.computerEffectiveDifficulty ?? app.config?.computerDifficulty);
@@ -6638,8 +6636,10 @@
           if (app.oraclePerf.thinking) {
             const depthLabel = Math.max(0, Number(app.oraclePerf.currentDepth) || 0);
             const targetLabel = Math.max(1, Number(app.oraclePerf.targetDepth) || 40);
-            el.oracleNpsCounter.textContent = `Oracle N/s: thinking d${depthLabel}/${targetLabel}`;
-            el.oracleNpsCounter.title = "Oracle is searching...";
+            el.oracleNpsCounter.textContent = depthLabel > 0
+              ? `Oracle N/s: thinking d${depthLabel}/${targetLabel}`
+              : "Oracle N/s: thinking...";
+            el.oracleNpsCounter.title = "Oracle is running a timed native search.";
           } else if (app.oraclePerf.elapsedMs > 0 && app.oraclePerf.nodes > 0) {
             el.oracleNpsCounter.textContent = `Oracle N/s: ${Math.max(0, app.oraclePerf.nodesPerSecond).toLocaleString()}`;
             el.oracleNpsCounter.title = `Nodes: ${Math.round(app.oraclePerf.nodes).toLocaleString()} | Time: ${Math.round(app.oraclePerf.elapsedMs).toLocaleString()} ms`;

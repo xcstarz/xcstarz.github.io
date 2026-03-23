@@ -1449,7 +1449,7 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 int oracle_module_version() {
-  return 6;
+  return 7;
 }
 
 EMSCRIPTEN_KEEPALIVE
@@ -1649,9 +1649,9 @@ int oracle_choose_native_move(int board_size,
   }
   SearchContext ctx;
   ctx.style = oracle_style;
-  const bool force_exact_endgame = safe_max_depth <= 12
-    || (safe_max_depth <= 14 && legal_moves.size() <= 12);
-  if (time_budget_ms > 0 && !force_exact_endgame) {
+  const bool force_exact_endgame = safe_max_depth <= 6
+    || (safe_max_depth <= 8 && legal_moves.size() <= 6);
+  if (safe_time_budget_ms > 0 && !force_exact_endgame) {
     ctx.use_deadline = true;
     ctx.deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(safe_time_budget_ms);
   }
