@@ -1716,8 +1716,8 @@
             </div>
             <div id="computerDifficultyField" class="field hidden" style="margin-top: 12px;">
               <label for="computerDifficulty">Computer Difficulty</label>
-              <input id="computerDifficulty" class="difficulty-slider" type="range" min="0" max="9" step="0.01" value="3">
-              <div id="computerDifficultyLabel" style="font-size:12px;color:#9eb8e6;margin-top:6px;">Medium (3/9)</div>
+              <input id="computerDifficulty" class="difficulty-slider" type="range" min="0" max="13" step="0.01" value="3">
+              <div id="computerDifficultyLabel" style="font-size:12px;color:#9eb8e6;margin-top:6px;">Medium (3/13)</div>
               <label for="adaptiveDifficulty" style="margin-top:8px;">Adaptive Difficulty</label>
               <select id="adaptiveDifficulty">
                 <option value="off" selected>Off</option>
@@ -2556,18 +2556,22 @@
       }
     }
 
-    const COMPUTER_MAX_DIFFICULTY_TIER = 9;
+    const COMPUTER_MAX_DIFFICULTY_TIER = 13;
     const COMPUTER_DIFFICULTY_TIER_META = [
-      { tier: 0, id: "easy", label: "Easy", base: "easy" },
-      { tier: 1, id: "easy-medium-1", label: "Easy+ (blend)", base: "easy" },
-      { tier: 2, id: "easy-medium-2", label: "Easy/Medium", base: "medium" },
+      { tier: 0, id: "beginner", label: "Beginner", base: "easy" },
+      { tier: 1, id: "easy", label: "Easy", base: "easy" },
+      { tier: 2, id: "easy-medium", label: "Easy/Medium", base: "medium" },
       { tier: 3, id: "medium", label: "Medium", base: "medium" },
-      { tier: 4, id: "medium-hard-1", label: "Medium+ (blend)", base: "medium" },
-      { tier: 5, id: "medium-hard-2", label: "Medium/Hard", base: "hard" },
-      { tier: 6, id: "hard", label: "Hard", base: "hard" },
-      { tier: 7, id: "hard-oracle-1", label: "Hard/Oracle (top-2 mix)", base: "hard" },
-      { tier: 8, id: "hard-oracle-2", label: "Oracle- (top-3 mix)", base: "hard" },
-      { tier: 9, id: "oracle", label: "Oracle (strongest available)", base: "oracle" },
+      { tier: 4, id: "harder-medium", label: "Harder Medium", base: "medium" },
+      { tier: 5, id: "hardest-medium", label: "Hardest Medium", base: "medium" },
+      { tier: 6, id: "medium-hard", label: "Medium/Hard", base: "hard" },
+      { tier: 7, id: "hard", label: "Hard", base: "hard" },
+      { tier: 8, id: "harder", label: "Harder", base: "hard" },
+      { tier: 9, id: "hardest", label: "Hardest", base: "hard" },
+      { tier: 10, id: "expert", label: "Expert", base: "oracle" },
+      { tier: 11, id: "harder-expert", label: "Harder Expert", base: "oracle" },
+      { tier: 12, id: "hardest-expert", label: "Hardest Expert", base: "oracle" },
+      { tier: 13, id: "oracle", label: "Oracle", base: "oracle" },
     ];
 
     function normalizeComputerDifficultyTier(value, fallbackTier = 3) {
@@ -2591,16 +2595,16 @@
 
     function difficultyToSliderValue(difficulty) {
       const normalized = normalizeComputerDifficulty(difficulty);
-      if (normalized === "easy") return "0";
-      if (normalized === "hard") return "6";
-      if (normalized === "oracle") return "9";
+      if (normalized === "easy") return "1";
+      if (normalized === "hard") return "7";
+      if (normalized === "oracle") return "13";
       return "3";
     }
 
     function getDifficultyLabelText(valueOrTier) {
       if (typeof valueOrTier === "string" && !/^-?\d+(\.\d+)?$/.test(valueOrTier)) {
         const normalized = normalizeComputerDifficulty(valueOrTier);
-        if (normalized === "oracle") return "Oracle (strongest available)";
+        if (normalized === "oracle") return "Oracle";
         return normalized.charAt(0).toUpperCase() + normalized.slice(1);
       }
       return getDifficultyTierMeta(valueOrTier).label;
@@ -2610,7 +2614,7 @@
       if (!el.computerDifficultyLabel || !el.computerDifficulty) return;
       const tier = sliderValueToDifficultyTier(el.computerDifficulty.value);
       const difficulty = sliderValueToDifficulty(tier);
-      const label = `${getDifficultyLabelText(tier)} (${tier}/9)`;
+      const label = `${getDifficultyLabelText(tier)} (${tier}/${COMPUTER_MAX_DIFFICULTY_TIER})`;
       el.computerDifficultyLabel.textContent = label;
       const current = Number(el.computerDifficulty.value || 0);
       const min = Number(el.computerDifficulty.min || 0);
@@ -2665,18 +2669,18 @@
           const advantage = evaluateStateForPlayer(computer.id) - evaluateStateForPlayer(human.id);
           // Turn-only adaptation: respond aggressively to current board pressure.
           if (advantage < -2800) {
-            targetTier = Math.max(targetTier, 9);
+            targetTier = Math.max(targetTier, COMPUTER_MAX_DIFFICULTY_TIER);
             adaptiveUrgency = 3;
           } else if (advantage < -1800) {
-            targetTier = Math.max(targetTier, 9);
+            targetTier = Math.max(targetTier, COMPUTER_MAX_DIFFICULTY_TIER);
             adaptiveUrgency = 2;
           } else if (advantage < -1000) {
-            targetTier = Math.max(targetTier, 9);
+            targetTier = Math.max(targetTier, COMPUTER_MAX_DIFFICULTY_TIER - 1);
             adaptiveUrgency = 2;
           } else if (advantage < -500) {
-            targetTier = Math.max(targetTier, 8);
+            targetTier = Math.max(targetTier, COMPUTER_MAX_DIFFICULTY_TIER - 2);
             adaptiveUrgency = 1;
-          } else if (advantage < -200) targetTier = Math.max(targetTier, 6);
+          } else if (advantage < -200) targetTier = Math.max(targetTier, 7);
           else if (advantage > 2600) targetTier = Math.max(0, baseTier - 2);
           else if (advantage > 1000) targetTier = Math.max(0, baseTier - 1);
 
@@ -2695,10 +2699,10 @@
             app.config.adaptiveTwoTurnThreatCacheValue = humanCanForceWinInTwo;
           }
           if (humanCanWinNow) {
-            targetTier = Math.max(targetTier, 9);
+            targetTier = Math.max(targetTier, COMPUTER_MAX_DIFFICULTY_TIER);
             adaptiveUrgency = 3;
           } else if (humanCanForceWinInTwo) {
-            targetTier = Math.max(targetTier, 9);
+            targetTier = Math.max(targetTier, COMPUTER_MAX_DIFFICULTY_TIER);
             adaptiveUrgency = Math.max(adaptiveUrgency, 2);
           }
         }
@@ -5605,22 +5609,67 @@
         return chooseComputerMoveByNamedDifficulty(player, "oracle");
       }
       if (tier <= 0) return chooseComputerMoveByNamedDifficulty(player, "easy");
-      if (tier === 1) return chooseComputerMoveByNamedDifficulty(player, Math.random() < 0.32 ? "medium" : "easy");
-      if (tier === 2) return chooseComputerMoveByNamedDifficulty(player, Math.random() < 0.62 ? "medium" : "easy");
-      if (tier === 3) return chooseComputerMoveByNamedDifficulty(player, "medium");
-      if (tier === 4) return chooseComputerMoveByNamedDifficulty(player, Math.random() < 0.34 ? "hard" : "medium");
-      if (tier === 5) return chooseComputerMoveByNamedDifficulty(player, Math.random() < 0.66 ? "hard" : "medium");
-      if (tier === 6) return chooseComputerMoveByNamedDifficulty(player, adaptiveStrict ? (Math.random() < 0.62 ? "oracle" : "hard") : "hard");
-      if (tier === 7) {
-        if (adaptiveStrict) return chooseOracleMoveFromRankedPool(player, adaptiveUrgency >= 2 ? [0.95, 0.05] : [0.88, 0.12]);
-        if (Math.random() < 0.52) return chooseComputerMoveByNamedDifficulty(player, "hard");
-        return chooseOracleMoveFromRankedPool(player, [0.62, 0.38]);
+      if (tier >= COMPUTER_MAX_DIFFICULTY_TIER) return chooseComputerMoveByNamedDifficulty(player, "oracle");
+
+      // Calibrated per-tier policy blend so each named tier jump feels similarly stronger.
+      // Order: [easy, medium, hard, oracle]
+      const TIER_POLICY_WEIGHTS = [
+        [1.00, 0.00, 0.00, 0.00], // 0 beginner
+        [0.82, 0.18, 0.00, 0.00], // 1 easy
+        [0.56, 0.44, 0.00, 0.00], // 2 easy/medium
+        [0.00, 1.00, 0.00, 0.00], // 3 medium
+        [0.00, 0.76, 0.24, 0.00], // 4 harder medium
+        [0.00, 0.52, 0.48, 0.00], // 5 hardest medium
+        [0.00, 0.30, 0.70, 0.00], // 6 medium/hard
+        [0.00, 0.00, 1.00, 0.00], // 7 hard
+        [0.00, 0.00, 0.82, 0.18], // 8 harder
+        [0.00, 0.00, 0.63, 0.37], // 9 hardest
+        [0.00, 0.00, 0.42, 0.58], // 10 expert
+        [0.00, 0.00, 0.24, 0.76], // 11 harder expert
+        [0.00, 0.00, 0.10, 0.90], // 12 hardest expert
+        [0.00, 0.00, 0.00, 1.00], // 13 oracle
+      ];
+
+      let [wEasy, wMedium, wHard, wOracle] = TIER_POLICY_WEIGHTS[tier] || TIER_POLICY_WEIGHTS[3];
+
+      if (adaptiveStrict && adaptiveUrgency > 0) {
+        const urgencyBoost = Math.min(0.18, Math.max(0, adaptiveUrgency) * 0.06);
+        let remainingBoost = urgencyBoost;
+        const hardShift = Math.min(wHard, remainingBoost);
+        wHard -= hardShift;
+        wOracle += hardShift;
+        remainingBoost -= hardShift;
+        if (remainingBoost > 0) {
+          const mediumShift = Math.min(wMedium, remainingBoost);
+          wMedium -= mediumShift;
+          wOracle += mediumShift;
+          remainingBoost -= mediumShift;
+        }
+        if (remainingBoost > 0) {
+          const easyShift = Math.min(wEasy, remainingBoost);
+          wEasy -= easyShift;
+          wOracle += easyShift;
+        }
       }
-      if (tier === 8) {
-        if (adaptiveStrict) return chooseOracleMoveFromRankedPool(player, adaptiveUrgency >= 2 ? [0.97, 0.03] : [0.9, 0.08, 0.02]);
-        return chooseOracleMoveFromRankedPool(player, [0.46, 0.39, 0.15]);
-      }
-      return chooseComputerMoveByNamedDifficulty(player, "oracle");
+
+      const roll = Math.random();
+      const edge1 = wEasy;
+      const edge2 = edge1 + wMedium;
+      const edge3 = edge2 + wHard;
+
+      if (roll < edge1) return chooseComputerMoveByNamedDifficulty(player, "easy");
+      if (roll < edge2) return chooseComputerMoveByNamedDifficulty(player, "medium");
+      if (roll < edge3) return chooseComputerMoveByNamedDifficulty(player, "hard");
+
+      // Oracle branch quality increases with oracle share on this tier.
+      const oracleBlend = Math.max(0, Math.min(1, wOracle));
+      const oracleWeights = [
+        0.52 + (0.45 * oracleBlend),
+        0.33 * (1 - oracleBlend),
+        0.12 * (1 - oracleBlend),
+        0.03 * (1 - oracleBlend),
+      ];
+      return chooseOracleMoveFromRankedPool(player, oracleWeights);
     }
 
     function withPreservedGameState(task) {
