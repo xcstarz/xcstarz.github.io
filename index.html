@@ -5487,16 +5487,14 @@
     function getOracleAlphaBetaSearchConfig(openCells, style = app.config?.oracleStyle || "balanced") {
       const normalized = normalizeOracleStyle(style);
       const styleTimeAdjustMs = normalized === "aggressive" ? 200 : normalized === "defensive" ? -100 : 0;
-      let maxDepth = 20;
+      const boardSize = Number(app.config?.size) || 13;
+      let maxDepth = boardSize === 7 ? 11 : 18;
       let timeBudgetMs = 2200;
       if (openCells > 24) {
-        maxDepth = 14;
         timeBudgetMs = 750;
       } else if (openCells > 16) {
-        maxDepth = 16;
         timeBudgetMs = 1050;
       } else if (openCells > 8) {
-        maxDepth = 18;
         timeBudgetMs = 1500;
       }
       return {
