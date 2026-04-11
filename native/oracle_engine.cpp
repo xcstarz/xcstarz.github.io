@@ -268,9 +268,9 @@ constexpr std::array<std::array<int8_t, kOracleNnueInputs>, kOracleNnueHidden> k
   {{  1,  3, -1,  2,  4,  4, -3,  3, -3,  4, -4,  3, -4,  5, -4,  2 }},
   {{  1, -2,  2, -2,  4, -3,  4, -3,  4, -4,  5, -4,  5, -4,  5, -4 }},
 }};
-constexpr std::array<int16_t, kOracleNnueHidden> kOracleNnueB1{{ 24, 22, 18, 16, 10, 8, 14, 6 }};
+constexpr std::array<int16_t, kOracleNnueHidden> kOracleNnueB1{{ 12, 11, 9, 8, 5, 4, 7, 3 }};
 constexpr std::array<int8_t, kOracleNnueHidden> kOracleNnueW2{{ 7, 7, 6, 6, 5, 5, 4, 4 }};
-constexpr int kOracleNnueOutBias = -128;
+constexpr int kOracleNnueOutBias = -64;
 
 #if defined(__wasm_simd128__)
 inline int horizontal_sum_i16x8(v128_t lanes) {
@@ -861,22 +861,22 @@ OracleTuning get_oracle_tuning(int style) {
 
 int evaluate_oracle_nnue(const OracleSignals& signals, int style) {
   std::array<int16_t, kOracleNnueInputs> input{};
-  input[0] = 64;  // bias
-  input[1] = style == kStyleAggressive ? 64 : 0;
-  input[2] = style == kStyleDefensive ? 64 : 0;
-  input[3] = signals.own_alive ? 64 : -64;
-  input[4] = signals.opp_alive ? 64 : -64;
-  input[5] = signals.own_has_first_tile ? 48 : -48;
-  input[6] = signals.opp_has_first_tile ? 48 : -48;
-  input[7] = std::clamp(signals.own_jump_pool * 10, 0, 96);
-  input[8] = std::clamp(signals.opp_jump_pool * 10, 0, 96);
-  input[9] = std::clamp((14 - signals.own_distance) * 8, -96, 96);
-  input[10] = std::clamp((signals.opp_distance - 4) * 8, -96, 96);
-  input[11] = std::clamp(signals.own_projection_gain * 22, -110, 110);
-  input[12] = std::clamp(signals.opp_projection_gain * 22, -110, 110);
-  input[13] = std::clamp((signals.own_projection_status == 1 ? 96 : 0) - (signals.own_projection_status == 2 ? 96 : 0), -96, 96);
-  input[14] = std::clamp((signals.opp_projection_status == 2 ? 96 : 0) - (signals.opp_projection_status == 1 ? 96 : 0), -96, 96);
-  input[15] = std::clamp((signals.own_projection_steps - signals.opp_projection_steps) * 10, -100, 100);
+  input[0] = 16;  // bias
+  input[1] = style == kStyleAggressive ? 16 : 0;
+  input[2] = style == kStyleDefensive ? 16 : 0;
+  input[3] = signals.own_alive ? 16 : -16;
+  input[4] = signals.opp_alive ? 16 : -16;
+  input[5] = signals.own_has_first_tile ? 12 : -12;
+  input[6] = signals.opp_has_first_tile ? 12 : -12;
+  input[7] = std::clamp(signals.own_jump_pool * 3, 0, 24);
+  input[8] = std::clamp(signals.opp_jump_pool * 3, 0, 24);
+  input[9] = std::clamp((14 - signals.own_distance) * 2, -24, 24);
+  input[10] = std::clamp((signals.opp_distance - 4) * 2, -24, 24);
+  input[11] = std::clamp(signals.own_projection_gain * 6, -30, 30);
+  input[12] = std::clamp(signals.opp_projection_gain * 6, -30, 30);
+  input[13] = std::clamp((signals.own_projection_status == 1 ? 24 : 0) - (signals.own_projection_status == 2 ? 24 : 0), -24, 24);
+  input[14] = std::clamp((signals.opp_projection_status == 2 ? 24 : 0) - (signals.opp_projection_status == 1 ? 24 : 0), -24, 24);
+  input[15] = std::clamp((signals.own_projection_steps - signals.opp_projection_steps) * 3, -30, 30);
 
   int output = kOracleNnueOutBias;
 #if defined(__wasm_simd128__)
@@ -892,7 +892,7 @@ int evaluate_oracle_nnue(const OracleSignals& signals, int style) {
     int acc = kOracleNnueB1[h]
       + horizontal_sum_i16x8(prod_lo)
       + horizontal_sum_i16x8(prod_hi);
-    const int activated = std::clamp(acc, 0, 255);
+    const int activated = std::clamp(acc, 0, 127);
     activated_hidden[h] = static_cast<int16_t>(activated);
   }
   const v128_t hidden_i16 = wasm_v128_load(activated_hidden.data());
@@ -905,11 +905,11 @@ int evaluate_oracle_nnue(const OracleSignals& signals, int style) {
     for (int i = 0; i < kOracleNnueInputs; ++i) {
       acc += static_cast<int>(kOracleNnueW1[h][i]) * static_cast<int>(input[i]);
     }
-    const int activated = std::clamp(acc, 0, 255);
+    const int activated = std::clamp(acc, 0, 127);
     output += activated * static_cast<int>(kOracleNnueW2[h]);
   }
 #endif
-  return std::clamp(output / 48, -420, 420);
+  return std::clamp(output / 12, -420, 420);
 }
 
 int evaluate_state_for_player(const StateNative& state, int root_player_index, int style) {
