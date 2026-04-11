@@ -274,11 +274,14 @@ constexpr int kOracleNnueOutBias = -64;
 
 #if defined(__wasm_simd128__)
 inline int horizontal_sum_i16x8(v128_t lanes) {
-  alignas(16) std::array<int16_t, 8> values{};
-  wasm_v128_store(values.data(), lanes);
-  int sum = 0;
-  for (int lane = 0; lane < 8; ++lane) sum += values[lane];
-  return sum;
+  const v128_t lo_i32 = wasm_i32x4_extend_low_i16x8(lanes);
+  const v128_t hi_i32 = wasm_i32x4_extend_high_i16x8(lanes);
+  const v128_t pair = wasm_i32x4_add(lo_i32, hi_i32);
+  const int s0 = wasm_i32x4_extract_lane(pair, 0);
+  const int s1 = wasm_i32x4_extract_lane(pair, 1);
+  const int s2 = wasm_i32x4_extract_lane(pair, 2);
+  const int s3 = wasm_i32x4_extract_lane(pair, 3);
+  return s0 + s1 + s2 + s3;
 }
 #endif
 
