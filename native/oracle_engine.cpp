@@ -9,6 +9,9 @@
 #include <vector>
 
 #include <emscripten/emscripten.h>
+#if defined(__wasm_simd128__)
+#include <wasm_simd128.h>
+#endif
 
 namespace {
 
@@ -268,6 +271,16 @@ constexpr std::array<std::array<int8_t, kOracleNnueInputs>, kOracleNnueHidden> k
 constexpr std::array<int16_t, kOracleNnueHidden> kOracleNnueB1{{ 24, 22, 18, 16, 10, 8, 14, 6 }};
 constexpr std::array<int8_t, kOracleNnueHidden> kOracleNnueW2{{ 7, 7, 6, 6, 5, 5, 4, 4 }};
 constexpr int kOracleNnueOutBias = -128;
+
+#if defined(__wasm_simd128__)
+inline int horizontal_sum_i16x8(v128_t lanes) {
+  alignas(16) std::array<int16_t, 8> values{};
+  wasm_v128_store(values.data(), lanes);
+  int sum = 0;
+  for (int lane = 0; lane < 8; ++lane) sum += values[lane];
+  return sum;
+}
+#endif
 
 struct TranspositionEntry {
   int depth = 0;
@@ -847,7 +860,7 @@ OracleTuning get_oracle_tuning(int style) {
 }
 
 int evaluate_oracle_nnue(const OracleSignals& signals, int style) {
-  std::array<int, kOracleNnueInputs> input{};
+  std::array<int16_t, kOracleNnueInputs> input{};
   input[0] = 64;  // bias
   input[1] = style == kStyleAggressive ? 64 : 0;
   input[2] = style == kStyleDefensive ? 64 : 0;
@@ -866,14 +879,36 @@ int evaluate_oracle_nnue(const OracleSignals& signals, int style) {
   input[15] = std::clamp((signals.own_projection_steps - signals.opp_projection_steps) * 10, -100, 100);
 
   int output = kOracleNnueOutBias;
+#if defined(__wasm_simd128__)
+  const v128_t input_lo = wasm_v128_load(input.data());
+  const v128_t input_hi = wasm_v128_load(input.data() + 8);
+  std::array<int16_t, kOracleNnueHidden> activated_hidden{};
+  for (int h = 0; h < kOracleNnueHidden; ++h) {
+    const v128_t weights_i8 = wasm_v128_load(kOracleNnueW1[h].data());
+    const v128_t weights_lo = wasm_i16x8_extend_low_i8x16(weights_i8);
+    const v128_t weights_hi = wasm_i16x8_extend_high_i8x16(weights_i8);
+    const v128_t prod_lo = wasm_i16x8_mul(weights_lo, input_lo);
+    const v128_t prod_hi = wasm_i16x8_mul(weights_hi, input_hi);
+    int acc = kOracleNnueB1[h]
+      + horizontal_sum_i16x8(prod_lo)
+      + horizontal_sum_i16x8(prod_hi);
+    const int activated = std::clamp(acc, 0, 255);
+    activated_hidden[h] = static_cast<int16_t>(activated);
+  }
+  const v128_t hidden_i16 = wasm_v128_load(activated_hidden.data());
+  const v128_t out_weights_i16 = wasm_i16x8_load8x8(kOracleNnueW2.data());
+  const v128_t out_prod = wasm_i16x8_mul(hidden_i16, out_weights_i16);
+  output += horizontal_sum_i16x8(out_prod);
+#else
   for (int h = 0; h < kOracleNnueHidden; ++h) {
     int acc = kOracleNnueB1[h];
     for (int i = 0; i < kOracleNnueInputs; ++i) {
-      acc += static_cast<int>(kOracleNnueW1[h][i]) * input[i];
+      acc += static_cast<int>(kOracleNnueW1[h][i]) * static_cast<int>(input[i]);
     }
     const int activated = std::clamp(acc, 0, 255);
     output += activated * static_cast<int>(kOracleNnueW2[h]);
   }
+#endif
   return std::clamp(output / 48, -420, 420);
 }
 

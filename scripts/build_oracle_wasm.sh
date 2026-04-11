@@ -9,6 +9,7 @@ source "$ROOT_DIR/.emsdk/emsdk_env.sh" >/dev/null
 em++ native/oracle_engine.cpp \
   -O3 \
   -std=c++20 \
+  -msimd128 \
   -sWASM=1 \
   -sMODULARIZE=1 \
   -sEXPORT_NAME=createOracleWasmModule \
